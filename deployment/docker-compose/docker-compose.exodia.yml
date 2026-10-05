@@ -203,7 +203,7 @@ services:
         condition: service_healthy
       neo4j:
         condition: service_healthy
-        required: false
+        required: true
     security_opt:
     - no-new-privileges:true
     volumes:
@@ -355,6 +355,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    entrypoint:
+    - /bin/bash
+    - -c
+    - unset NEO4J_URI NEO4J_USERNAME NEO4J_PASSWORD NEO4J_DATABASE; exec /startup/docker-entrypoint.sh neo4j
 volumes:
   mongodb_data:
     driver: local
