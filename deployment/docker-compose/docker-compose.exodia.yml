@@ -3,7 +3,7 @@ services:
     image: exodia-pipeshub:50be81e21a0b6646c1e6d7cca1a161e27e9aa8a4
     restart: always
     build:
-      context: ../../
+      context: .
       dockerfile: Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: '1'
@@ -192,8 +192,8 @@ services:
     - USE_PARSING_SERVICE=${USE_PARSING_SERVICE:-false}
     - DEFER_EXTRACTION=${DEFER_EXTRACTION:-false}
     - VECTOR_COLLECTION_STRATEGY=${VECTOR_COLLECTION_STRATEGY:-single}
-    - EXODIA_ADMIN_EMAIL=${EXODIA_ADMIN_EMAIL:?}
-    - EXODIA_ADMIN_PASSWORD=${EXODIA_ADMIN_PASSWORD:?}
+    - EXODIA_ADMIN_EMAIL=${EXODIA_ADMIN_EMAIL:-}
+    - EXODIA_ADMIN_PASSWORD=${EXODIA_ADMIN_PASSWORD:-}
     depends_on:
       qdrant:
         condition: service_healthy
