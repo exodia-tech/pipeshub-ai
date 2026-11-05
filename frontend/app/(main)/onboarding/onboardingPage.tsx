@@ -427,29 +427,12 @@ function OnboardingPageInner() {
           style={{ padding: '8px 0 24px', flexShrink: 0 }}
         >
           <Text size="1" style={{ color: 'var(--gray-9)', textAlign: 'center' }}>
-            {t('onboarding.footer.copyright')} &nbsp;·&nbsp;{' '}
-            <a href="/privacy" style={{ color: 'var(--gray-9)', textDecoration: 'none' }}>
+            <a href="https://exodiatech.com" target="_blank" rel="noreferrer" style={{ color: 'var(--gray-9)', textDecoration: 'none' }}>
+              EXODIA Brain
+            </a> &nbsp;·&nbsp;{' '}
+            <a href="https://exodiatech.com/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--gray-9)', textDecoration: 'none' }}>
               {t('onboarding.footer.privacyPolicy')}
-            </a>{' '}
-            &nbsp;·&nbsp;{' '}
-            <a
-              href="https://pipeshub.com"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: 'var(--gray-9)', textDecoration: 'none' }}
-            >
-              {t('onboarding.footer.website')}
-            </a>{' '}
-            &nbsp;·&nbsp; {t('onboarding.footer.visitDocs')}{' '}
-            <a
-              href="https://docs.pipeshub.com"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: 'var(--accent-11)', textDecoration: 'none' }}
-            >
-              {t('onboarding.footer.docsLabel')}
-            </a>{' '}
-            {t('onboarding.footer.toLearnMore')}
+            </a>
           </Text>
         </Flex>
       )}

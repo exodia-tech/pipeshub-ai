@@ -115,7 +115,7 @@ export default function MailPage() {
             variant="outline"
             color="gray"
             size="2"
-            onClick={() => window.open('https://docs.pipeshub.com/smtp', '_blank')}
+            onClick={() => window.open('https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md', '_blank')}
             style={{ cursor: 'pointer', flexShrink: 0, gap: 6 }}
           >
             <span className="material-icons-outlined" style={{ fontSize: 15 }}>

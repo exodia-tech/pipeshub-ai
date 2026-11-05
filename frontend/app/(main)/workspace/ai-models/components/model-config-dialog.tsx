@@ -525,7 +525,7 @@ export function ModelConfigDialog({
         aria-label={t('workspace.aiModels.configDocsOpenLabel')}
         style={{ cursor: 'pointer', gap: 6 }}
         onClick={() =>
-          window.open(`${EXTERNAL_LINKS.documentation}ai-models/overview`, '_blank', 'noopener,noreferrer')
+          window.open(EXTERNAL_LINKS.documentation, '_blank', 'noopener,noreferrer')
         }
       >
         <MaterialIcon name="open_in_new" size={16} color="var(--gray-11)" />

@@ -73,7 +73,7 @@ export function Oauth2PageHeader({
         color="gray"
         size="2"
         aria-label={docsOpenLabel}
-        onClick={() => window.open('https://docs.pipeshub.com/developer/oauth2', '_blank')}
+        onClick={() => window.open('https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md', '_blank')}
       >
         <MaterialIcon name="open_in_new" size={16} color="var(--gray-11)" />
       </IconButton>

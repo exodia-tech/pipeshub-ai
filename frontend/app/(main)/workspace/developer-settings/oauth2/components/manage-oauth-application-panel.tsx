@@ -805,7 +805,7 @@ export function ManageOAuthApplicationPanel({
       size="1"
       style={{ cursor: 'pointer', gap: 4 }}
       onClick={() =>
-        window.open('https://docs.pipeshub.com/developer/oauth2', '_blank')
+        window.open('https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md', '_blank')
       }
     >
       <MaterialIcon name="open_in_new" size={14} color="var(--slate-11)" />

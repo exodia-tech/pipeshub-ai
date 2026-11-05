@@ -281,7 +281,7 @@ export default function AuthenticationPage() {
             size="2"
             onClick={() =>
               window.open(
-                'https://docs.pipeshub.com/auth',
+                'https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md',
                 '_blank',
               )
             }

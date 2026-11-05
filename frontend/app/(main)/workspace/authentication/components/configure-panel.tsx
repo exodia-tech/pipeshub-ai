@@ -22,10 +22,10 @@ interface ConfigurePanelProps {
 // ── Per-method display info ────────────────────────────────
 
 const METHOD_DOC_URLS: Record<ConfigurableMethod, string> = {
-  google: 'https://docs.pipeshub.com/auth/google',
-  microsoft: 'https://docs.pipeshub.com/auth/microsoft-azureAd',
-  samlSso: 'https://docs.pipeshub.com/auth/saml',
-  oauth: 'https://docs.pipeshub.com/auth',
+  google: 'https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md',
+  microsoft: 'https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md',
+  samlSso: 'https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md',
+  oauth: 'https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md',
 };
 
 const METHOD_ICONS: Record<ConfigurableMethod, string> = {

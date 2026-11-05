@@ -17,7 +17,7 @@ export default function PasswordResetSuccess() {
     <Box style={{ width: '100%', maxWidth: '440px' }}>
       <Box style={{ marginBottom: '24px' }}>
         <Image
-          src="/login-page-assets/pipeshub/white-square.svg"
+          src="/login-page-assets/exodia-brain/white-square.svg"
           alt="EXODIA Brain"
           width={48}
           height={48}

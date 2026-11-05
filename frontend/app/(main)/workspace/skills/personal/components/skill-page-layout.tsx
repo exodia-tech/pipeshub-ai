@@ -91,7 +91,7 @@ export function SkillPageLayout({
           <WorkspaceHeaderIconButton icon="refresh" onClick={onRefresh} />
           <WorkspaceHeaderIconButton
             icon="open_in_new"
-            onClick={() => window.open('https://docs.pipeshub.com/agents/skills', '_blank')}
+            onClick={() => window.open('https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md', '_blank')}
           />
         </Flex>
       </Flex>

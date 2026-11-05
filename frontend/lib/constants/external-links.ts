@@ -5,7 +5,7 @@
 
 export const EXTERNAL_LINKS = {
   /** Project documentation site */
-  documentation: 'https://docs.pipeshub.com/',
+  documentation: 'https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md',
   /** GitHub repository */
-  github: 'https://github.com/pipeshub-ai/pipeshub-ai',
+  github: 'https://github.com/exodia-tech/pipeshub-ai',
 } as const;

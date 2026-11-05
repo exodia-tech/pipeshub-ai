@@ -79,7 +79,7 @@ export function BotConfigPanel() {
       color="gray"
       size="1"
       style={{ cursor: 'pointer', gap: 4 }}
-      onClick={() => window.open('https://docs.pipeshub.com/integrations', '_blank')}
+      onClick={() => window.open('https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md', '_blank')}
     >
       <MaterialIcon name="open_in_new" size={14} color="var(--slate-11)" />
       {t('workspace.bots.documentation')}

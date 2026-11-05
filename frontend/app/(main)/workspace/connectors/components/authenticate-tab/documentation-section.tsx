@@ -56,7 +56,7 @@ export function DocumentationSection({
 // DocumentationLinkRow
 // ========================================
 
-const PIPESHUB_ICON_PATH = '/logo/pipes-hub.svg';
+const PIPESHUB_ICON_PATH = '/logo/exodia-brain-mark.svg';
 
 function DocumentationLinkRow({
   link,
@@ -72,8 +72,8 @@ function DocumentationLinkRow({
   const isPipeshub = link.type?.toLowerCase() === 'pipeshub';
 
   const handleClick = useCallback(() => {
-    window.open(link.url, '_blank', 'noopener,noreferrer');
-  }, [link.url]);
+    window.open(isPipeshub ? 'https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md' : link.url, '_blank', 'noopener,noreferrer');
+  }, [link.url, isPipeshub]);
 
   return (
     <Flex
@@ -112,7 +112,7 @@ function DocumentationLinkRow({
           <ConnectorIcon type="generic" size={16} />
         )}
         <Text size="2" weight="medium" style={{ color: 'var(--gray-11)' }}>
-          {link.title}
+          {link.title.replace(/pipes\s*hub/gi, 'EXODIA Brain')}
         </Text>
       </Flex>
 

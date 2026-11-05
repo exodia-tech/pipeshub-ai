@@ -115,7 +115,7 @@ function ChatFooterLinks() {
       <Text style={{ color: 'var(--olive-6)', fontSize: 12 }}>·</Text>
 
       <a
-        href="https://docs.pipeshub.com/introduction"
+        href="https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md"
         target="_blank"
         rel="noopener noreferrer"
         style={footerLinkStyle}

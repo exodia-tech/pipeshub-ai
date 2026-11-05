@@ -10,7 +10,7 @@ describe('EXODIA Brain loading states', () => {
     const { container } = render(<LottieLoader size={48} showLabel label="Loading EXODIA Brain" />);
     expect(screen.getByText('Loading EXODIA Brain')).toBeTruthy();
     expect(container.querySelector('svg')?.getAttribute('width')).toBe('48');
-    expect(container.querySelector('image')?.getAttribute('href')).toBe('/logo/exodia-official.jpeg');
+    expect(container.querySelector('image')?.getAttribute('href')).toBe('/logo/exodia-brain-mark.png');
     expect(container.querySelector('svg')?.classList.contains('exodia-brain-active')).toBe(true);
     expect(container.querySelector('canvas')).toBeNull();
   });

@@ -4,7 +4,6 @@
 import React from 'react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
-import { PipesHubIcon } from '@/app/components/ui';
 import { LottieLoader } from '@/app/components/ui/lottie-loader';
 
 // ─── Props ────────────────────────────────────────────────────────────────────

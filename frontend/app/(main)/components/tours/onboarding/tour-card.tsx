@@ -200,7 +200,7 @@ export function OnboardingTour() {
               i18nKey="onboarding.tour.completedDescription"
               components={{
                 docs: <a
-                  href="https://docs.pipeshub.com/"
+                  href="https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--accent-9)', textDecoration: 'none' }}

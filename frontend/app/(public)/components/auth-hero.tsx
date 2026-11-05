@@ -131,7 +131,7 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
         >
           {/* EXODIA Brain logo mark */}
           <Image
-            src="/login-page-assets/pipeshub/white-square.svg"
+            src="/login-page-assets/exodia-brain/white-square.svg"
             alt=""
             width={33}
             height={33}
@@ -219,11 +219,11 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
         }}
       >
         <Image
-          src="/login-page-assets/pipeshub/white-horizontal.svg"
+          src="/login-page-assets/exodia-brain/white-horizontal.svg"
           alt="EXODIA Brain"
           width={240}
-          height={34}
-          style={{ opacity: 0.95 }}
+          height={80}
+          style={{ opacity: 0.95, filter: 'brightness(0) invert(1)' }}
         />
       </Box>
     </Box>

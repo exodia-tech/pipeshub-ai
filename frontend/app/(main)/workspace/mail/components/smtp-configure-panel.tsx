@@ -174,7 +174,7 @@ export function SmtpConfigurePanel({
       variant="outline"
       color="gray"
       size="1"
-      onClick={() => window.open('https://docs.pipeshub.com/smtp', '_blank')}
+      onClick={() => window.open('https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md', '_blank')}
       style={{ cursor: 'pointer', gap: 'var(--space-1)' }}
     >
       <span className="material-icons-outlined" style={{ fontSize: 14 }}>open_in_new</span>

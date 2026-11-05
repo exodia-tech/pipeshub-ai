@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-const GITHUB_API_URL = 'https://api.github.com/repos/pipeshub-ai/pipeshub-ai';
-const CACHE_KEY = 'pipeshub:github-stars:v1';
+const GITHUB_API_URL = 'https://api.github.com/repos/exodia-tech/pipeshub-ai';
+const CACHE_KEY = 'exodia-brain:github-stars:v1';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — star count changes slowly
 const STALE_RETRY_MS = 5 * 60 * 1000; // back off 5min after a failed fetch
 

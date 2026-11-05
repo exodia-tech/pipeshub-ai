@@ -34,6 +34,7 @@ export default function PublicLayout({
   return (
     <html lang={currentLang} suppressHydrationWarning>
       <head>
+        <title>EXODIA Brain</title>
         <ThemeScript />
         <link
           href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined|Material+Icons"

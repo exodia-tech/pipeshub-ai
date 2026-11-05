@@ -220,7 +220,7 @@
     "save": "저장",
     "saving": "저장 중…",
     "footer": {
-      "copyright": "© 2026 Pipeshub LLC",
+      "copyright": "EXODIA Brain",
       "privacyPolicy": "개인정보 처리방침",
       "website": "웹사이트",
       "visitDocs": "자세한 내용은",
@@ -728,7 +728,7 @@
     "deleteAgent": "에이전트 삭제",
     "deleteAgentConfirm": "이 에이전트를 삭제하시겠습니까?",
     "deleteAgentDescription": "다음 이름의 에이전트",
-    "deleteAgentWarning": "가 Pipeshub에서 영구적으로 제거됩니다. 이 에이전트를 사용하는 채팅이 정상적으로 작동하지 않을 수 있습니다.",
+    "deleteAgentWarning": "가 EXODIA Brain에서 영구적으로 제거됩니다. 이 에이전트를 사용하는 채팅이 정상적으로 작동하지 않을 수 있습니다.",
     "agentListRowMenuAria": "에이전트 옵션",
     "failedToDeleteAgent": "에이전트를 삭제할 수 없습니다",
     "rename": "이름 변경",
@@ -744,7 +744,7 @@
     "failedToDelete": "채팅을 삭제하지 못했습니다",
     "deleteChatConfirm": "정말 삭제하시겠습니까?",
     "deleteChatDescription": "다음 제목의 채팅",
-    "deleteChatWarning": "이 Pipeshub에서 영구적으로 제거됩니다. 공유 액세스 권한이 있는 모든 사용자의 액세스가 해제됩니다.",
+    "deleteChatWarning": "이 EXODIA Brain에서 영구적으로 제거됩니다. 공유 액세스 권한이 있는 모든 사용자의 액세스가 해제됩니다.",
     "archiveChatConfirm": "정말 보관하시겠습니까?",
     "archiveChatDescription": "다음 제목의 채팅",
     "archiveChatWarning": "이 보관됩니다.",
@@ -1468,7 +1468,7 @@
       "searchPlaceholder": "검색...",
       "newApplication": "새 OAuth 애플리케이션",
       "emptyTitle": "OAuth 2.0 애플리케이션 없음",
-      "emptyDescription": "OAuth 2.0 앱을 생성하여 서드파티 통합이 Pipeshub를 통해 조직에 접근할 수 있도록 합니다.",
+      "emptyDescription": "OAuth 2.0 앱을 생성하여 서드파티 통합이 EXODIA Brain를 통해 조직에 접근할 수 있도록 합니다.",
       "loading": "애플리케이션을 불러오는 중...",
       "errorGeneric": "OAuth 애플리케이션을 불러오지 못했습니다",
       "retry": "다시 시도",
@@ -1604,7 +1604,7 @@
         "errorOptionalUrlInvalid": "선택 URL을 입력하는 경우 유효한 http(s) 주소여야 합니다.",
         "grantRequiredTitle": "권한 부여 유형 필요",
         "grantRequiredDescription": "하나 이상의 권한 부여 유형이 선택된 상태여야 합니다.",
-        "clientCredentialsWarning": "클라이언트 자격 증명 토큰은 토큰 엔드포인트를 호출하는 사람이 아니라 항상 이 애플리케이션을 생성한 사용자로서 Pipeshub에 접근합니다. 부여한 스코프 범위 안에서 토큰은 그 사용자가 접근할 수 있는 모든 것에 접근할 수 있고 그 사용자의 역할까지 물려받으므로, 관리자가 생성한 애플리케이션은 관리자 권한을 갖게 됩니다. 또한 해당 계정이 삭제되면 토큰은 작동을 멈춥니다. 이 애플리케이션이 Authorization Code 플로우도 지원하는 경우, 사용자는 그 방식으로 직접 인증할 수 있습니다."
+        "clientCredentialsWarning": "클라이언트 자격 증명 토큰은 토큰 엔드포인트를 호출하는 사람이 아니라 항상 이 애플리케이션을 생성한 사용자로서 EXODIA Brain에 접근합니다. 부여한 스코프 범위 안에서 토큰은 그 사용자가 접근할 수 있는 모든 것에 접근할 수 있고 그 사용자의 역할까지 물려받으므로, 관리자가 생성한 애플리케이션은 관리자 권한을 갖게 됩니다. 또한 해당 계정이 삭제되면 토큰은 작동을 멈춥니다. 이 애플리케이션이 Authorization Code 플로우도 지원하는 경우, 사용자는 그 방식으로 직접 인증할 수 있습니다."
       }
     },
     "personalAccessTokens": {
@@ -1698,7 +1698,7 @@
       "configUpdateModel": "모델 업데이트",
       "configFillRequiredTooltip": "모든 필수 필드를 입력하세요",
       "configSaveErrorFallback": "모델 구성을 저장하지 못했습니다",
-      "configSaveOutboundError": "PipesHub가 컨테이너 내부에서 이 모델 제공자에 연결할 수 없습니다. 클라우드 제공자에는 아웃바운드 인터넷이 필요합니다 — deployment/docker-compose/ADVANCED_DEPLOYMENT.md#container-outbound-connectivity를 참조하세요.",
+      "configSaveOutboundError": "EXODIA Brain가 컨테이너 내부에서 이 모델 제공자에 연결할 수 없습니다. 클라우드 제공자에는 아웃바운드 인터넷이 필요합니다 — deployment/docker-compose/ADVANCED_DEPLOYMENT.md#container-outbound-connectivity를 참조하세요.",
       "configSaveTimeoutError": "모델을 검증하는 동안 요청 시간이 초과되었습니다. 클라우드 제공자에는 EXODIA Brain 컨테이너에서 나가는 아웃바운드 인터넷이 필요합니다 — deployment/docker-compose/ADVANCED_DEPLOYMENT.md#container-outbound-connectivity를 참조하세요.",
       "configNoConfigRequired": "이 제공업체에는 구성이 필요하지 않습니다.",
       "configDefaultModelNotice": "시스템에서 기본적으로 \"{{modelName}}\"을(를) 사용합니다.",
@@ -2011,7 +2011,7 @@
       "selectPrompt": "미리 보려면 보관된 채팅을 선택하세요",
       "restore": "복원",
       "permanentlyDelete": "영구 삭제",
-      "deleteConfirmMessage": "이 채팅은 Pipeshub에서 영구적으로 삭제됩니다. 공유된 액세스 권한도 모두 사라집니다.",
+      "deleteConfirmMessage": "이 채팅은 EXODIA Brain에서 영구적으로 삭제됩니다. 공유된 액세스 권한도 모두 사라집니다.",
       "restoreSuccess": "채팅이 복원되었습니다",
       "restoreError": "채팅 복원에 실패했습니다",
       "deleteSuccess": "삭제되었습니다",
@@ -2054,7 +2054,7 @@
       "postalCodePlaceholder": "예: 94107",
       "dataCollection": "데이터 수집 설정",
       "enableDataCollection": "사용",
-      "dataCollectionDescription": "PipesHub는 다양한 비즈니스 목적으로 개인 정보를 수집하고 처리합니다.",
+      "dataCollectionDescription": "EXODIA Brain는 다양한 비즈니스 목적으로 개인 정보를 수집하고 처리합니다.",
       "dataCollectionReason1": "제품에 대한 고객 서비스 및 지원 제공",
       "dataCollectionReason2": "마케팅 커뮤니케이션 발송",
       "dataCollectionReason3": "뉴스레터 또는 기타 업데이트 구독 관리",
@@ -2234,7 +2234,7 @@
       },
       "successDialog": {
         "title": "인스턴스 구성이 완료되어 동기화할 준비가 되었습니다!",
-        "description": "지금 바로 {{name}} 데이터를 Pipeshub와 동기화하거나,",
+        "description": "지금 바로 {{name}} 데이터를 EXODIA Brain와 동기화하거나,",
         "descriptionSuffix": "나중에 설정에서 진행할 수 있습니다.",
         "later": "나중에 하기",
         "startSync": "지금 동기화 시작"
@@ -2677,7 +2677,7 @@
         "authMode": "인증 모드",
         "headerName": "헤더 이름",
         "authorizationUrl": "인증 URL",
-        "dcrHint": "비워 두세요 — 서버가 지원하는 경우 PipesHub가 동적 클라이언트 등록을 자동으로 감지하여 사용합니다",
+        "dcrHint": "비워 두세요 — 서버가 지원하는 경우 EXODIA Brain가 동적 클라이언트 등록을 자동으로 감지하여 사용합니다",
         "tokenUrl": "토큰 URL",
         "scopes": "스코프",
         "scopesPlaceholder": "스코프 추가",
@@ -2702,14 +2702,14 @@
         "saved": "OAuth 앱이 저장되었습니다",
         "saveError": "OAuth 앱을 저장하지 못했습니다",
         "title": "OAuth 앱 구성",
-        "description": "PipesHub가 이 서버의 동적 클라이언트 등록 지원 여부를 자동으로 감지합니다. 지원하지 않는 경우에만 클라이언트 자격 증명이 필요합니다.",
+        "description": "EXODIA Brain가 이 서버의 동적 클라이언트 등록 지원 여부를 자동으로 감지합니다. 지원하지 않는 경우에만 클라이언트 자격 증명이 필요합니다.",
         "alreadyConfigured": "이 서버에는 이미 OAuth 앱이 구성되어 있습니다.",
         "clientId": "클라이언트 ID",
         "clientIdPlaceholder": "클라이언트 ID 입력",
         "clientSecret": "클라이언트 시크릿",
         "clientSecretPlaceholder": "클라이언트 시크릿 입력",
         "dcrProbing": "이 서버가 자동 등록을 지원하는지 확인하는 중…",
-        "dcrSupportedHint": "이 서버는 자동 등록을 지원합니다. PipesHub가 자동으로 등록하므로 클라이언트 자격 증명이 필요하지 않습니다.",
+        "dcrSupportedHint": "이 서버는 자동 등록을 지원합니다. EXODIA Brain가 자동으로 등록하므로 클라이언트 자격 증명이 필요하지 않습니다.",
         "dcrUnsupportedHint": "이 서버는 수동으로 등록된 OAuth 앱이 필요합니다. 아래 콜백 URL로 OAuth 앱을 만든 후 클라이언트 ID와 시크릿을 입력하세요.",
         "dcrUnknownHint": "자동 등록 지원 여부를 확인할 수 없습니다. 지원하지 않는 경우 아래 콜백 URL로 OAuth 앱을 등록하고 클라이언트 ID와 시크릿을 입력하세요.",
         "callbackUrlLabel": "콜백 URL",
@@ -2721,7 +2721,7 @@
         "completingTitle": "로그인을 완료하는 중…",
         "processingHint": "계정 연결이 완료될 때까지 잠시 기다려 주세요.",
         "successTitle": "연결되었습니다",
-        "successBody": "이 창을 닫고 PipesHub로 돌아가셔도 됩니다.",
+        "successBody": "이 창을 닫고 EXODIA Brain로 돌아가셔도 됩니다.",
         "failedTitle": "연결 실패",
         "retryHint": "문제가 발생했습니다. 이 창을 닫고 다시 시도해 주세요.",
         "providerError": "공급자에서 오류를 반환했습니다: {{error}}",
@@ -3218,7 +3218,7 @@
       },
       "demoData": {
         "title": "데모 데이터",
-        "description": "Acme Corp는 PipesHub를 체험해 볼 수 있도록 불러온 가상의 회사입니다. 보이는 내용만 바뀌며 삭제되는 것은 없습니다.",
+        "description": "Acme Corp는 EXODIA Brain를 체험해 볼 수 있도록 불러온 가상의 회사입니다. 보이는 내용만 바뀌며 삭제되는 것은 없습니다.",
         "label": "내 답변, 검색, 레코드에 Acme Corp 데모 데이터 표시",
         "followingDefault": "기본값을 따릅니다. 조직에 자체 데이터가 생길 때까지 표시되고 이후에는 숨겨집니다.",
         "yourChoice": "직접 선택한 설정입니다.",
@@ -3489,7 +3489,7 @@
       "errorGeneric": "서비스 계정을 불러오지 못했습니다.",
       "retry": "다시 시도",
       "emptyTitle": "아직 서비스 계정이 없습니다",
-      "emptyDescription": "서비스 계정은 스크립트가 동료 계정으로 로그인하지 않고 PipesHub에서 읽는 방법입니다. 부여한 범위만 볼 수 있고, 담당자가 퇴사해도 계속 작동합니다.",
+      "emptyDescription": "서비스 계정은 스크립트가 동료 계정으로 로그인하지 않고 EXODIA Brain에서 읽는 방법입니다. 부여한 범위만 볼 수 있고, 담당자가 퇴사해도 계속 작동합니다.",
       "columnName": "이름",
       "columnDescription": "용도",
       "columnStatus": "상태",
@@ -4058,12 +4058,12 @@
   },
   "auth": {
     "titleSection": {
-      "defaultTitle": "Pipeshub에 오신 것을 환영합니다",
+      "defaultTitle": "EXODIA Brain에 오신 것을 환영합니다",
       "defaultSubtitle": "조직의 지식을 이제 검색하고 연결할 수 있습니다."
     },
     "signUp": {
       "title": "시작하기",
-      "subtitle": "Pipeshub에 오신 것을 환영합니다 -- 시작해 볼까요!",
+      "subtitle": "EXODIA Brain에 오신 것을 환영합니다 -- 시작해 볼까요!",
       "firstNameLabel": "이름*",
       "lastNameLabel": "성*",
       "orgNameLabel": "조직 이름*",
@@ -4106,8 +4106,8 @@
         "fullNameRequired": "전체 이름은 필수입니다."
       },
       "confirmDialog": {
-        "title": "PipesHub의 권한 할당 방식",
-        "description": "PipesHub는 플랫폼과 연결된 모든 앱에서 이메일로 사용자를 식별합니다.",
+        "title": "EXODIA Brain의 권한 할당 방식",
+        "description": "EXODIA Brain는 플랫폼과 연결된 모든 앱에서 이메일로 사용자를 식별합니다.",
         "permissionsTitle": "권한은 기존 앱과 동일하게 적용됩니다",
         "permissionsBody": "EXODIA Brain 내에서의 접근 권한은 각 연결된 앱에서와 동일합니다 — 더도 덜도 아닙니다. Google Drive에서 제한된 문서는 여기서도 제한됩니다.",
         "emailNotePre": "가입에 사용한 이메일 —",
@@ -4129,7 +4129,7 @@
       "orgEmailVerifyFailedTitle": "인증 실패",
       "orgEmailVerifyFailedDescription": "링크가 유효하지 않거나 만료되었을 수 있습니다. 다시 가입해 주세요.",
       "loadFailedTitle": "로그인을 불러올 수 없습니다",
-      "loadFailedDescription": "PipesHub가 로그인 옵션을 불러오기 위해 서버에 연결하지 못했습니다. 연결 또는 서버 주소를 확인한 후 다시 시도하세요.",
+      "loadFailedDescription": "EXODIA Brain가 로그인 옵션을 불러오기 위해 서버에 연결하지 못했습니다. 연결 또는 서버 주소를 확인한 후 다시 시도하세요.",
       "retry": "다시 시도"
     },
     "common": {
@@ -4166,7 +4166,7 @@
       "tooManyIncorrectCredentials": "잘못된 자격 증명을 너무 여러 번 입력했습니다"
     },
     "desktopHandoff": {
-      "title": "로그인이 PipesHub로 전송되었습니다",
+      "title": "로그인이 EXODIA Brain로 전송되었습니다",
       "description": "이 탭을 닫고 EXODIA Brain 앱으로 돌아가세요.",
       "openApp": "EXODIA Brain 열기"
     }
@@ -4269,7 +4269,7 @@
     },
     "team": "팀",
     "teamsNoRoles": "팀에는 역할이 없습니다",
-    "invite": "Pipeshub에 초대"
+    "invite": "EXODIA Brain에 초대"
   },
   "demoData": {
     "badge": {
@@ -4278,7 +4278,7 @@
     },
     "removalNotice": {
       "title": "Acme Corp 데모 데이터가 아직 워크스페이스에 있습니다",
-      "description": "이제 회사의 실제 데이터가 PipesHub에 있습니다. 데모는 기본적으로 답변에서 숨겨지지만 누구나 다시 켤 수 있고 샘플 계정도 계속 로그인할 수 있습니다. 모두에 대해 끄거나 영구적으로 제거하세요.",
+      "description": "이제 회사의 실제 데이터가 EXODIA Brain에 있습니다. 데모는 기본적으로 답변에서 숨겨지지만 누구나 다시 켤 수 있고 샘플 계정도 계속 로그인할 수 있습니다. 모두에 대해 끄거나 영구적으로 제거하세요.",
       "remove": "영구 제거",
       "keep": "일단 유지",
       "turnOff": "모두에 대해 끄기"
