@@ -300,7 +300,7 @@ export function ProjectList() {
             {t('projects.pageTitle')}
           </Text>
         </Flex>
-        <LoadingButton color="jade" onClick={() => setCreateOpen(true)}>
+        <LoadingButton color="blue" onClick={() => setCreateOpen(true)}>
           <Flex align="center" gap="2">
             <MaterialIcon name="add" size={16} />
             {t('chat.projects.newProject')}

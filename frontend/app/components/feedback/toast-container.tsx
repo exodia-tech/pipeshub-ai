@@ -132,7 +132,7 @@ export function ToastContainer() {
   const bottomToasts = toasts.filter((t) => t.placement !== 'top');
 
   return ReactDOM.createPortal(
-    <Theme accentColor="jade" grayColor="olive" appearance={appearance} radius="medium" data-accent-color="emerald">
+    <Theme accentColor="blue" grayColor="olive" appearance={appearance} radius="medium">
       <style jsx global>{`
         @keyframes toastSlideIn {
           from {

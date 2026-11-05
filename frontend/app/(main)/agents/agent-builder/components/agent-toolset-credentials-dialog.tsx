@@ -352,7 +352,7 @@ export function AgentToolsetCredentialsDialog({
             {t('agentBuilder.toolsetCredentialsDesc')}
           </Dialog.Description>
 
-          <Callout.Root color="jade" variant="surface" size="1" mb="3">
+          <Callout.Root color="blue" variant="surface" size="1" mb="3">
             <Callout.Icon>
               <MaterialIcon name="smart_toy" size={18} />
             </Callout.Icon>

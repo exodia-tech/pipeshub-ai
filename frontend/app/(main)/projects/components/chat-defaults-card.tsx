@@ -60,7 +60,7 @@ export function ChatDefaultsCard() {
           <PanelRow
             label={t('chat.reasoningEffort.label', { defaultValue: 'Reasoning effort' })}
             value={
-              <Badge color="jade" variant="soft">
+              <Badge color="blue" variant="soft">
                 {reasoningEffortLabel}
               </Badge>
             }

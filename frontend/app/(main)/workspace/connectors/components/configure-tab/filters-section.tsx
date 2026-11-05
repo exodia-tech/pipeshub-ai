@@ -1043,7 +1043,7 @@ function ManualIndexingSection({
           ) : null}
         </Flex>
         <Switch
-          color="jade"
+          color="blue"
           size="2"
           checked={checked}
           disabled={readOnly}

@@ -317,7 +317,7 @@ export function FilterDropdown({
                 </Text>
               </Box>
               {!summaryBelowTrigger && hasSelection ? (
-                <Badge color="jade" variant="soft" size="1" radius="full" style={{ flexShrink: 0 }}>
+                <Badge color="blue" variant="soft" size="1" radius="full" style={{ flexShrink: 0 }}>
                   {t('filterDropdown.selectedCount', { count: selectedValues.length })}
                 </Badge>
               ) : null}
@@ -326,7 +326,7 @@ export function FilterDropdown({
           {summaryBelowTrigger && hasSelection ? (
             <Flex direction="column" gap="2">
               <Flex align="center" gap="2" wrap="wrap" justify="between">
-                <Badge color="jade" variant="soft" size="1" radius="full">
+                <Badge color="blue" variant="soft" size="1" radius="full">
                   {t('filterDropdown.selectedCount', { count: selectedValues.length })}
                 </Badge>
                 {clearSelectionButton()}
@@ -337,7 +337,7 @@ export function FilterDropdown({
                   return (
                     <Badge
                       key={val}
-                      color="jade"
+                      color="blue"
                       variant="soft"
                       size="1"
                       title={text}
@@ -425,7 +425,7 @@ export function FilterDropdown({
                   return (
                     <Badge
                       key={val}
-                      color="jade"
+                      color="blue"
                       variant="soft"
                       size="1"
                       title={text}

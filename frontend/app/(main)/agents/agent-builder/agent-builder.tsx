@@ -1172,7 +1172,7 @@ export function AgentBuilder({ agentKey }: { agentKey: string | null }) {
               </Button>
               <Button
                 size="2"
-                color="jade"
+                color="blue"
                 onClick={() => {
                   setShowPostUpdateDialog(false);
                   if (loadedAgent) router.push(buildChatHref({ agentId: loadedAgent._key }));

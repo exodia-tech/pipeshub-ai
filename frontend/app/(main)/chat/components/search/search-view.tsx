@@ -226,7 +226,7 @@ export function ChatSearch({ open, onClose }: ChatSearchProps) {
 
   const overlay = (
     <Theme
-      accentColor="jade"
+      accentColor="blue"
       grayColor="olive"
       appearance={appearance}
       radius="medium"

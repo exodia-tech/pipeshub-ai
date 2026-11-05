@@ -519,7 +519,7 @@ export function RecordViewShell({ recordId }: RecordViewShellProps) {
                   </Text>
                 </Flex>
                 {hasDownloadableFile && (
-                  <Button variant="solid" color="jade" size="3" onClick={handleDownload}>
+                  <Button variant="solid" color="blue" size="3" onClick={handleDownload}>
                     <MaterialIcon name="download" size={18} />
                     {t('recordView.download')}
                   </Button>
@@ -592,7 +592,7 @@ export function RecordViewShell({ recordId }: RecordViewShellProps) {
                 </Flex>
 
                 {webUrl ? (
-                  <Button variant="solid" color="jade" size="3" onClick={handleOpenExternal}>
+                  <Button variant="solid" color="blue" size="3" onClick={handleOpenExternal}>
                     <MaterialIcon name="open_in_new" size={18} />
                     {t('recordView.openExternal')}
                   </Button>
@@ -774,7 +774,7 @@ export function RecordViewShell({ recordId }: RecordViewShellProps) {
             <AlertDialog.Action>
               <Button
                 variant="solid"
-                color="jade"
+                color="blue"
                 onClick={handleForceReindex}
                 disabled={isReindexing}
               >

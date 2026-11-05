@@ -172,7 +172,7 @@ export function ArchivedChatSearch({
 
   const overlay = (
     <Theme
-      accentColor="jade"
+      accentColor="blue"
       grayColor="olive"
       appearance={appearance}
       radius="medium"

@@ -205,7 +205,7 @@ export function AgentBuilderHeader(props: {
               <Tooltip content={t('agentBuilder.serviceAccountBadgeTooltip')}>
                 <Badge
                   size="2"
-                  color="jade"
+                  color="blue"
                   variant="soft"
                   style={{
                     flexShrink: 0,
@@ -231,7 +231,7 @@ export function AgentBuilderHeader(props: {
                 <Button
                   type="button"
                   variant="solid"
-                  color="jade"
+                  color="blue"
                   size="2"
                   disabled={saving || serviceAccountPermissionDenied}
                   onClick={() => {

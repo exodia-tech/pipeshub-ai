@@ -353,7 +353,7 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
               <LoadingButton
                 type="button"
                 size="2"
-                color="jade"
+                color="blue"
                 onClick={() => void handleCreate()}
                 loading={creating}
                 loadingLabel={t('action.creating')}

@@ -134,8 +134,8 @@ function SetupRow({
 function SetStatus({ done, text }: { done: boolean; text: string }) {
   return (
     <Flex align="center" gap="1">
-      {done && <MaterialIcon name="check" size={14} color="var(--jade-9)" />}
-      <Text size="1" style={{ color: done ? 'var(--jade-11)' : 'var(--slate-9)' }}>
+      {done && <MaterialIcon name="check" size={14} color="var(--blue-9)" />}
+      <Text size="1" style={{ color: done ? 'var(--blue-11)' : 'var(--slate-9)' }}>
         {text}
       </Text>
     </Flex>
@@ -291,7 +291,7 @@ export function ProjectSettingsPanel({
                 </LoadingButton>
                 <LoadingButton
                   size="1"
-                  color="jade"
+                  color="blue"
                   onClick={onSaveInstructions}
                   loading={isSavingInstructions}
                   loadingLabel={t('chat.projects.workspace.saving')}

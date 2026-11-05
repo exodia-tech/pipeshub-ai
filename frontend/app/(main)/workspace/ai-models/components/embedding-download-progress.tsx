@@ -147,7 +147,7 @@ export function EmbeddingDownloadProgress({
             <MaterialIcon
               name={isFailed ? 'error' : 'downloading'}
               size={24}
-              color={isFailed ? 'var(--red-10)' : 'var(--jade-10)'}
+              color={isFailed ? 'var(--red-10)' : 'var(--blue-10)'}
             />
             <Flex direction="column" gap="1" style={{ minWidth: 0 }}>
               <Text size="4" weight="bold">
@@ -161,7 +161,7 @@ export function EmbeddingDownloadProgress({
 
           {!isFailed && (
             <Box>
-              <Progress value={progress} max={100} size="2" color="jade" />
+              <Progress value={progress} max={100} size="2" color="blue" />
               <Flex justify="between" style={{ marginTop: 8 }}>
                 <Text size="1" style={{ color: 'var(--gray-11)' }}>
                   {t(statusLabelKey(status))}
@@ -195,7 +195,7 @@ export function EmbeddingDownloadProgress({
               {t('workspace.aiModels.downloadClose')}
             </Button>
             {isFailed && (
-              <Button color="jade" onClick={() => setRetryToken((n) => n + 1)}>
+              <Button color="blue" onClick={() => setRetryToken((n) => n + 1)}>
                 {t('workspace.aiModels.downloadRetry')}
               </Button>
             )}

@@ -102,7 +102,7 @@ export function SendImagesRow({
 
         <Flex align="center" style={{ flexShrink: 0 }}>
           <Switch
-            color="jade"
+            color="blue"
             size="2"
             checked={enabled}
             disabled={disabled}

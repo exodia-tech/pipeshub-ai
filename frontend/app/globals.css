@@ -49,128 +49,51 @@
   font-display: swap;
 }
 
-/* ========================
-   Custom Accent Color Scale
-   Base color: #047857 (Emerald)
-   ======================== */
-
-/* Light Mode */
+/* EXODIA Brain uses Radix blue throughout. Legacy emerald tokens remain
+   aliases so existing controls share the same complete palette. */
 :root, .light, .light-theme {
   --effects-translucent: rgba(255, 255, 255, 0.8);
   --tokens-colors-surface: rgba(139, 139, 139, 0.084);
-  --accent-surface: rgba(18, 249, 157, 0.04);
   --white-to-dark: rgba(0, 0, 0, 0.074);
-  --emerald-1: #f5fefb;
-  --emerald-2: #edfdf8;
-  --emerald-3: #d4f7eb;
-  --emerald-4: #bbf0dd;
-  --emerald-5: #9fe7cd;
-  --emerald-6: #7edabb;
-  --emerald-7: #53c9a4;
-  --emerald-8: #12b589;
-  --emerald-9: #047857;
-  --emerald-10: #10674C;
-  --emerald-11: #035e44;
-  --emerald-12: #0f3d2c;
-
-  /* Alpha variants  */
-  --emerald-a1: rgba(4, 120, 87, 0.024);
-  --emerald-a2: rgba(4, 120, 87, 0.06);
-  --emerald-a3: rgba(4, 120, 87, 0.13);
-  --emerald-a4: rgba(4, 120, 87, 0.22);
-  --emerald-a5: rgba(4, 120, 87, 0.32);
-  --emerald-a6: rgba(4, 120, 87, 0.44);
-  --emerald-a7: rgba(4, 120, 87, 0.58);
-  --emerald-a8: rgba(4, 120, 87, 0.76);
-  --emerald-a9: rgba(4, 120, 87, 1);
-  --emerald-a10: rgba(16, 103, 76, 1);
-  --emerald-a11: rgba(3, 94, 68, 1);
-  --emerald-a12: rgba(15, 61, 44, 1);
-  --emerald-contrast: #ffffff;
-  --emerald-surface: rgba(245, 254, 251, 0.8);
-  --emerald-indicator: #047857;
-  --emerald-track: #047857;
-
   --page-background: #dcdcdc;
   --file-icon-fill: #ffffff;
 }
-
-/* Dark Mode */
-.dark, .dark-theme,
-[data-is-root-theme="true"].dark,
-:root[class~="dark"] {
+.dark, .dark-theme, [data-is-root-theme="true"].dark, :root[class~="dark"] {
   --effects-translucent: rgba(29, 29, 33, 0.70);
   --tokens-colors-surface: rgba(0, 0, 0, 0.25);
-  --accent-surface: rgba(18, 249, 157, 0.04);
   --white-to-dark: rgba(0, 0, 0, 0.25);
-  --emerald-1: #0d1512;
-  --emerald-2: #0f1f1a;
-  --emerald-3: #0c3126;
-  --emerald-4: #063f31;
-  --emerald-5: #084A35;
-  --emerald-6: #145c49;
-  --emerald-7: #1e6d58;
-  --emerald-8: #268169;
-  --emerald-9: #047857;
-  --emerald-10: #17906c;
-  --emerald-11: #3dd9a0;
-  --emerald-12: #EEEEEE;
-
-  /* Alpha variants */
-  --emerald-a1: rgba(0, 222, 69, 0.02);
-  --emerald-a2: rgba(0, 255, 168, 0.06);
-  --emerald-a3: rgba(0, 255, 162, 0.07); /* Figma Accent Alpha/3 = #00ffa212 */
-  --emerald-a4: rgba(0, 255, 170, 0.21);
-  --emerald-a5: rgba(0, 255, 176, 0.27);
-  --emerald-a6: rgba(32, 255, 187, 0.33);
-  --emerald-a7: rgba(53, 255, 196, 0.41);
-  --emerald-a8: rgba(66, 255, 203, 0.49);
-  --emerald-a9: rgba(4, 120, 87, 1);
-  --emerald-a10: rgba(80, 255, 208, 0.56);
-  --emerald-a11: rgba(136, 254, 206, 0.79); /* Figma Accent Alpha/11 = #88fececa */
-  --emerald-a12: rgba(184, 255, 240, 0.94);
-
-  --emerald-contrast: #ffffff;
-  --emerald-surface: rgba(12, 49, 38, 0.5);
-  --emerald-indicator: #3dd9a0;
-  --emerald-track: #3dd9a0;
-
   --page-background: #111113;
   --file-icon-fill: #212225;
 }
-
-/* Map custom emerald to accent variables */
-.radix-themes[data-accent-color="emerald"] {
-  --accent-1: var(--emerald-1);
-  --accent-2: var(--emerald-2);
-  --accent-3: var(--emerald-3);
-  --accent-4: var(--emerald-4);
-  --accent-5: var(--emerald-5);
-  --accent-6: var(--emerald-6);
-  --accent-7: var(--emerald-7);
-  --accent-8: var(--emerald-8);
-  --accent-9: var(--emerald-9);
-  --accent-10: var(--emerald-10);
-  --accent-11: var(--emerald-11);
-  --accent-12: var(--emerald-12);
-
-  --accent-a1: var(--emerald-a1);
-  --accent-a2: var(--emerald-a2);
-  --accent-a3: var(--emerald-a3);
-  --accent-a4: var(--emerald-a4);
-  --accent-a5: var(--emerald-a5);
-  --accent-a6: var(--emerald-a6);
-  --accent-a7: var(--emerald-a7);
-  --accent-a8: var(--emerald-a8);
-  --accent-a9: var(--emerald-a9);
-  --accent-a10: var(--emerald-a10);
-  --accent-a11: var(--emerald-a11);
-  --accent-a12: var(--emerald-a12);
-
-  --accent-contrast: var(--emerald-contrast);
-  --accent-surface: var(--emerald-surface);
-  --accent-indicator: var(--emerald-indicator);
-  --accent-track: var(--emerald-track);
+.radix-themes {
+  --emerald-1: var(--blue-1);
+  --emerald-2: var(--blue-2);
+  --emerald-3: var(--blue-3);
+  --emerald-4: var(--blue-4);
+  --emerald-5: var(--blue-5);
+  --emerald-6: var(--blue-6);
+  --emerald-7: var(--blue-7);
+  --emerald-8: var(--blue-8);
+  --emerald-9: var(--blue-9);
+  --emerald-10: var(--blue-10);
+  --emerald-11: var(--blue-11);
+  --emerald-12: var(--blue-12);
+  --emerald-a1: var(--blue-a1);
+  --emerald-a2: var(--blue-a2);
+  --emerald-a3: var(--blue-a3);
+  --emerald-a4: var(--blue-a4);
+  --emerald-a5: var(--blue-a5);
+  --emerald-a6: var(--blue-a6);
+  --emerald-a7: var(--blue-a7);
+  --emerald-a8: var(--blue-a8);
+  --emerald-a9: var(--blue-a9);
+  --emerald-a10: var(--blue-a10);
+  --emerald-a11: var(--blue-a11);
+  --emerald-a12: var(--blue-a12);
+  --emerald-contrast: var(--blue-contrast);
+  --emerald-surface: var(--blue-surface);
+  --emerald-indicator: var(--blue-indicator);
+  --emerald-track: var(--blue-track);
 }
 
 /* ========================
@@ -208,11 +131,11 @@
   --mode-image-toggle: var(--blue-9);
 
   /* Agent Mode (green) */
-  --mode-agent-bg: var(--green-a3);
-  --mode-agent-fg: var(--green-11);
-  --mode-agent-icon: var(--green-11);
-  --mode-agent-active-bg: var(--green-3);
-  --mode-agent-toggle: var(--green-9);
+  --mode-agent-bg: var(--blue-a3);
+  --mode-agent-fg: var(--blue-11);
+  --mode-agent-icon: var(--blue-11);
+  --mode-agent-active-bg: var(--blue-3);
+  --mode-agent-toggle: var(--blue-9);
 
   /* Agent builder — neutral panel chrome (matches Radix gray scale; no accent tint) */
   --agent-flow-node-border: var(--gray-7);

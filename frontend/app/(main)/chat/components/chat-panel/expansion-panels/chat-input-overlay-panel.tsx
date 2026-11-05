@@ -85,7 +85,7 @@ export function ChatInputOverlayPanel({
 
   const overlay = (
     <Theme
-      accentColor="jade"
+      accentColor="blue"
       grayColor="olive"
       appearance={appearance}
       radius="medium"

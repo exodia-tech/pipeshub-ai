@@ -547,7 +547,7 @@ export function AskUserQuestionCard({
                 style={{ flexShrink: 0 }}
               >
                 {showAnswers && hasVisibleSelections(questions, answers) ? (
-                  <Badge color="jade" size="1">
+                  <Badge color="blue" size="1">
                     {t('askUserQuestion.answered')}
                   </Badge>
                 ) : null}
@@ -593,7 +593,7 @@ export function AskUserQuestionCard({
                                 : (q.multiSelect ? 'check_box_outline_blank' : 'radio_button_unchecked')
                             }
                             size={18}
-                            color={row.selected ? 'var(--jade-11)' : 'var(--slate-8)'}
+                            color={row.selected ? 'var(--blue-11)' : 'var(--slate-8)'}
                           />
                           <Text
                             size="2"
@@ -671,7 +671,7 @@ export function AskUserQuestionCard({
               {currentQ.multiSelect ? 'Select all that apply' : 'Select one'}
             </Text> */}
             {currentQ.multiSelect && selectedIds.length > 0 ? (
-              <Badge size="1" color="jade" variant="soft">
+              <Badge size="1" color="blue" variant="soft">
                 {t('askUserQuestion.selectedCount', { count: selectedIds.length })}
               </Badge>
             ) : null}

@@ -142,7 +142,7 @@ export function AuthMethodRow({
         {(() => {
           const toggle = (
             <Switch
-              color="jade"
+              color="blue"
               size="2"
               checked={state.enabled}
               onCheckedChange={toggleDisabled ? undefined : () => onToggle(state.type)}

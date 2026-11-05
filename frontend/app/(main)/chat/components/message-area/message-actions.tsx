@@ -350,7 +350,7 @@ export function MessageActions({
                     name={feedbackGiven === 'like' ? 'thumb_up' : 'thumb_up_off_alt'}
                     size={ICON_SIZES.SECONDARY}
                     variant={feedbackGiven === 'like' ? 'filled' : 'outlined'}
-                    color={feedbackGiven === 'like' ? 'var(--jade-11)' : 'var(--slate-11)'}
+                    color={feedbackGiven === 'like' ? 'var(--blue-11)' : 'var(--slate-11)'}
                   />
                 </IconButton>
               </Popover.Trigger>

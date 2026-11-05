@@ -249,7 +249,7 @@ export function OverviewTab({
                 width: `${instance.syncProgress.percentage ?? 0}%`,
                 height: '100%',
                 borderRadius: 'var(--radius-full)',
-                backgroundColor: 'var(--jade-9)',
+                backgroundColor: 'var(--blue-9)',
                 transition: 'width 300ms ease',
               }}
             />

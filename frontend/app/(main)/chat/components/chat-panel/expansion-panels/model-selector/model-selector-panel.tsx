@@ -471,7 +471,7 @@ function ModelItem({ model, isSelected, onSelect }: ModelItemProps) {
         {/* Tags */}
         <Flex align="center" gap="1" wrap="wrap" style={{ marginTop: 'var(--space-1)' }}>
           {model.isDefault && (
-            <Badge size="1" variant="outline" color="jade">
+            <Badge size="1" variant="outline" color="blue">
               Default
             </Badge>
           )}

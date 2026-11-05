@@ -392,7 +392,7 @@ export function ServiceAccountConfirmDialog({
             <LoadingButton
               type="button"
               size="2"
-              color="jade"
+              color="blue"
               onClick={() => void onConfirm()}
               disabled={confirmDisabled && !creating}
               loading={creating}

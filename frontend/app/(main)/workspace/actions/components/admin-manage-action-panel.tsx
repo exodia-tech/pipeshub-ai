@@ -874,7 +874,7 @@ export function AdminManageActionPanel({
         ) : null}
         <Button
           type="button"
-          color="jade"
+          color="blue"
           loading={saving}
           disabled={!hasChanges}
           onClick={() => void handleSave()}

@@ -650,7 +650,7 @@ export function OAuthAuthorizeView() {
               style={{
                 flex: 1,
                 minHeight: 32,
-                backgroundColor: '#047857',
+                backgroundColor: 'var(--accent-9)',
               }}
               onClick={() => handleConsent('granted')}
             >

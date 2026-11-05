@@ -527,7 +527,7 @@ function TeamActionSetupPanelRoot({
             {t('workspace.actions.postCreateAuth.body')}
           </Dialog.Description>
           <Flex justify="end">
-            <Button color="jade" onClick={() => setPostCreateNoticeOpen(false)}>
+            <Button color="blue" onClick={() => setPostCreateNoticeOpen(false)}>
               {t('workspace.actions.postCreateAuth.gotIt')}
             </Button>
           </Flex>

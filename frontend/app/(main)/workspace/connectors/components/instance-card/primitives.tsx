@@ -488,7 +488,7 @@ export function ConnectButton({ onClick }: { onClick?: () => void }) {
         height: 32,
         padding: '0 var(--space-3)',
         borderRadius: 'var(--radius-2)',
-        backgroundColor: isHovered ? 'var(--jade-10)' : 'var(--jade-9)',
+        backgroundColor: isHovered ? 'var(--blue-10)' : 'var(--blue-9)',
         color: 'white',
         fontSize: 13,
         fontWeight: 500,
