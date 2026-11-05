@@ -135,14 +135,14 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
             alt=""
             width={33}
             height={33}
-            style={{ flexShrink: 0, opacity: 0.9 }}
+            style={{ flexShrink: 0, opacity: 0.9, filter: 'brightness(1.8)' }}
           />
 
           {/* Search text */}
           <Text
             style={{
               color: 'white',
-              fontSize: '19px',
+              fontSize: '16px',
               fontWeight: 400,
               textTransform: 'uppercase',
               letterSpacing: '0.03em',

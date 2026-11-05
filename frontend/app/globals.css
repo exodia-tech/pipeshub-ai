@@ -1278,3 +1278,6 @@ th code {
 /* EXODIA website palette: light #1b6fcc; dark #4da6ff. */
 .radix-themes { --accent-9: #1b6fcc; --accent-10: #185fae; --accent-11: #185fae; --accent-contrast: #fff; }
 .dark .radix-themes, .dark.radix-themes { --accent-9: #4da6ff; --accent-10: #73b9ff; --accent-11: #73b9ff; --accent-contrast: #0a0a14; }
+
+/* Keep the royal-blue product mark legible on dark backgrounds. */
+.dark .exodia-brain-mark { filter: brightness(1.8); }
