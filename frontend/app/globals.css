@@ -1,5 +1,5 @@
 @import '@radix-ui/themes/styles.css';
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+@font-face { font-family: 'Sora'; src: url('/fonts/sora/Sora.ttf') format('truetype'); font-weight: 100 800; font-style: normal; font-display: swap; }
 
 @font-face {
   font-family: 'ClashGrotesk';
@@ -279,7 +279,7 @@
    ======================== */
 
 body {
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Sora', sans-serif;
   margin: 0;
   overflow: hidden;
 }
@@ -311,7 +311,7 @@ body {
 
 /* Override Radix Themes default font and cursors */
 .radix-themes {
-  --default-font-family: 'Manrope', sans-serif;
+  --default-font-family: 'Sora', sans-serif;
 
   /* Override Radix Themes cursor tokens to use pointer for interactive elements */
   --cursor-button: pointer !important;
@@ -827,7 +827,7 @@ li > blockquote {
 
 .agent-builder-flow {
   background: var(--agent-flow-canvas-bg);
-  font-family: Manrope, var(--default-font-family), sans-serif;
+  font-family: Sora, var(--default-font-family), sans-serif;
   color: var(--agent-flow-text);
   -webkit-font-smoothing: antialiased;
 }
@@ -1109,7 +1109,7 @@ li > blockquote {
  * Plain del text: standard line-through via CSS.
  *
  * del code: CSS text-decoration position is calculated from the *declaring*
- * element's font metrics (Manrope). When the child uses a different font
+ * element's font metrics (Sora). When the child uses a different font
  * (monospace) the offset never lands at the visual centre.
  * Fix: display:inline-block stops the parent's decoration propagating through,
  * then a ::after pseudo draws the line at exactly 50% of the element's height.
@@ -1261,3 +1261,20 @@ th code {
   border-top: 1px solid var(--olive-4);
   margin: 1em 0;
 }
+
+/* Modified by EXODIA: branded loading states respect reduced-motion preferences. */
+@keyframes exodia-brain-pulse {
+  50% { opacity: 0.35; }
+}
+
+.exodia-brain-active {
+  animation: exodia-brain-pulse 1.6s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exodia-brain-active { animation: none; }
+}
+
+/* EXODIA website palette: light #1b6fcc; dark #4da6ff. */
+.radix-themes { --accent-9: #1b6fcc; --accent-10: #185fae; --accent-11: #185fae; --accent-contrast: #fff; }
+.dark .radix-themes, .dark.radix-themes { --accent-9: #4da6ff; --accent-10: #73b9ff; --accent-11: #73b9ff; --accent-contrast: #0a0a14; }

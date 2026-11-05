@@ -1,3 +1,4 @@
+// Modified by EXODIA: branding assertions.
 import { expect } from 'chai'
 import {
   handleBackendError,
@@ -89,7 +90,7 @@ describe('handleBackendError', () => {
       )
       expect(result).to.be.instanceOf(InternalServerError)
       expect(result.message).to.equal(
-        'Something went wrong while PipesHub tried to create team. Please try again in a moment; if it keeps happening, ask your admin to check the services page.',
+        'Something went wrong while EXODIA Brain tried to create team. Please try again in a moment; if it keeps happening, ask your admin to check the services page.',
       )
       expect(result.message).to.not.include('KeyError')
       expect(result.message).to.not.include('qdrant')

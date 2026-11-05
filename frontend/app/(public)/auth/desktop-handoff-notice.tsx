@@ -1,10 +1,11 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import { Button, Flex, Heading, Text } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Shown once an OAuth result has been handed to the PipesHub desktop app.
+ * Shown once an OAuth result has been handed to the EXODIA Brain desktop app.
  *
  * The automatic navigation to the `pipeshub://` link is best effort: browsers
  * prompt before handing a custom scheme to an application, and some suppress

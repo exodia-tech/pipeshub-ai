@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 /**
  * chat-streaming.spec.ts
  *
@@ -219,8 +220,8 @@ async function mockConversationDetail(
 // ---------------------------------------------------------------------------
 
 test.describe('Chat — SSE streaming (mocked backend)', () => {
-  const QUESTION = 'What is PipesHub?';
-  const ANSWER = 'PipesHub is an AI-powered workplace platform for enterprise search and automation.';
+  const QUESTION = 'What is EXODIA Brain?';
+  const ANSWER = 'EXODIA Brain is an AI-powered workplace platform for enterprise search and automation.';
 
   test.beforeEach(async ({ page }) => {
     // All route mocks must be registered BEFORE page.goto so that requests

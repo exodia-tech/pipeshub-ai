@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { Request, Response, NextFunction } from 'express';
 import { Logger } from '../services/logger.service';
 import { BaseError } from '../errors/base.error';
@@ -6,14 +7,14 @@ import { isClientSafeError, isReaderWritten } from '../errors/reader-friendly';
 import { jsonResponse, logError } from '../utils/error.middleware.utils';
 
 /**
- * What a reader is told when the failure is in PipesHub's own plumbing (a
+ * What a reader is told when the failure is in EXODIA Brain's own plumbing (a
  * broker, cache or database). Those errors describe the machine, so they stay
  * in the log. The request id rides alongside as `requestId` rather than inside
  * this sentence: a client that quotes it can show it, and one that filters
  * technical-looking text can still trust the words.
  */
 const INFRASTRUCTURE_FAILURE_MESSAGE =
-  "Something went wrong on PipesHub's side. Please try again; if it keeps happening, ask your admin for help.";
+  "Something went wrong on EXODIA Brain's side. Please try again; if it keeps happening, ask your admin for help.";
 
 export class ErrorMiddleware {
   private static logger = Logger.getInstance();

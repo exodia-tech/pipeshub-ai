@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { AxiosError, isAxiosError } from 'axios';
 
 export enum ErrorType {
@@ -121,8 +122,8 @@ function retryAfterSeconds(error: AxiosError): number | undefined {
 
 export function busyMessage(retryAfter?: number): string {
   return retryAfter
-    ? `PipesHub is busy right now. Please try again in ${retryAfter} second${retryAfter === 1 ? '' : 's'}.`
-    : 'PipesHub is busy right now. Please try again in a few seconds.';
+    ? `EXODIA Brain is busy right now. Please try again in ${retryAfter} second${retryAfter === 1 ? '' : 's'}.`
+    : 'EXODIA Brain is busy right now. Please try again in a few seconds.';
 }
 
 function isAxiosRequestCancelled(error: AxiosError): boolean {

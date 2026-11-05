@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React, { useEffect, useMemo, useCallback, useRef, useState, Suspense } from 'react';
@@ -1257,7 +1258,7 @@ function UsersPageContent() {
         title={t('workspace.users.actions.removeUserTitle')}
         message={t('workspace.users.actions.removeUserMessage', {
           email: removeTarget?.email || removeTarget?.name || '',
-          workspace: 'Pipeshub',
+          workspace: 'EXODIA Brain',
         })}
         confirmLabel={t('workspace.users.actions.removeButton')}
         cancelLabel={t('workspace.users.actions.cancelButton')}

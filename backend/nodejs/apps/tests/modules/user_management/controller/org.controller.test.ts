@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import 'reflect-metadata';
 import { expect } from 'chai';
 import sinon from 'sinon';
@@ -571,7 +572,7 @@ describe('OrgController', () => {
         expect(error).to.not.be.instanceOf(BadRequestError);
         expect(error.statusCode).to.equal(500);
         // The database's own words stay in the log, not on someone's screen.
-        expect(error.message).to.contain('PipesHub tried to create the organisation');
+        expect(error.message).to.contain('EXODIA Brain tried to create the organisation');
         expect(error.message).to.not.contain('Mongo');
       }
     });

@@ -1,4 +1,5 @@
 {
+  "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "collections": {
     "stats": {
       "title": "분석",
@@ -212,7 +213,7 @@
     "nav": {
       "prev": "이전",
       "next": "다음",
-      "enterPipeshub": "Pipeshub 시작하기",
+      "enterPipeshub": "EXODIA Brain 시작하기",
       "finishing": "완료 중…",
       "saveLlmFirst": "계속하려면 먼저 AI 모델 단계를 저장하세요"
     },
@@ -433,9 +434,9 @@
   },
   "electron": {
     "serverUrlSetup": {
-      "title": "PipesHub 서버에 연결",
-      "subtitleFirstRun": "시작하려면 PipesHub 서버의 URL을 입력하세요.",
-      "subtitleExisting": "PipesHub 서버 URL을 확인하거나 업데이트하세요.",
+      "title": "EXODIA Brain 서버에 연결",
+      "subtitleFirstRun": "시작하려면 EXODIA Brain 서버의 URL을 입력하세요.",
+      "subtitleExisting": "EXODIA Brain 서버 URL을 확인하거나 업데이트하세요.",
       "label": "서버 URL",
       "submit": "연결",
       "changeServer": "서버 변경",
@@ -1611,7 +1612,7 @@
       "subtitle": "MCP 서버와 같은 자신의 스크립트 및 통합에 사용할 장기 토큰을 생성합니다. 토큰은 본인만 볼 수 있습니다.",
       "newToken": "새 토큰",
       "emptyTitle": "개인 액세스 토큰이 없습니다",
-      "emptyDescription": "PipesHub MCP 서버 또는 자신의 스크립트를 연결할 토큰을 생성하세요.",
+      "emptyDescription": "EXODIA Brain MCP 서버 또는 자신의 스크립트를 연결할 토큰을 생성하세요.",
       "errorGeneric": "개인 액세스 토큰을 불러오지 못했습니다",
       "retry": "다시 시도",
       "columnName": "이름",
@@ -1698,7 +1699,7 @@
       "configFillRequiredTooltip": "모든 필수 필드를 입력하세요",
       "configSaveErrorFallback": "모델 구성을 저장하지 못했습니다",
       "configSaveOutboundError": "PipesHub가 컨테이너 내부에서 이 모델 제공자에 연결할 수 없습니다. 클라우드 제공자에는 아웃바운드 인터넷이 필요합니다 — deployment/docker-compose/ADVANCED_DEPLOYMENT.md#container-outbound-connectivity를 참조하세요.",
-      "configSaveTimeoutError": "모델을 검증하는 동안 요청 시간이 초과되었습니다. 클라우드 제공자에는 PipesHub 컨테이너에서 나가는 아웃바운드 인터넷이 필요합니다 — deployment/docker-compose/ADVANCED_DEPLOYMENT.md#container-outbound-connectivity를 참조하세요.",
+      "configSaveTimeoutError": "모델을 검증하는 동안 요청 시간이 초과되었습니다. 클라우드 제공자에는 EXODIA Brain 컨테이너에서 나가는 아웃바운드 인터넷이 필요합니다 — deployment/docker-compose/ADVANCED_DEPLOYMENT.md#container-outbound-connectivity를 참조하세요.",
       "configNoConfigRequired": "이 제공업체에는 구성이 필요하지 않습니다.",
       "configDefaultModelNotice": "시스템에서 기본적으로 \"{{modelName}}\"을(를) 사용합니다.",
       "configSectionModelConfiguration": "모델 구성",
@@ -2344,8 +2345,8 @@
         "additionalSettingsDescription": "커넥터별 동기화 옵션을 구성합니다",
         "nonEditableUrlFieldTooltip": "웹사이트 URL은 설정한 후에는 변경할 수 없습니다.",
         "nonEditableLockedFieldTooltip": "이 값은 설정한 후에는 변경할 수 없습니다.",
-        "localFsDesktopOnlyBanner": "로컬 파일 시스템 설정은 PipesHub 데스크톱 앱에서만 변경할 수 있습니다. 이 화면은 읽기 전용입니다.",
-        "localFsDesktopOnlySaveTooltip": "이 설정을 변경하려면 PipesHub 데스크톱 앱을 여세요.",
+        "localFsDesktopOnlyBanner": "로컬 파일 시스템 설정은 EXODIA Brain 데스크톱 앱에서만 변경할 수 있습니다. 이 화면은 읽기 전용입니다.",
+        "localFsDesktopOnlySaveTooltip": "이 설정을 변경하려면 EXODIA Brain 데스크톱 앱을 여세요.",
         "importDate": "가져오기 시작 날짜",
         "importDateDescription": "메시지를 가져올 시작 날짜를 선택하세요",
         "importAllTime": "전체 기간 데이터 가져오기",
@@ -2452,11 +2453,11 @@
         }
       },
       "localFsDesktop": {
-        "offlineToast": "동기화하려면 이 폴더를 관리하는 컴퓨터에서 PipesHub 데스크톱 앱을 여세요.",
-        "offlineNamedToast": "이 폴더를 관리하는 기기 {{deviceName}}이(가) 연결되어 있지 않습니다. 동기화하려면 해당 기기에서 PipesHub 데스크톱 앱을 여세요.",
-        "unclaimedToast": "이 커넥터는 아직 데스크톱에서 설정되지 않았습니다. 이 폴더를 관리하는 컴퓨터에서 PipesHub 데스크톱 앱을 열고 동기화를 한 번 활성화하세요.",
-        "ownedByOtherDeviceToast": "이 커넥터는 {{deviceName}}에 속해 있습니다. 해당 기기의 PipesHub 데스크톱 앱에서 동기화를 활성화하세요.",
-        "ownedByOtherDeviceUnknownToast": "이 커넥터는 다른 기기에 속해 있습니다. 해당 기기의 PipesHub 데스크톱 앱에서 동기화를 활성화하세요.",
+        "offlineToast": "동기화하려면 이 폴더를 관리하는 컴퓨터에서 EXODIA Brain 데스크톱 앱을 여세요.",
+        "offlineNamedToast": "이 폴더를 관리하는 기기 {{deviceName}}이(가) 연결되어 있지 않습니다. 동기화하려면 해당 기기에서 EXODIA Brain 데스크톱 앱을 여세요.",
+        "unclaimedToast": "이 커넥터는 아직 데스크톱에서 설정되지 않았습니다. 이 폴더를 관리하는 컴퓨터에서 EXODIA Brain 데스크톱 앱을 열고 동기화를 한 번 활성화하세요.",
+        "ownedByOtherDeviceToast": "이 커넥터는 {{deviceName}}에 속해 있습니다. 해당 기기의 EXODIA Brain 데스크톱 앱에서 동기화를 활성화하세요.",
+        "ownedByOtherDeviceUnknownToast": "이 커넥터는 다른 기기에 속해 있습니다. 해당 기기의 EXODIA Brain 데스크톱 앱에서 동기화를 활성화하세요.",
         "deviceIdentityError": "이 기기를 식별할 수 없습니다: {{error}}"
       },
       "schemaForm": {
@@ -2468,7 +2469,7 @@
       },
       "personal": {
         "desktopRequiredTitle": "데스크톱 앱 필요",
-        "desktopRequiredDescription": "로컬 파일 시스템 커넥터는 PipesHub 데스크톱 앱에서만 사용할 수 있습니다. 이 커넥터를 설정하려면 데스크톱 앱을 사용하세요."
+        "desktopRequiredDescription": "로컬 파일 시스템 커넥터는 EXODIA Brain 데스크톱 앱에서만 사용할 수 있습니다. 이 커넥터를 설정하려면 데스크톱 앱을 사용하세요."
       },
       "syncStatus": {
         "paused": "동기화 일시 중지됨",
@@ -3139,7 +3140,7 @@
         "title": "역할 및 권한",
         "role": "역할",
         "groups": "그룹",
-        "roleDescription": "Pipeshub 앱에서의 역할",
+        "roleDescription": "EXODIA Brain 앱에서의 역할",
         "groupsDescription": "소속된 사용자 그룹",
         "noGroups": "사용자 그룹이 없습니다"
       },
@@ -4108,7 +4109,7 @@
         "title": "PipesHub의 권한 할당 방식",
         "description": "PipesHub는 플랫폼과 연결된 모든 앱에서 이메일로 사용자를 식별합니다.",
         "permissionsTitle": "권한은 기존 앱과 동일하게 적용됩니다",
-        "permissionsBody": "PipesHub 내에서의 접근 권한은 각 연결된 앱에서와 동일합니다 — 더도 덜도 아닙니다. Google Drive에서 제한된 문서는 여기서도 제한됩니다.",
+        "permissionsBody": "EXODIA Brain 내에서의 접근 권한은 각 연결된 앱에서와 동일합니다 — 더도 덜도 아닙니다. Google Drive에서 제한된 문서는 여기서도 제한됩니다.",
         "emailNotePre": "가입에 사용한 이메일 —",
         "emailNotePost": "— 이 조직의 앱에서 사용하는 이메일과 동일해야 권한이 올바르게 인식됩니다.",
         "cancelButton": "취소",
@@ -4166,14 +4167,14 @@
     },
     "desktopHandoff": {
       "title": "로그인이 PipesHub로 전송되었습니다",
-      "description": "이 탭을 닫고 PipesHub 앱으로 돌아가세요.",
-      "openApp": "PipesHub 열기"
+      "description": "이 탭을 닫고 EXODIA Brain 앱으로 돌아가세요.",
+      "openApp": "EXODIA Brain 열기"
     }
   },
   "healthGate": {
     "title": "서버에 연결할 수 없음",
     "description": "현재 서버에 연결할 수 없습니다. 서버가 시작 중이거나 점검 중일 수 있습니다. 다시 연결을 시도하고 있습니다.",
-    "contactAdmin": "문제가 계속되면 PipesHub 관리자에게 문의해 주세요."
+    "contactAdmin": "문제가 계속되면 EXODIA Brain 관리자에게 문의해 주세요."
   },
   "askUserQuestion": {
     "questionsHeadingSingular": "질문:",

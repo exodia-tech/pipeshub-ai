@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 /**
  * Desktop half of the browser-based OAuth sign-in flow.
  *
@@ -75,7 +76,7 @@ export class DesktopOAuthError extends Error {
 export function buildDesktopRedirectUri(provider: DesktopOAuthProvider): string {
   const base = getFrontendOrigin();
   if (!base) {
-    throw new DesktopOAuthError('no-server-url', 'No PipesHub server URL is configured.');
+    throw new DesktopOAuthError('no-server-url', 'No EXODIA Brain server URL is configured.');
   }
   return `${base}/auth/${provider}/callback`;
 }
@@ -225,7 +226,7 @@ export function desktopOAuthErrorMessage(error: unknown, providerLabel: string):
       case 'timeout':
         return `${providerLabel} sign-in timed out. Please try again.`;
       case 'no-server-url':
-        return 'Connect to a PipesHub server before signing in.';
+        return 'Connect to a EXODIA Brain server before signing in.';
       case 'open-failed':
         return 'Could not open your browser. Please try again.';
       case 'unavailable':

@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -179,7 +180,7 @@ export function ConnectorPanel() {
       instanceAuthenticated);
   const configReadOnly = isLocalFsConfigReadOnly(connectorType);
   // Use registry connector's display name so the panel always shows the type name
-  // (e.g. "Pipeshub docs") rather than an instance name when creating a new connector.
+  // (e.g. "EXODIA Brain docs") rather than an instance name when creating a new connector.
   const connectorTypeName = registryConnectors.find((c) => c.type === connectorType)?.name ?? connectorName;
 
   const prevPanelTabRef = useRef<PanelTab | null>(null);

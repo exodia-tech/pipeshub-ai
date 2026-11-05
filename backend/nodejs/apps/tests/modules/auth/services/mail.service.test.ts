@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import 'reflect-metadata';
 import { expect } from 'chai';
 import sinon from 'sinon';
@@ -171,7 +172,7 @@ describe('MailService', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(InternalServerError);
         expect((error as InternalServerError).message).to.contain(
-          'PipesHub tried to send that email',
+          'EXODIA Brain tried to send that email',
         );
       } finally {
         axios.defaults.adapter = origAdapter;

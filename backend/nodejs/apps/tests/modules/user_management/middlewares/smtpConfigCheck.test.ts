@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import 'reflect-metadata';
 import { expect } from 'chai';
 import sinon from 'sinon';
@@ -63,7 +64,7 @@ describe('smtpConfigCheck Middleware', () => {
 
     expect(next.calledOnce).to.be.true;
     const error = next.firstCall.args[0];
-    expect(error.message).to.contain('PipesHub tried to check the email settings');
+    expect(error.message).to.contain('EXODIA Brain tried to check the email settings');
   });
 
   it('should call next with InternalServerError when response statusCode is not 200', async () => {
@@ -78,7 +79,7 @@ describe('smtpConfigCheck Middleware', () => {
     expect(next.calledOnce).to.be.true;
     const error = next.firstCall.args[0];
     expect(error).to.be.an('error');
-    expect(error.message).to.contain('PipesHub tried to check the email settings');
+    expect(error.message).to.contain('EXODIA Brain tried to check the email settings');
   });
 
   it('should call next with NotFoundError when credentials data is null', async () => {

@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React from 'react';
@@ -73,7 +74,7 @@ export function OnboardingHeader({
         )}
       </Box>
 
-      {/* Center — PipesHub Logo */}
+      {/* Center — EXODIA Brain Logo */}
       <Flex align="center" justify="center">
         <PipesHubIcon size={32} color="var(--accent-8)" />
       </Flex>

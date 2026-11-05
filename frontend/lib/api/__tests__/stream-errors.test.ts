@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { describe, expect, it } from 'vitest';
 import {
   CHAT_STREAM_ERROR_MESSAGES,
@@ -22,7 +23,7 @@ describe('streamHttpError', () => {
       CHAT_STREAM_ERROR_MESSAGES,
     );
     expect(err).toBeInstanceOf(StreamError);
-    expect(err.message).toBe('PipesHub is busy right now. Please try again in 12 seconds.');
+    expect(err.message).toBe('EXODIA Brain is busy right now. Please try again in 12 seconds.');
     expect(err.message).not.toContain('429');
   });
 
@@ -62,7 +63,7 @@ describe('streamHttpError', () => {
 });
 
 describe('streamFailure', () => {
-  it('says PipesHub could not be reached when the request never got an answer', () => {
+  it('says EXODIA Brain could not be reached when the request never got an answer', () => {
     const err = streamFailure(new TypeError('Failed to fetch'), false, CHAT_STREAM_ERROR_MESSAGES);
     expect(err.message).toBe(CHAT_STREAM_ERROR_MESSAGES.offline);
   });

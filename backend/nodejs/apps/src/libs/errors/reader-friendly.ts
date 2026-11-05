@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { HttpError, InternalServerError } from './http.errors';
 
 /**
@@ -35,7 +36,7 @@ export const isClientSafeError = (error: Error): boolean =>
   clientSafeErrors.has(error);
 
 /**
- * Messages another PipesHub service sends that were written for a reader.
+ * Messages another EXODIA Brain service sends that were written for a reader.
  * Each entry names where it comes from, so a wording change there shows up as
  * a failing test here rather than as a mystery.
  */
@@ -59,7 +60,7 @@ export const isReaderWritten = (text: string | undefined): boolean =>
   typeof text === 'string' && READER_WRITTEN_MESSAGES.has(normalise(text));
 
 /**
- * What a reader is told when something failed on PipesHub's side. The failure's
+ * What a reader is told when something failed on EXODIA Brain's side. The failure's
  * own words describe the machine that broke, so they go to the log and this
  * goes to the person. ``operation`` finishes "tried to ..." — "create the
  * organisation", "send the sign-in code".
@@ -68,7 +69,7 @@ export const serverFailureMessage = (operation: string): string => {
   const what = /^[A-Z][a-z]/.test(operation)
     ? operation.charAt(0).toLowerCase() + operation.slice(1)
     : operation;
-  return `Something went wrong while PipesHub tried to ${what}. Please try again in a moment; if it keeps happening, ask your admin to check the services page.`;
+  return `Something went wrong while EXODIA Brain tried to ${what}. Please try again in a moment; if it keeps happening, ask your admin to check the services page.`;
 };
 
 /**

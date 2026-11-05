@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { describe, it, expect } from 'vitest';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { busyMessage, parseRetryAfter, processError } from '../api-error';
@@ -23,7 +24,7 @@ describe('busy and slow responses', () => {
 
   it('uses the Retry-After seconds when the server sends them', () => {
     const processed = processError(httpError(503, {}, { 'retry-after': '5' }));
-    expect(processed.message).toBe('PipesHub is busy right now. Please try again in 5 seconds.');
+    expect(processed.message).toBe('EXODIA Brain is busy right now. Please try again in 5 seconds.');
   });
 
   it("prefers the server's own words", () => {
@@ -52,6 +53,6 @@ describe('Retry-After parsing', () => {
   it('quotes the seconds left when a busy response sends a date', () => {
     const inFive = new Date(Date.now() + 4_500).toUTCString();
     const processed = processError(httpError(503, {}, { 'retry-after': inFive }));
-    expect(processed.message).toMatch(/^PipesHub is busy right now\. Please try again in [45] seconds\.$/);
+    expect(processed.message).toMatch(/^EXODIA Brain is busy right now\. Please try again in [45] seconds\.$/);
   });
 });

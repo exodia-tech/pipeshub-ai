@@ -1,3 +1,4 @@
+// Modified by EXODIA: branding assertions.
 import 'reflect-metadata'
 import { expect } from 'chai'
 import sinon from 'sinon'
@@ -307,7 +308,7 @@ describe('ErrorMiddleware', () => {
       handler(error, req, res, next)
 
       const response = res.json.firstCall.args[0]
-      expect(response.error.message).to.include("went wrong on PipesHub's side")
+      expect(response.error.message).to.include("went wrong on EXODIA Brain's side")
       expect(response.error.message).to.not.include('Secret internal detail')
     })
 
@@ -357,7 +358,7 @@ describe('ErrorMiddleware', () => {
 
         const response = res.json.firstCall.args[0]
         expect(response.error.code).to.equal('INTERNAL_ERROR')
-        expect(response.error.message).to.include("went wrong on PipesHub's side")
+        expect(response.error.message).to.include("went wrong on EXODIA Brain's side")
         // The id rides beside the words, so a client that filters
         // technical-looking text still shows the sentence.
         expect(response.error.message).to.not.include('req-7')
@@ -391,7 +392,7 @@ describe('ErrorMiddleware', () => {
 
       const res = createMockResponse()
       const message =
-        'Something went wrong while PipesHub tried to create team. Please try again in a moment.'
+        'Something went wrong while EXODIA Brain tried to create team. Please try again in a moment.'
       handler(
         markClientSafe(new InternalServerError(message)),
         createMockRequest(),

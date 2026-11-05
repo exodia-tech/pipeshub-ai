@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { describe, it, expect } from 'vitest';
 import type { TFunction } from 'i18next';
 import { ErrorType, type ProcessedError } from '@/lib/api/api-error';
@@ -22,10 +23,10 @@ describe('extractErrorCode', () => {
   it('walks the Node proxy wrap { error: { details: pythonBody } }', () => {
     const nodeBody = {
       error: {
-        message: 'Cannot reach cloud LLM providers from PipesHub.',
+        message: 'Cannot reach cloud LLM providers from EXODIA Brain.',
         details: {
           status: 'error',
-          message: 'Cannot reach cloud LLM providers from PipesHub.',
+          message: 'Cannot reach cloud LLM providers from EXODIA Brain.',
           details: { error_code: 'outbound_connectivity', provider: 'gemini' },
         },
       },
@@ -36,7 +37,7 @@ describe('extractErrorCode', () => {
 
 describe('resolveModelConfigSaveError', () => {
   it('uses the outbound i18n key when outbound_connectivity is nested on the axios body', () => {
-    const pythonMessage = 'Cannot reach cloud LLM providers from PipesHub.';
+    const pythonMessage = 'Cannot reach cloud LLM providers from EXODIA Brain.';
     const err = processed({
       type: ErrorType.SERVER_ERROR,
       message: pythonMessage,

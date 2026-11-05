@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
@@ -317,7 +318,7 @@ export class OrgController {
           usersMails: [contactEmail],
           subject: 'New Org Account Creation',
           templateData: {
-            invitee: 'PipesHub',
+            invitee: 'EXODIA Brain',
             name: 'User',
             orgName: org.registeredName,
             link: `${this.config.frontendUrl}`,

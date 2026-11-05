@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -131,7 +132,7 @@ export const OTP_ALREADY_USED =
 export const EMAIL_MISMATCH =
   "You signed in with a different account than the email you entered. Sign in with the matching account, or go back and enter that account's email.";
 export const PROVIDER_SHARED_NO_EMAIL =
-  "Your sign-in provider didn't share an email address, so we couldn't sign you in. Ask your admin to allow the email permission for PipesHub.";
+  "Your sign-in provider didn't share an email address, so we couldn't sign you in. Ask your admin to allow the email permission for EXODIA Brain.";
 export const ADMIN_ONLY_SIGN_IN_SETTINGS =
   'Only workspace admins can view or change sign-in settings.';
 export const SIGN_IN_ACCOUNT_CHANGED =
@@ -620,7 +621,7 @@ export class UserAccountController {
         emailTemplateType: 'resetPassword',
         initiator: { jwtAuthToken: mailAuthToken, orgId: user.orgId?.toString() },
         usersMails: [user.email],
-        subject: 'PipesHub | Reset your password!',
+        subject: 'EXODIA Brain | Reset your password!',
         templateData: {
           orgName: org?.shortName || org?.registeredName,
           name: user.fullName,
@@ -1315,8 +1316,8 @@ export class UserAccountController {
         const blockedUntil = this.getBlockedUntilIso(userCredential as IUserCredentials);
         throw new BadRequestError(
           blockedUntil
-            ? `Your account has been disabled. If it is a mistake, Please reach out to contact@pipeshub.com to get it restored. [blockedUntil:${blockedUntil}]`
-            : 'Your account has been disabled. If it is a mistake, Please reach out to contact@pipeshub.com to get it restored.',
+            ? `Your account has been disabled. If it is a mistake, Please reach out to mo@exodiatech.com to get it restored. [blockedUntil:${blockedUntil}]`
+            : 'Your account has been disabled. If it is a mistake, Please reach out to mo@exodiatech.com to get it restored.',
         );
       }
 
@@ -1621,7 +1622,7 @@ export class UserAccountController {
     );
     if (identity.email !== String(user.email ?? '').toLowerCase()) {
       throw new UnauthorizedError(
-        "This Microsoft account doesn't match the account you're signing in to. Sign in with the Microsoft account linked to your PipesHub email.",
+        "This Microsoft account doesn't match the account you're signing in to. Sign in with the Microsoft account linked to your EXODIA Brain email.",
       );
     }
 
@@ -1659,7 +1660,7 @@ export class UserAccountController {
     );
     if (identity.email !== String(user.email ?? '').toLowerCase()) {
       throw new UnauthorizedError(
-        "This Microsoft account doesn't match the account you're signing in to. Sign in with the Microsoft account linked to your PipesHub email.",
+        "This Microsoft account doesn't match the account you're signing in to. Sign in with the Microsoft account linked to your EXODIA Brain email.",
       );
     }
 

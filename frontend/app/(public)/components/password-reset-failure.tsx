@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React from 'react';
@@ -27,7 +28,7 @@ export default function PasswordResetFailure({
       <Box style={{ marginBottom: '24px' }}>
         <Image
           src="/login-page-assets/pipeshub/white-square.svg"
-          alt="Pipeshub"
+          alt="EXODIA Brain"
           width={48}
           height={48}
         />

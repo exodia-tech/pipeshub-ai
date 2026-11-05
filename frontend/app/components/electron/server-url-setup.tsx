@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React, { useState, useLayoutEffect, useEffect } from 'react';
@@ -166,7 +167,7 @@ function ServerUrlSetupScreen({ onComplete }: { onComplete: () => void }) {
         <Flex direction="column" align="center" gap="3" style={{ marginBottom: 'var(--space-6)' }}>
           <img
             src="/logo/pipes-hub.svg"
-            alt="PipesHub"
+            alt="EXODIA Brain"
             width={56}
             height={56}
           />

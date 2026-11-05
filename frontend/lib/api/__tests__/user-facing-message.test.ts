@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { describe, it, expect } from 'vitest';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { ErrorType, getUserFacingErrorMessage, processError } from '../api-error';
@@ -60,14 +61,14 @@ describe('getUserFacingErrorMessage', () => {
         error: {
           code: 'INTERNAL_ERROR',
           message:
-            "Something went wrong on PipesHub's side. Please try again; if it keeps happening, ask your admin for help.",
+            "Something went wrong on EXODIA Brain's side. Please try again; if it keeps happening, ask your admin for help.",
           requestId: '65f1c2ab9e4d7a3b1c0d8e2f-AbC123',
         },
       }),
     );
     expect(processed.requestId).toBe('65f1c2ab9e4d7a3b1c0d8e2f-AbC123');
     expect(getUserFacingErrorMessage(processed, FALLBACK)).toContain(
-      "went wrong on PipesHub's side",
+      "went wrong on EXODIA Brain's side",
     );
   });
 

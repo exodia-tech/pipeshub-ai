@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React, { useState } from 'react';
@@ -119,7 +120,7 @@ export function UserBackgroundSurvey() {
             align="center"
             style={{ color: 'var(--gray-9)', marginBottom: '12px', display: 'block' }}
           >
-            This will help us personalise your Pipeshub experience
+            This will help us personalise your EXODIA Brain experience
           </Text>
         </Box>
 

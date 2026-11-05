@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client'
 
 import React, { useState } from "react";
@@ -50,7 +51,7 @@ export type ConnectorType =
   | 'confluence'
   | 'bookstack'
   | 'drupal-wiki'
-  /** PipesHub Collections / KB — backend `Connectors.KNOWLEDGE_BASE` = `"KB"` */
+  /** EXODIA Brain Collections / KB — backend `Connectors.KNOWLEDGE_BASE` = `"KB"` */
   | 'kb'
   | 'knowledge-base'
   | 'google-docs'

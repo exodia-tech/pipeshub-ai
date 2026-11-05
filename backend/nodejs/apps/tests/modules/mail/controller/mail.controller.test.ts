@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import 'reflect-metadata'
 import { expect } from 'chai'
 import sinon from 'sinon'
@@ -245,7 +246,7 @@ describe('mail/controller/mail.controller', () => {
 
       expect(next.calledOnce).to.be.true
       const err = next.firstCall.args[0]
-      expect(err.message).to.contain('PipesHub tried to send that email')
+      expect(err.message).to.contain('EXODIA Brain tried to send that email')
     })
   })
 })

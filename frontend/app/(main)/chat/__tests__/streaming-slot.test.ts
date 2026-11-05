@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 /**
  * A chat turn end to end: `streamMessageForSlot` → `ChatApi.streamMessage` →
  * the SSE transport → the AG-UI handler → the slot in the chat store. Only
@@ -260,7 +261,7 @@ describe('when the answer fails', () => {
     expect(useChatStore.getState().pendingConversations[slotId]).toBeUndefined();
   });
 
-  it('says PipesHub is busy when the request is rate limited', async () => {
+  it('says EXODIA Brain is busy when the request is rate limited', async () => {
     const slotId = newSlot();
     respondWith(jsonResponse(429, {}, { 'retry-after': '3' }));
     await streamMessageForSlot(slotId, Q, request());

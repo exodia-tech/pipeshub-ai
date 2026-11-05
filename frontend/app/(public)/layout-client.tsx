@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -20,7 +21,7 @@ export default function PublicLayoutClient({
 
   useEffect(() => {
     setMounted(true);
-    document.title = 'PipesHub';
+    document.title = 'EXODIA Brain';
     if (language) {
       import('@/lib/i18n/config').then((module) => {
         module.default.changeLanguage(language);

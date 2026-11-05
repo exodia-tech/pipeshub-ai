@@ -1,3 +1,4 @@
+// Modified by EXODIA: website blue accent palette.
 'use client';
 
 import { Theme } from '@radix-ui/themes';
@@ -121,7 +122,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   return (
     <ThemeContext.Provider value={{ appearance, preference, setPreference }}>
       <Theme
-        accentColor="jade"
+        accentColor="blue"
         grayColor="olive"
         appearance={appearance}
         radius="medium"

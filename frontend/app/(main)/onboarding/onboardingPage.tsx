@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React, { useEffect, useRef, useState, Suspense } from 'react';
@@ -135,7 +136,7 @@ function OnboardingPageInner() {
   };
 
   /**
-   * Called when the user clicks "Enter Pipeshub" on the final step.
+   * Called when the user clicks "Enter EXODIA Brain" on the final step.
    * Marks onboarding as configured and navigates to the main app.
    */
   const handleFinishOnboarding = async () => {
@@ -158,7 +159,7 @@ function OnboardingPageInner() {
       navigateTo(nextStep);
     }
     // If nextStep is null (e.g. final optional step saved), stay on the step —
-    // the user will click "Enter Pipeshub" in the footer when ready.
+    // the user will click "Enter EXODIA Brain" in the footer when ready.
   };
 
   // ---- System config step numbering ----
@@ -175,7 +176,7 @@ function OnboardingPageInner() {
   const isLastStep = currentIndex === steps.length - 1;
   const isLoadingStep = stepFromUrl === 'loading';
 
-  // "Enter Pipeshub" is only enabled once the required LLM step is saved
+  // "Enter EXODIA Brain" is only enabled once the required LLM step is saved
   const isLlmCompleted = completedStepIds.includes('ai-model');
 
   // Highlight Next button when the current step has been saved

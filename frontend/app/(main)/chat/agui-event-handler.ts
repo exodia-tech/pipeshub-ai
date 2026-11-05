@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 /**
  * AG-UI wire protocol -> `StreamMessageCallbacks` adapter (AG-UI migration
  * plan, Phase 3a/3b). `streaming.ts`'s slot-scoped Zustand logic and
@@ -276,7 +277,7 @@ class LivePartsBuilder {
  * Applies the top-level `replace`/`add` ops AG-UI's `STATE_DELTA` carries
  * (see `AGUIFormatter.answer_delta` server-side) onto `{citations,
  * normalizedAnswer, rawLength}`. Not a general JSON Patch implementation —
- * PipesHub's server only ever patches these single-level paths.
+ * EXODIA Brain's server only ever patches these single-level paths.
  */
 function applyStatePatch(state: AGUIStreamState, ops: AGUIJsonPatchOp[]): AGUIStreamState {
   let next = state;

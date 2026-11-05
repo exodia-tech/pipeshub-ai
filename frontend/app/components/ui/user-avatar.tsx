@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React from 'react';
@@ -49,7 +50,7 @@ function firstChar(s: string): string {
 /**
  * Derive initials from a free-form name string by splitting on separators.
  * Returns '' when no usable characters remain (caller decides the fallback).
- * e.g. "Acme Corporation" → "AC", "Pipeshub Inc." → "PI", "sofia.chen" → "SC", .
+ * e.g. "Acme Corporation" → "AC", "EXODIA Brain Inc." → "PI", "sofia.chen" → "SC", .
  */
 function initialsFromName(name: string): string {
   const parts = name.split(/[\s._-]+/).filter(Boolean);
@@ -65,7 +66,7 @@ function initialsFromName(name: string): string {
  * whitespace-only values, and multi-byte (emoji) first characters.
  */
 export function getInitials({ fullName, firstName, lastName, email }: UserAvatarProfile): string {
-  // 1. fullName (e.g. "Acme Corporation" → "AC", "Pipeshub Inc." → "PI")
+  // 1. fullName (e.g. "Acme Corporation" → "AC", "EXODIA Brain Inc." → "PI")
   const fromFullName = initialsFromName(fullName?.trim() ?? '');
   if (fromFullName) return fromFullName;
 

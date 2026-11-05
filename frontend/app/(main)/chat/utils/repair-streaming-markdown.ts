@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 /**
  * Repairs incomplete / unterminated markdown content that arrives mid-stream
  * via SSE so that `ReactMarkdown + remark-gfm` always receives valid input.
@@ -86,7 +87,7 @@ export function repairStreamingMarkdown(content: string): string {
   // ── 3. Drop the last line if it is a partial table row ───────────────────
   // A GFM table row must start AND end with `|`. During streaming the very
   // last chunk is often a cell value still being typed, e.g.:
-  //   | Organization Name | PipesHub
+  //   | Organization Name | EXODIA Brain
   // Dropping it (instead of force-closing with a trailing `|`) means the
   // table only re-renders once per completed row instead of once per chunk.
   const lastLine = lines[lines.length - 1];

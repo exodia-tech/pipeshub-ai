@@ -1,3 +1,4 @@
+// Modified by EXODIA: branding assertions.
 import 'reflect-metadata'
 import { expect } from 'chai'
 import sinon from 'sinon'
@@ -17,7 +18,7 @@ import { KafkaError } from '../../../src/libs/errors/kafka.errors'
  * sentence we wrote rather than the generic line.
  */
 
-const GENERIC = "Something went wrong on PipesHub's side"
+const GENERIC = "Something went wrong on EXODIA Brain's side"
 
 /** What the middleware writes: `{ error: { code, message, requestId? } }`. */
 interface ErrorBody {
@@ -123,10 +124,10 @@ describe('what this module writes reaches the client', () => {
       { data: { detail: 'ECONNREFUSED' } },
       'trouble reaching one of its services',
     ],
-    ['a 500', { statusCode: 500, data: { detail: 'KeyError: llm' } }, 'Something went wrong while PipesHub tried to'],
-    ['a 502', { statusCode: 502, data: {} }, 'Something went wrong while PipesHub tried to'],
-    ['an unrecognised status', { statusCode: 599, data: {} }, 'Something went wrong while PipesHub tried to'],
-    ['a value that is not an object', 'just a string', 'Something went wrong while PipesHub tried to'],
+    ['a 500', { statusCode: 500, data: { detail: 'KeyError: llm' } }, 'Something went wrong while EXODIA Brain tried to'],
+    ['a 502', { statusCode: 502, data: {} }, 'Something went wrong while EXODIA Brain tried to'],
+    ['an unrecognised status', { statusCode: 599, data: {} }, 'Something went wrong while EXODIA Brain tried to'],
+    ['a value that is not an object', 'just a string', 'Something went wrong while EXODIA Brain tried to'],
     ['a 503 with no detail', { statusCode: 503, data: {} }, 'briefly unavailable'],
     ['a 504 with no detail', { statusCode: 504, data: {} }, 'took longer than expected'],
   ]
@@ -149,7 +150,7 @@ describe('what this module writes reaches the client', () => {
     )
     const { message, headers } = sendThroughMiddleware(mapped)
 
-    expect(message).to.equal('This part of PipesHub is briefly unavailable. Please try again in 5 seconds.')
+    expect(message).to.equal('This part of EXODIA Brain is briefly unavailable. Please try again in 5 seconds.')
     expect(headers['retry-after']).to.equal('5')
   })
 

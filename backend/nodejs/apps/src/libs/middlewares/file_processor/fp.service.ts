@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import multer from 'multer';
 import { createMulter } from '../../utils/multer.utils';
 import {
@@ -250,8 +251,8 @@ export class FileProcessorService implements IFileUploadService {
       }
       case FileRejectionReason.UNSUPPORTED_TYPE:
         return extension
-          ? `PipesHub can't read .${extension} files. Convert it to a supported format such as PDF, DOCX or TXT and upload it again.`
-          : "PipesHub can't read this type of file. Convert it to a supported format such as PDF, DOCX or TXT and upload it again.";
+          ? `EXODIA Brain can't read .${extension} files. Convert it to a supported format such as PDF, DOCX or TXT and upload it again.`
+          : "EXODIA Brain can't read this type of file. Convert it to a supported format such as PDF, DOCX or TXT and upload it again.";
       default:
         return "This file couldn't be uploaded. Try uploading it again.";
     }

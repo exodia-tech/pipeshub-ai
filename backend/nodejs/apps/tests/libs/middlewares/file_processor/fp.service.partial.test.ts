@@ -1,3 +1,4 @@
+// Modified by EXODIA: branding assertions.
 import 'reflect-metadata'
 import { expect } from 'chai'
 import sinon from 'sinon'
@@ -476,7 +477,7 @@ describe('FileProcessorService - rejectionMessage edge cases', () => {
 
     expect(req.body.rejectedFiles).to.have.length(1)
     expect(req.body.rejectedFiles[0].error).to.equal(
-      "PipesHub can't read this type of file. Convert it to a supported format such as PDF, DOCX or TXT and upload it again.",
+      "EXODIA Brain can't read this type of file. Convert it to a supported format such as PDF, DOCX or TXT and upload it again.",
     )
   })
 

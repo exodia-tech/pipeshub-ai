@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import axios from 'axios';
 import jwkToPem from 'jwk-to-pem';
@@ -138,7 +139,7 @@ export const validateAzureAdUser = async (
 };
 
 /**
- * The email that identifies the PipesHub account for a verified token, and
+ * The email that identifies the EXODIA Brain account for a verified token, and
  * whether the token's `email` claim can be trusted to change stored data.
  *
  * `email` is set by tenant admins and never verified by Microsoft, so with a

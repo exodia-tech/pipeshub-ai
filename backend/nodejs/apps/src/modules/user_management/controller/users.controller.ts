@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { Response, NextFunction } from 'express';
 import { User, Users } from '../schema/users.schema'; // Adjust path as needed
 import { AuthenticatedUserRequest } from '../../../libs/middlewares/types';
@@ -2853,7 +2854,7 @@ export class UserController {
           orgId: user.orgId?.toString(),
         },
         usersMails: [newEmail],
-        subject: 'PipesHub | Verify your email !',
+        subject: 'EXODIA Brain | Verify your email !',
         templateData: {
           orgName: org?.shortName || org?.registeredName,
           name: user.fullName,
@@ -2882,7 +2883,7 @@ export class UserController {
             orgId: String(user.orgId ?? ''),
           },
           usersMails: [currentEmail],
-          subject: 'PipesHub | Your email address is being changed',
+          subject: 'EXODIA Brain | Your email address is being changed',
           templateData: {
             orgName: org?.shortName ?? org?.registeredName,
             name: user.fullName,

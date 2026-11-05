@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import React from 'react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
@@ -129,7 +130,7 @@ describe('Personal connectors page', () => {
       variant: 'info',
       title: 'Desktop app required',
       description:
-        'Local filesystem connector is only available in the PipesHub desktop app. Please use the desktop app to set up this connector.',
+        'Local filesystem connector is only available in the EXODIA Brain desktop app. Please use the desktop app to set up this connector.',
     });
     expect(screen.queryByRole('dialog', { name: 'Set up Local Folder' })).toBeNull();
   });

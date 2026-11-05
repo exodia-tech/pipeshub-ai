@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React from 'react';
@@ -9,7 +10,7 @@ import { LottieLoader } from '@/app/components/ui/lottie-loader';
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface AuthTitleSectionProps {
-  /** Main heading. Defaults to "Welcome to Pipeshub". */
+  /** Main heading. Defaults to "Welcome to EXODIA Brain". */
   title?: string;
   /** Subtitle below the heading. Defaults to the tagline. */
   subtitle?: string;

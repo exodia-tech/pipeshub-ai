@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { describe, it, expect } from 'vitest';
 import { repairStreamingMarkdown } from '../repair-streaming-markdown';
 
@@ -26,7 +27,7 @@ describe('repairStreamingMarkdown', () => {
   });
 
   it('drops an incomplete trailing table row instead of force-closing it', () => {
-    const content = '| Organization Name | PipesHub';
+    const content = '| Organization Name | EXODIA Brain';
     // No trailing `|` yet — the row is dropped entirely rather than closed
     // with a synthetic ` |`, so the table doesn't re-lay-out on every
     // partial-cell chunk.

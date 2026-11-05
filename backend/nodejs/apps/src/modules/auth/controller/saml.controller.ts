@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import passport from 'passport';
 import {
   Strategy as SamlStrategy,
@@ -34,7 +35,7 @@ import {
 
 const orgIdToSamlEmailKey: Record<string, string> = {};
 export const SAML_LOGOUT_UNSUPPORTED_MESSAGE =
-  "Signing out through your identity provider isn't supported. To sign out, use Sign out in PipesHub.";
+  "Signing out through your identity provider isn't supported. To sign out, use Sign out in EXODIA Brain.";
 @injectable()
 export class SamlController {
   constructor(

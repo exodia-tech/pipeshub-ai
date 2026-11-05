@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import { Logger } from '../services/logger.service';
 import {
   BadRequestError,
@@ -21,12 +22,12 @@ import {
 const logger = Logger.getInstance({ service: 'Backend Error' });
 
 /**
- * Shown when one PipesHub service cannot reach another. The fault is on the
+ * Shown when one EXODIA Brain service cannot reach another. The fault is on the
  * server, so it never asks the reader to check their own connection, and it
  * never names the service that is down.
  */
 export const SERVICE_UNAVAILABLE_MESSAGE =
-  'PipesHub is having trouble reaching one of its services. Try again in a minute; if it continues, ask your admin to check the services page.';
+  'EXODIA Brain is having trouble reaching one of its services. Try again in a minute; if it continues, ask your admin to check the services page.';
 
 /**
  * FastAPI validation errors (422) send `detail` as an array of
@@ -98,8 +99,8 @@ const retryHint = (retry: { retryAfter: string } | undefined): string => {
 };
 
 const TRANSIENT_FALLBACK: Record<429 | 503 | 504, string> = {
-  429: 'PipesHub is handling a lot of requests right now.',
-  503: 'This part of PipesHub is briefly unavailable.',
+  429: 'EXODIA Brain is handling a lot of requests right now.',
+  503: 'This part of EXODIA Brain is briefly unavailable.',
   504: 'This took longer than expected to respond.',
 };
 
@@ -142,7 +143,7 @@ const isConnectionRefused = (error: Indexed): boolean => {
 };
 
 /**
- * Turn a failed call to another PipesHub service into the error a caller can
+ * Turn a failed call to another EXODIA Brain service into the error a caller can
  * hand to the error middleware. Callers read every shape the service commands
  * return: `{ statusCode, data, message }`, axios's `{ response: { status, data } }`
  * and `{ statusCode, data, msg }`.

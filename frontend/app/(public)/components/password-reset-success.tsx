@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React from 'react';
@@ -17,7 +18,7 @@ export default function PasswordResetSuccess() {
       <Box style={{ marginBottom: '24px' }}>
         <Image
           src="/login-page-assets/pipeshub/white-square.svg"
-          alt="Pipeshub"
+          alt="EXODIA Brain"
           width={48}
           height={48}
         />
@@ -36,7 +37,7 @@ export default function PasswordResetSuccess() {
           Your password has been changed!
         </Text>
         <Text style={{ color: 'var(--gray-11)', fontSize: '14px', lineHeight: '20px' }}>
-          Your password has been successfully updated. You can now sign in to your Pipeshub
+          Your password has been successfully updated. You can now sign in to your EXODIA Brain
           workspace with your new password.
         </Text>
       </Flex>

@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,7 @@ interface ShareableRowProps {
   noRolesInfo?: { title: string; description: string };
   /** Whether to show a radio button for selection */
   showRadio?: boolean;
-  /** Whether to show "Invite to Pipeshub" link */
+  /** Whether to show "Invite to EXODIA Brain" link */
   showInvite?: boolean;
   /** Whether this is the current user */
   isCurrentUser?: boolean;

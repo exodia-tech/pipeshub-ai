@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 /**
  * The SSE transport under chat answers, KB uploads and model downloads:
  * frame parsing across arbitrary chunk boundaries, the token handshake, and
@@ -204,7 +205,7 @@ describe('what a person reads when the chat stream fails', () => {
     expect(sink.events).toEqual([]);
   });
 
-  it('says PipesHub could not be reached when the request never leaves the browser', async () => {
+  it('says EXODIA Brain could not be reached when the request never leaves the browser', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     const sink = collect();
     await streamSSERequest('/s', {}, sink);
@@ -277,14 +278,14 @@ describe('streamSSEUpload', () => {
     fetchMock.mockResolvedValueOnce(new Response('busy', { status: 503, headers: { 'retry-after': '9' } }));
     const sink = collect();
     await streamSSEUpload('/u', form(), sink);
-    expect(sink.errors[0]).toMatchObject({ status: 503, retryAfter: 9, message: 'PipesHub is busy right now. Please try again in 9 seconds.' });
+    expect(sink.errors[0]).toMatchObject({ status: 503, retryAfter: 9, message: 'EXODIA Brain is busy right now. Please try again in 9 seconds.' });
   });
 
   it('keeps the full server wait even when it is too long to quote in the message', async () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 429, headers: { 'retry-after': '600' } }));
     const sink = collect();
     await streamSSEUpload('/u', form(), sink);
-    expect(sink.errors[0]).toMatchObject({ retryAfter: 600, message: 'PipesHub is busy right now. Please try again in a few seconds.' });
+    expect(sink.errors[0]).toMatchObject({ retryAfter: 600, message: 'EXODIA Brain is busy right now. Please try again in a few seconds.' });
   });
 
   it('gives a plain next step for other refusals', async () => {
@@ -322,7 +323,7 @@ describe('streamSSEUpload', () => {
   });
 
   // Each message lands on every affected file's row in the upload tracker.
-  it("says PipesHub couldn't be reached, not the browser's own words, when the upload never leaves", async () => {
+  it("says EXODIA Brain couldn't be reached, not the browser's own words, when the upload never leaves", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     const sink = collect();
     await streamSSEUpload('/u', form(), sink);

@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import 'reflect-metadata';
 import bcrypt from 'bcryptjs';
 import { expect } from 'chai';
@@ -2892,7 +2893,7 @@ describe('UserController', () => {
       await controller.resendInvite(req, res, next);
 
       expect(next.calledOnce).to.be.true;
-      expect(next.firstCall.args[0].message).to.include('PipesHub tried to send the invitation');
+      expect(next.firstCall.args[0].message).to.include('EXODIA Brain tried to send the invitation');
     });
 
     it('should throw InternalServerError when mail sending fails (password disabled)', async () => {
@@ -2915,7 +2916,7 @@ describe('UserController', () => {
       await controller.resendInvite(req, res, next);
 
       expect(next.calledOnce).to.be.true;
-      expect(next.firstCall.args[0].message).to.include('PipesHub tried to send the invitation');
+      expect(next.firstCall.args[0].message).to.include('EXODIA Brain tried to send the invitation');
     });
   });
 
@@ -5086,7 +5087,7 @@ describe('UserController', () => {
       await controller.resendInvite(req, res, next);
 
       expect(next.calledOnce).to.be.true;
-      expect(next.firstCall.args[0].message).to.include('PipesHub tried to send the invitation');
+      expect(next.firstCall.args[0].message).to.include('EXODIA Brain tried to send the invitation');
     });
 
     it('should throw when password mail sending fails', async () => {
@@ -5113,7 +5114,7 @@ describe('UserController', () => {
       await controller.resendInvite(req, res, next);
 
       expect(next.calledOnce).to.be.true;
-      expect(next.firstCall.args[0].message).to.include('PipesHub tried to send the invitation');
+      expect(next.firstCall.args[0].message).to.include('EXODIA Brain tried to send the invitation');
     });
   });
 

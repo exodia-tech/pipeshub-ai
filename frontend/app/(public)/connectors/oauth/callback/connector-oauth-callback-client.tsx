@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -153,7 +154,7 @@ export function ConnectorOAuthCallbackClient() {
                 maxWidth: 432,
               }}
             >
-              Securely exchanging the authorization code with PipesHub.
+              Securely exchanging the authorization code with EXODIA Brain.
             </Text>
           </Flex>
         </Flex>

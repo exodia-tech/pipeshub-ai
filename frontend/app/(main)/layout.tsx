@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 'use client'
 
 import React, { Suspense, useEffect, useState } from "react"
@@ -68,7 +69,7 @@ export default function RootLayout({
   }, [language])
 
   useEffect(() => {
-    document.title = "Pipeshub AI"
+    document.title = "EXODIA Brain"
   }, [])
 
   const currentLang = mounted ? language : 'en'

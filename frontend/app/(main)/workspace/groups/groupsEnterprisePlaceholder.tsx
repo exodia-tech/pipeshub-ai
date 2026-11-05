@@ -75,12 +75,12 @@ export default function GroupsEnterprisePlaceholder() {
           <Text size="2" style={{ color: 'var(--slate-11)', lineHeight: '20px' }}>
             {t('workspace.groups.enterpriseContact', 'Contact')}{' '}
             <a
-              href="https://docs.pipeshub.com/contact-us"
+              href="mailto:mo@exodiatech.com"
               target="_blank"
               rel="noreferrer"
               style={{ color: 'var(--accent-11)', textDecoration: 'none' }}
             >
-              @pipeshub.com
+              mo@exodiatech.com
             </a>
           </Text>
         </Flex>

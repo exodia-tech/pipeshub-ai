@@ -1,3 +1,4 @@
+// Modified by EXODIA: customer-facing branding.
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
@@ -86,7 +87,7 @@ function renderView() {
 const firstPartyConsent = {
   requiresConsent: true,
   consentData: {
-    app: { name: 'PipesHub agent', isDynamic: false },
+    app: { name: 'EXODIA Brain agent', isDynamic: false },
     scopes: [{ name: 'user:read', description: 'Read users', category: 'User' }],
     user: { email: 'u@e.com', name: 'Test' },
   },
@@ -130,7 +131,7 @@ describe('OAuthDeviceView', () => {
     post.mockResolvedValue({ data: firstPartyConsent });
     renderView();
     await waitFor(() => {
-      expect(screen.getByText('PipesHub agent')).toBeTruthy();
+      expect(screen.getByText('EXODIA Brain agent')).toBeTruthy();
     });
     expect(screen.getByText(PHISHING_WARNING)).toBeTruthy();
     expect(screen.queryByText(UNREVIEWED_APP)).toBeNull();
