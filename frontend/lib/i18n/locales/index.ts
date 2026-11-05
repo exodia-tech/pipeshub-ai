@@ -10,6 +10,7 @@
  * so no further changes are needed there.
  */
 import enUS from './en-US.json';
+import itIT from './it-IT.json';
 import deDE from './de-DE.json';
 import esES from './es-ES.json';
 import enIN from './en-IN.json';
@@ -23,6 +24,7 @@ import type { Language } from '../supported-languages';
 
 export const locales: Record<Language, unknown> = {
   'en-US': enUS,
+  'it-IT': itIT,
   'de-DE': deDE,
   'es-ES': esES,
   'en-IN': enIN,

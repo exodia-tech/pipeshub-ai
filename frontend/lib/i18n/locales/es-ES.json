@@ -4192,6 +4192,10 @@
       "title": "Inicio de sesión enviado a EXODIA Brain",
       "description": "Puedes cerrar esta pestaña y volver a la aplicación de EXODIA Brain.",
       "openApp": "Abrir EXODIA Brain"
+    },
+    "hero": {
+      "title": "Your tools. One shared brain.",
+      "search": "Find answers in your company knowledge"
     }
   },
   "healthGate": {

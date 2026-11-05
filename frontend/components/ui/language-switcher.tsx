@@ -11,6 +11,7 @@ export function LanguageSwitcher() {
 
   const languages: { value: Language; label: string; nativeLabel: string }[] = [
     { value: 'en-US', label: 'English', nativeLabel: 'English' },
+    { value: 'it-IT', label: 'Italian', nativeLabel: 'Italiano' },
     { value: 'de-DE', label: 'German', nativeLabel: 'Deutsch' },
     { value: 'es-ES', label: 'Spanish', nativeLabel: 'Español' },
     { value: 'en-IN', label: 'English (India)', nativeLabel: 'English' },

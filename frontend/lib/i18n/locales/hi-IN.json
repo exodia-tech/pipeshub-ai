@@ -4164,6 +4164,10 @@
       "title": "साइन-इन EXODIA Brain को भेज दिया गया",
       "description": "आप यह टैब बंद करके EXODIA Brain ऐप पर वापस जा सकते हैं।",
       "openApp": "EXODIA Brain खोलें"
+    },
+    "hero": {
+      "title": "Your tools. One shared brain.",
+      "search": "Find answers in your company knowledge"
     }
   },
   "healthGate": {

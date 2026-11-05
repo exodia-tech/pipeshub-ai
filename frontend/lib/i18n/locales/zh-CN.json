@@ -4169,6 +4169,10 @@
       "title": "登录已发送到 EXODIA Brain",
       "description": "您可以关闭此标签页并返回 EXODIA Brain 应用。",
       "openApp": "打开 EXODIA Brain"
+    },
+    "hero": {
+      "title": "Your tools. One shared brain.",
+      "search": "Find answers in your company knowledge"
     }
   },
   "healthGate": {

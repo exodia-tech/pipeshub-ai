@@ -9,6 +9,7 @@
  */
 export const SUPPORTED_LANGUAGES = {
   'en-US': { value: 'en-US', menuName: 'English (US)' },
+  'it-IT': { value: 'it-IT', menuName: 'Italiano (Italia)' },
   'de-DE': { value: 'de-DE', menuName: 'Deutsch (Deutschland)' },
   'es-ES': { value: 'es-ES', menuName: 'Español (España)' },
   'en-IN': { value: 'en-IN', menuName: 'English (India)' },

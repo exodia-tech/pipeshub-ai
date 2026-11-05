@@ -4169,6 +4169,10 @@
       "title": "로그인이 EXODIA Brain로 전송되었습니다",
       "description": "이 탭을 닫고 EXODIA Brain 앱으로 돌아가세요.",
       "openApp": "EXODIA Brain 열기"
+    },
+    "hero": {
+      "title": "Your tools. One shared brain.",
+      "search": "Find answers in your company knowledge"
     }
   },
   "healthGate": {

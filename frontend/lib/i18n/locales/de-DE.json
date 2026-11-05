@@ -4164,6 +4164,10 @@
       "title": "Anmeldung an EXODIA Brain gesendet",
       "description": "Sie können diesen Tab schließen und zur EXODIA Brain-App zurückkehren.",
       "openApp": "EXODIA Brain öffnen"
+    },
+    "hero": {
+      "title": "Your tools. One shared brain.",
+      "search": "Find answers in your company knowledge"
     }
   },
   "healthGate": {
