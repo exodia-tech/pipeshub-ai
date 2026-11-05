@@ -68,7 +68,7 @@ const OtpField = React.forwardRef<HTMLInputElement, OtpFieldProps>(function OtpF
         autoFocus={autoFocus}
         maxLength={OTP_LENGTH}
         size="3"
-        color={error ? 'red' : 'jade'}
+        color={error ? 'red' : 'blue'}
         style={{
           width: '100%',
           letterSpacing: '0.2em',
