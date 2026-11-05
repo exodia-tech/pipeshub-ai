@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# Use the Docker 29 bundled frontend; avoid an extra registry fetch during deployment.
 # Slow layers (APT, Rust, Python deps, ML models, runtime stack) live in Dockerfile.base.
 # Override with local tags if registry images are missing:
 #   docker build --build-arg PYTHON_DEPS_IMAGE=myreg/python-deps --build-arg RUNTIME_BASE_IMAGE=myreg/runtime .
