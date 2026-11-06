@@ -49,6 +49,15 @@ const chatSessionSchema = new Schema<IChatSessionDocument>(
     isArchived: { type: Boolean, default: false },
     archivedBy: { type: Schema.Types.ObjectId },
     lastActivityAt: { type: Number, default: Date.now },
+    /**
+     * Owner's pin. Deliberately no default: pinning writes `true`, unpinning
+     * removes the field, so every unpinned row (including those created before
+     * this field existed) is "missing". A stored `false` would sort ahead of
+     * missing rows in a descending sort and scramble recency order.
+     */
+    isPinned: { type: Boolean },
+    /** Identifies the run that currently owns the thread, so only it can release or keep it alive. Internal: never selected. */
+    activeRunId: { type: String, select: false },
     status: {
       type: String,
       enum: ['None', 'Inprogress', 'Complete', 'Failed', 'Stopped'],
@@ -104,6 +113,10 @@ const chatSessionSchema = new Schema<IChatSessionDocument>(
      * getProjectConversations for the read-side of this rule.
      */
     projectVisibility: { type: String, enum: ['private', 'project'] },
+
+    // ---- Compare models: a hidden branch of another chat; no default, so ordinary chats never carry the key ----
+    compareOf: { type: Schema.Types.ObjectId, index: true },
+    compareFromMessageId: { type: Schema.Types.ObjectId },
   },
   { timestamps: true, collection: 'chatSessions' },
 );

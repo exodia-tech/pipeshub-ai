@@ -5,6 +5,7 @@ import {
   deleteRecord,
   restoreRecord,
   restoreRecords,
+  listTrash,
   getRecordById,
   updateRecord,
   getRecordBuffer,
@@ -36,6 +37,7 @@ import {
   deleteRecordSchema,
   restoreRecordSchema,
   restoreRecordsSchema,
+  listTrashSchema,
   reindexRecordGroupSchema,
   createKBSchema,
   getKBSchema,
@@ -55,7 +57,6 @@ import {
   demoDataPreferenceSchema,
   demoDataWorkspaceSchema,
 } from '../validators/validators';
-// Clean up unused commented import
 import { FileProcessingType } from '../../../libs/middlewares/file_processor/fp.constant';
 import { extensionToMimeType, getMimeType } from '../../storage/mimetypes/mimetypes';
 import { KeyValueStoreService } from '../../../libs/services/keyValueStore.service';
@@ -408,6 +409,16 @@ export function createKnowledgeBaseRouter(
     createFolder(appConfig),
   );
 
+  // Create subfolder (nested via path parameter)
+  router.post(
+    '/:kbId/folder/:folderId/subfolder',
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    authMiddleware.authenticate,
+    requireScopes(OAuthScopeNames.KB_WRITE),
+    ValidationMiddleware.validate(createFolderSchema),
+    createFolder(appConfig),
+  );
+
   // update folder
   router.put(
     '/:kbId/folder/:folderId',
@@ -459,6 +470,15 @@ export function createKnowledgeBaseRouter(
     requireScopes(OAuthScopeNames.KB_DELETE),
     ValidationMiddleware.validate(deletePermissionsSchema),
     removeKBPermission(appConfig),
+  );
+
+  // A collection's recently deleted items; the same scope as restore, since it lists what may be restored
+  router.get(
+    '/:kbId/trash',
+    authMiddleware.authenticate,
+    requireScopes(OAuthScopeNames.KB_DELETE),
+    ValidationMiddleware.validate(listTrashSchema),
+    listTrash(appConfig),
   );
 
   // Move record (file or folder) to another location

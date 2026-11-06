@@ -1,6 +1,7 @@
 import type { AppliedFilters, AskUserQuestionAnswer, AskUserQuestionPayload, AttachmentRef, MessagePart } from '../../types';
 import type { ConfidenceLevel, ModelInfo } from '../../types';
 import type { CitationMaps } from './response-tabs/citations';
+import type { ChatStreamErrorInfo } from '../../stream-error';
 
 export interface MessagePair {
   key: string;
@@ -10,6 +11,7 @@ export interface MessagePair {
   answer: string;
   citationMaps: CitationMaps;
   confidence?: ConfidenceLevel;
+  searchDegraded?: boolean;
   isStreaming: boolean;
   modelInfo?: ModelInfo;
   feedbackInfo?: { value?: 'like' | 'dislike' };
@@ -27,6 +29,8 @@ export interface MessagePair {
   persistedParts?: MessagePart[];
   /** Set when this response was cut short by a user-initiated Stop. */
   status?: 'stopped';
+  /** The server's error code and details when this reply is a failed run (live turns only). */
+  streamError?: ChatStreamErrorInfo;
   /** No assistant row follows this question — render the question alone, no answer area. */
   unanswered?: boolean;
 }
@@ -50,6 +54,9 @@ type AssistantCustom = {
   persistedAskUserQuestionAnswers?: Record<string, AskUserQuestionAnswer>;
   persistedParts?: MessagePart[];
   status?: 'stopped';
+  streamError?: ChatStreamErrorInfo;
+  /** A search behind this answer was answered from a partial search. */
+  searchDegraded?: boolean;
 };
 
 type UserCustom = {
@@ -170,6 +177,7 @@ export function buildMessagePairs(
           ? emptyCitationMaps
           : (metadata?.citationMaps || emptyCitationMaps),
         confidence: metadata?.confidence,
+        searchDegraded: metadata?.searchDegraded === true,
         isStreaming: isCurrentlyStreaming || isBeingRegenerated,
         modelInfo: metadata?.modelInfo,
         feedbackInfo: metadata?.feedbackInfo,
@@ -183,6 +191,7 @@ export function buildMessagePairs(
         persistedAskUserQuestionAnswers: metadata?.persistedAskUserQuestionAnswers,
         persistedParts: metadata?.persistedParts,
         status: metadata?.status,
+        streamError: metadata?.streamError,
       });
     }
   }

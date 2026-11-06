@@ -123,6 +123,16 @@ describe('deleting a selection', () => {
     expect(store().nodeChildrenCache.get('kb-1')?.map((n) => n.id)).toEqual(['r2']);
   });
 
+  it('names what was kept and why when the server refuses every delete', async () => {
+    fakeApi({ [`DELETE ${KB}/record/r1`]: { status: 403 }, [`DELETE ${KB}/record/r2`]: { status: 403 } });
+
+    await store().bulkDeleteSelected(items.slice(0, 2));
+
+    expect(toasts()).toEqual([
+      { variant: 'error', title: 'Could not delete 2 items', description: "You don't have permission to delete: a.pdf, b.pdf" },
+    ]);
+  });
+
   it('reports full success', async () => {
     fakeApi({ [`DELETE ${KB}/record/r1`]: { status: 200 }, [`DELETE ${KB}/record/r2`]: { status: 200 } });
     await store().bulkDeleteSelected(items.slice(0, 2));
@@ -203,26 +213,41 @@ describe('the sidebar child cache', () => {
 });
 
 describe('browsing state', () => {
-  it('goes back to page 1 whenever what is listed changes', () => {
-    store().setCollectionsPagination({ page: 3, limit: 50, totalItems: 500, totalPages: 10, hasNext: true, hasPrev: true });
+  it('goes back to the first page whenever what is listed changes', () => {
+    store().setCollectionsPagination({
+      cursor: 'c3', limit: 50, totalItems: 500, startIndex: 101, endIndex: 150,
+      hasNext: true, hasPrev: true, nextCursor: 'c4', prevCursor: 'c2',
+    });
     store().setSearchQuery('invoice');
-    expect(store().collectionsPagination.page).toBe(1);
-    store().setCollectionsPage(4);
+    expect(store().collectionsPagination.cursor).toBeNull();
+    store().setCollectionsCursor('c4');
     store().setSort({ field: 'name', order: 'asc' } as never);
-    expect(store().collectionsPagination.page).toBe(1);
-    store().setCollectionsPage(10);
-    expect(store().collectionsPagination).toMatchObject({ hasNext: false, hasPrev: true });
+    expect(store().collectionsPagination.cursor).toBeNull();
+    store().setCollectionsCursor('c9');
+    store().setFilter({ recordTypes: ['FILE'] } as never);
+    expect(store().collectionsPagination.cursor).toBeNull();
+    // A cursor is issued for one page size.
+    store().setCollectionsCursor('c9');
     store().setCollectionsLimit(100);
-    expect(store().collectionsPagination).toMatchObject({ page: 1, totalPages: 5, hasNext: true, hasPrev: false });
+    expect(store().collectionsPagination).toMatchObject({ cursor: null, limit: 100 });
   });
 
-  it('keeps the page when a filter is restored from the URL', () => {
-    store().setCollectionsPage(2);
+  it('moves only the position on Next; the footer waits for the response', () => {
+    store().setCollectionsPagination({
+      cursor: null, limit: 50, totalItems: 120, startIndex: 1, endIndex: 50,
+      hasNext: true, hasPrev: false, nextCursor: 'c2', prevCursor: null,
+    });
+    store().setCollectionsCursor('c2');
+    expect(store().collectionsPagination).toMatchObject({ cursor: 'c2', startIndex: 1, endIndex: 50, hasPrev: false });
+  });
+
+  it('keeps the position when a filter is restored from the URL', () => {
+    store().setCollectionsCursor('c2');
     store().hydrateFilter({ recordTypes: ['FILE'] } as never);
-    expect(store().collectionsPagination.page).toBe(2);
+    expect(store().collectionsPagination.cursor).toBe('c2');
     store().clearFilter();
     expect(store().filter).toEqual({});
-    expect(store().collectionsPagination.page).toBe(1);
+    expect(store().collectionsPagination.cursor).toBeNull();
   });
 
   it('expanding a folder collapses its siblings and everything under them', () => {
@@ -239,14 +264,21 @@ describe('browsing state', () => {
     expect(store().expandedFolders).toEqual({ b: true });
   });
 
-  it('pages all records from the loaded list', () => {
-    store().setAllRecordsLimit(2);
+  it('pages all records by cursor; a response never moves the position', () => {
+    // A client-side list is the whole result: nothing to page to.
     store().setAllRecords([{ id: '1' }, { id: '2' }, { id: '3' }] as never);
-    expect(store().allRecordsPagination).toMatchObject({ totalItems: 3, totalPages: 2, hasNext: true, hasPrev: false });
-    store().setAllRecordsPage(2);
-    expect(store().allRecordsPagination).toMatchObject({ hasNext: false, hasPrev: true });
-    store().syncAllRecordsPaginationMeta({ totalItems: 9, totalPages: 5, hasNext: true, hasPrev: true });
-    expect(store().allRecordsPagination).toMatchObject({ page: 2, limit: 2, totalItems: 9 });
+    expect(store().allRecordsPagination).toMatchObject({
+      totalItems: 3, startIndex: 1, endIndex: 3, hasNext: false, hasPrev: false, nextCursor: null,
+    });
+    store().setAllRecordsLimit(2);
+    store().setAllRecordsCursor('c2');
+    store().syncAllRecordsPaginationMeta({
+      cursor: 'ignored', limit: 99, totalItems: 9, startIndex: 3, endIndex: 4,
+      hasNext: true, hasPrev: true, nextCursor: 'c3', prevCursor: 'c1',
+    });
+    expect(store().allRecordsPagination).toMatchObject({
+      cursor: 'c2', limit: 2, totalItems: 9, startIndex: 3, endIndex: 4, nextCursor: 'c3', prevCursor: 'c1',
+    });
   });
 
   it('selects, toggles and clears', () => {
@@ -259,5 +291,51 @@ describe('browsing state', () => {
     store().addNodes([node('n1')]);
     store().addNodes([node('n1'), node('n2')]);
     expect(store().nodes.map((n) => n.id)).toEqual(['n1', 'n2']);
+  });
+});
+
+describe('applyNodeRename', () => {
+  it('shows a renamed collection in the header, breadcrumbs, rows and All Records selection at once', () => {
+    store().setTableData({
+      currentNode: { id: 'kb1', name: 'Old', nodeType: 'app' },
+      parentNode: null,
+      breadcrumbs: [{ id: 'kb1', name: 'Old', nodeType: 'app' }],
+      items: [node('kb1', { name: 'Old' }), node('r1', { name: 'keep' })],
+    } as never);
+    store().setAllRecordsSidebarSelection({ type: 'collection', id: 'kb1', name: 'Old' });
+
+    store().applyNodeRename('kb1', 'New');
+
+    expect(store().tableData?.currentNode?.name).toBe('New');
+    expect(store().tableData?.breadcrumbs?.[0]?.name).toBe('New');
+    expect(store().tableData?.items.map((i) => i.name)).toEqual(['New', 'keep']);
+    expect(store().allRecordsSidebarSelection).toEqual({ type: 'collection', id: 'kb1', name: 'New' });
+  });
+
+  it('renames the collection in the sidebar trees the duplicate-name check reads', () => {
+    const tree = (id: string, name: string, children: unknown[] = []) =>
+      ({ id, name, children, nodeType: 'app', hasChildren: children.length > 0, isExpanded: false, depth: 0, parentId: null });
+    useKnowledgeBaseStore.setState({
+      categorizedNodes: {
+        shared: [tree('kbS', 'Shared')],
+        private: [tree('kb1', 'Old', [tree('f1', 'Folder')])],
+      } as never,
+      nodes: [node('kb1', { name: 'Old' })],
+    });
+
+    store().applyNodeRename('kb1', 'New');
+    store().applyNodeRename('f1', 'Folder 2');
+
+    const cat = store().categorizedNodes;
+    expect(cat?.private[0]?.name).toBe('New');
+    expect(cat?.private[0]?.children[0]?.name).toBe('Folder 2');
+    expect(cat?.shared[0]?.name).toBe('Shared');
+    expect(store().nodes[0]?.name).toBe('New');
+  });
+
+  it('leaves everything alone when nothing open has that id', () => {
+    store().setTableData({ currentNode: { id: 'kb2', name: 'Other', nodeType: 'app' }, items: [] } as never);
+    store().applyNodeRename('kb1', 'New');
+    expect(store().tableData?.currentNode?.name).toBe('Other');
   });
 });

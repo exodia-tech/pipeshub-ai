@@ -93,6 +93,40 @@ sentence 1 also conflicting. Only what the answer itself asserts counts: a \
 view it raises in order to reject, or a source it reports as out of date, \
 neither states the claim nor conflicts with it.
 
+A condition or exception conflicts with a claim when it takes part of the \
+claim back: within the claim's own subject and limits, the claim is no longer \
+true as stated. A step still ahead on the way to an outcome does not take back \
+a claim about where it stands now. For the claim "The migration is on \
+schedule", neither "The migration is on schedule, but cut-over still depends \
+on passing the load test" nor "The migration is on schedule; sign-off is due \
+by 31 May" conflicts: being on schedule means those steps are still ahead and \
+expected. "The migration is on schedule, but only if the board reverses its \
+cancellation" does conflict, because a cancelled migration is not on schedule \
+now. Limits work the same way: "Up to $250, but your manager approves above \
+that" is about amounts beyond the claim and does not conflict with "A purchase \
+of up to $250 needs no approval", while an exception inside the claim's limits, \
+like the card refunds above, does. A duty the claim says nothing about does not \
+conflict either, as long as the claim stays true as stated: for "A purchase of \
+up to $250 needs no manager approval", "You can spend up to $250 without \
+manager approval, as long as you submit the receipt within 30 days" is \
+"supported" and does not conflict, so its sentence is not listed in \
+conflicting_sentence_ids: submitting a receipt does not change whether a \
+manager has to approve. A step still ahead never \
+makes a claim that the step has already happened true: "Marcus will approve it" \
+still does not support "Marcus approved it".
+
+How a plan is carried out does not take back what the plan is. For "The \
+strategy is to move Enterprise to a platform fee", neither "Existing customers \
+keep their current terms until their contracts end" nor "Customers who move \
+early get a 12% discount" conflicts: grandfathering, a phased roll-out or an \
+incentive to move early says how and when the move happens, not that it does \
+not happen. Such a sentence conflicts only when it reverses the plan within the \
+claim's own subject, like "Existing Enterprise customers stay on per-seat \
+pricing for good", or when it breaks a deadline or a coverage the claim \
+itself states: "Existing customers keep per-seat pricing until 2028" \
+conflicts with "Every Enterprise customer moves to the platform fee by June \
+2026".
+
 Be strict. None of these supports a claim:
 - a hedged or uncertain statement ("may", "might", "I think", "probably", \
 "it seems", "please confirm");

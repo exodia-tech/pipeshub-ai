@@ -25,6 +25,9 @@ import {
   getMcpInstance,
   updateMcpInstance,
   deleteMcpInstance,
+  getMcpLogos,
+  setMcpInstanceLogo,
+  removeMcpInstanceLogo,
   authenticateMcpInstance,
   updateMcpCredentials,
   removeMcpCredentials,
@@ -44,6 +47,8 @@ import {
   removeAgentMcpCredentials,
   reauthenticateAgentMcpInstance,
   getAgentMcpOAuthAuthorizationUrl,
+  getMyMcpToolRules,
+  updateMyMcpToolRules,
 } from '../controller/mcp_servers.controller';
 import { guardPathParams } from '../../../libs/middlewares/safe-path-params.middleware';
 
@@ -61,16 +66,23 @@ export function createMcpServersRouter(container: Container): Router {
   // ---- Discovery / consumption (before '/instances/:instanceId' so 'my-mcp-servers' never matches as an id) --
 
   router.get('/my-mcp-servers', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_READ), getMyMcpServers(config));
+  // The uploaded logos of the custom servers the caller can see.
+  router.get(
+    '/logos',
+    authMiddleware.authenticate.bind(authMiddleware),
+    requireScopes(OAuthScopeNames.MCP_READ),
+    getMcpLogos(config),
+  );
 
   // ---- OAuth callback / discovery (state-keyed, instance-agnostic paths) --
 
   router.get('/oauth/callback', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_WRITE), handleMcpOAuthCallback(config));
   // Discovery is required in *create* mode, before an instanceId exists — MCP_WRITE (not
-  // READ) because it's admin-gated on the Python side and is the same trust boundary as
-  // configuring an OAuth app.
+  // READ): it is the same trust boundary as configuring an OAuth app. Python probes a
+  // non-admin's URL under the public-only policy of a personal instance.
   router.post('/oauth/discover', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_WRITE), discoverMcpOAuthMetadata(config));
 
-  // ---- Instances (admin-managed, org-scoped) ------------------------------
+  // ---- Instances (org-wide ones admin-managed, personal ones owner-managed) --
 
   router.get('/instances', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_READ), listMcpInstances(config));
   router.post('/instances', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_WRITE), createMcpInstance(config));
@@ -78,6 +90,32 @@ export function createMcpServersRouter(container: Container): Router {
   router.put('/instances/:instanceId', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_WRITE), updateMcpInstance(config));
   router.delete('/instances/:instanceId', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_DELETE), deleteMcpInstance(config));
   router.get('/instances/:instanceId/tools', authMiddleware.authenticate, requireScopes(OAuthScopeNames.MCP_READ), getMcpInstanceTools(config));
+  router.put(
+    '/instances/:instanceId/logo',
+    authMiddleware.authenticate.bind(authMiddleware),
+    requireScopes(OAuthScopeNames.MCP_WRITE),
+    setMcpInstanceLogo(config),
+  );
+  // Removing a logo edits the server and destroys nothing, so it needs write, not delete.
+  router.delete(
+    '/instances/:instanceId/logo',
+    authMiddleware.authenticate.bind(authMiddleware),
+    requireScopes(OAuthScopeNames.MCP_WRITE),
+    removeMcpInstanceLogo(config),
+  );
+  // Tool approvals: the caller's own rules.
+  router.get(
+    '/instances/:instanceId/my-tool-rules',
+    authMiddleware.authenticate.bind(authMiddleware),
+    requireScopes(OAuthScopeNames.MCP_READ),
+    getMyMcpToolRules(config),
+  );
+  router.put(
+    '/instances/:instanceId/my-tool-rules',
+    authMiddleware.authenticate.bind(authMiddleware),
+    requireScopes(OAuthScopeNames.MCP_WRITE),
+    updateMyMcpToolRules(config),
+  );
 
   // ---- Auth — API token / headers -----------------------------------------
 

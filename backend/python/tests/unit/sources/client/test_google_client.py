@@ -977,17 +977,8 @@ class TestToolsetRefreshScopes:
             ("gmail", "v1", ("app.agents.actions.google.gmail.gmail", "Gmail")),
             ("drive", "v3", ("app.agents.actions.google.drive.drive", "GoogleDrive")),
             ("calendar", "v3", ("app.agents.actions.google.calendar.calendar", "GoogleCalendar")),
-            # The Meet toolset module does not import today (it names a ToolCategory
-            # that tool_builder no longer has), so its consent list is spelled out.
-            (
-                "meet",
-                "v2",
-                [
-                    "https://www.googleapis.com/auth/calendar",
-                    "https://www.googleapis.com/auth/calendar.events",
-                    "https://www.googleapis.com/auth/meetings.space.created",
-                ],
-            ),
+            ("docs", "v1", ("app.agents.actions.google.docs.docs", "GoogleDocs")),
+            ("sheets", "v4", ("app.agents.actions.google.sheets.sheets", "GoogleSheets")),
         ],
     )
     @patch("app.sources.client.google.google.build")
@@ -1007,6 +998,19 @@ class TestToolsetRefreshScopes:
         consented = (
             self._consent_scopes(*consent_screen) if isinstance(consent_screen, tuple) else consent_screen
         )
+        refresh_scopes = await self._refresh_scopes(
+            service_name, version, mock_credentials_cls, logger, mock_config_service
+        )
+        assert sorted(refresh_scopes) == sorted(consented)
+
+    @staticmethod
+    async def _refresh_scopes(
+        service_name: str,
+        version: str,
+        mock_credentials_cls: MagicMock,
+        logger: logging.Logger,
+        mock_config_service: AsyncMock,
+    ) -> list[str]:
         # Importing the real routes module alone trips a circular import.
         toolsets_routes = MagicMock()
         toolsets_routes.get_oauth_credentials_for_toolset = AsyncMock(
@@ -1024,9 +1028,22 @@ class TestToolsetRefreshScopes:
                 config_service=mock_config_service,
                 version=version,
             )
+        return mock_credentials_cls.call_args.kwargs["scopes"]
 
-        refresh_scopes = mock_credentials_cls.call_args.kwargs["scopes"]
-        assert sorted(refresh_scopes) == sorted(consented)
+    @pytest.mark.asyncio
+    @patch("app.sources.client.google.google.build")
+    @patch("app.sources.client.google.google.Credentials")
+    async def test_calendar_neither_asks_for_nor_refreshes_with_gmail_send(
+        self, mock_credentials_cls, mock_build, logger, mock_config_service
+    ) -> None:
+        # Invites go out through Calendar's sendUpdates; nothing in the toolset sends mail.
+        gmail_send = "https://www.googleapis.com/auth/gmail.send"
+        consented = self._consent_scopes("app.agents.actions.google.calendar.calendar", "GoogleCalendar")
+        refresh_scopes = await self._refresh_scopes(
+            "calendar", "v3", mock_credentials_cls, logger, mock_config_service
+        )
+        assert gmail_send not in consented
+        assert gmail_send not in refresh_scopes
 
 
 class TestBuildFromToolsetEdgeCases:

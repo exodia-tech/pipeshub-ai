@@ -103,6 +103,9 @@ class TerminalAnswerStreamer:
         self._emit_interval = answer_delta_min_interval()
         self._last_emit = 0.0
         self._withheld = False
+        # A text-only reply a POST_MODEL hook sent back for another try stays
+        # on screen after the next turn resets `_buffer`; clear it then.
+        self._stale_on_screen = False
 
         # Reasoning/thinking accumulation (Phase 1f) — one entry per model
         # turn that actually reasoned. Populated from the SAME `AgentEvent`
@@ -112,12 +115,16 @@ class TerminalAnswerStreamer:
         # much to persist (see `reasoning_persistence.py`).
         self._reasoning_buffer = ""
         self.reasoning_turns: list[dict[str, Any]] = []
+        self._model_call_reasoning_start = 0
 
     async def on_event(self, event: "AgentEvent") -> None:
         if event.event_type == EventType.TEXT_MESSAGE_START:
             self._start_turn(continues=bool(event.payload.get("continues_truncated")))
         elif event.event_type == EventType.TEXT_MESSAGE_CONTENT:
             await self._on_delta(event.payload.get("delta", ""))
+        elif event.event_type == EventType.TEXT_MESSAGE_END:
+            if event.payload.get("discarded"):
+                await self._discard_model_call()
         elif event.event_type == EventType.TOOL_CALL_START:
             # Skip clearing the buffer for terminal tools whose answer is
             # streamed via TEXT_MESSAGE_CONTENT deltas extracted from the
@@ -128,7 +135,9 @@ class TerminalAnswerStreamer:
                 await self._drop_carried_text()
             else:
                 await self._clear_preamble()
-        elif event.event_type == EventType.AGENT_COMPLETE:
+        elif event.event_type in (EventType.AGENT_COMPLETE, EventType.CANCELLATION):
+            # A stopped run ends in CANCELLATION, never AGENT_COMPLETE; without
+            # this the finalizer saw "" and saved the stopped answer empty.
             self.streamed_answer = self._buffer
             # Flush only what the limiter actually withheld, so a turn it
             # never throttled does not pay for a second full-size frame.
@@ -139,7 +148,7 @@ class TerminalAnswerStreamer:
         elif event.event_type == EventType.REASONING_MESSAGE_CONTENT:
             self._reasoning_buffer += event.payload.get("delta", "")
         elif event.event_type == EventType.REASONING_MESSAGE_END:
-            if self._reasoning_buffer:
+            if self._reasoning_buffer and not event.payload.get("discarded"):
                 self.reasoning_turns.append({
                     "turnIndex": event.payload.get("turn_index"),
                     "content": self._reasoning_buffer,
@@ -170,7 +179,9 @@ class TerminalAnswerStreamer:
         ends in a tool call instead."""
         self._carried = len(self._buffer) if continues else 0
         if not continues:
+            self._stale_on_screen = self._stale_on_screen or bool(self._buffer)
             self._buffer = ""
+        self._model_call_reasoning_start = len(self.reasoning_turns)
         self._last_emit = 0.0
         self._withheld = False
         self._web_records = self._collector.web_records
@@ -202,7 +213,8 @@ class TerminalAnswerStreamer:
         self._withheld = False
         return True
 
-    async def _emit_state_delta(self, chunk: str = "") -> None:
+    async def _emit_state_delta(self, chunk: str = "", *, discarded: bool = False) -> None:
+        self._stale_on_screen = False
         answer_text, confidence = parse_confidence_from_answer(self._buffer)
         answer_text = strip_partial_confidence_trailer(answer_text)
         normalized, citations = normalize_citations_and_chunks(
@@ -215,15 +227,25 @@ class TerminalAnswerStreamer:
         )
         for evt in self._context.formatter.answer_delta(
             self._context, chunk=chunk, accumulated=normalized, citations=citations,
-            confidence=confidence, raw_length=len(self._buffer),
+            confidence=confidence, raw_length=len(self._buffer), discarded=discarded,
         ):
             await self._event_sink.write(evt)
+
+    async def _discard_model_call(self) -> None:
+        """The model call failed mid-stream and may be retried: take back
+        what it streamed so the retry does not show it a second time."""
+        del self.reasoning_turns[self._model_call_reasoning_start:]
+        self._buffer = self._buffer[:self._carried]
+        await self._emit_state_delta(discarded=True)
 
     async def _drop_carried_text(self) -> None:
         """A turn that followed a cut-off reply wrote its answer through a
         terminal tool instead of continuing it, so the carried-over text is
         not part of the answer."""
         if not self._carried:
+            # Nothing of this turn is on screen yet, but a reply sent back may be.
+            if self._stale_on_screen and not self._buffer:
+                await self._clear_preamble()
             return
         self._buffer = self._buffer[self._carried:]
         self._carried = 0
@@ -244,9 +266,10 @@ class TerminalAnswerStreamer:
         drops an ended message with no following `RUN_FINISHED` the same
         way it drops this legacy empty-buffer reset."""
         self._carried = 0
-        if not self._buffer:
+        if not self._buffer and not self._stale_on_screen:
             return
         self._buffer = ""
+        self._stale_on_screen = False
         for evt in self._context.formatter.answer_delta(
             self._context, chunk="", accumulated="", citations=[], raw_length=0,
         ):

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Flex, Text, IconButton, Avatar, Switch, Tooltip } from '@radix-ui/themes';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { ConnectorIcon } from '@/app/components/ui';
-import { formatRelativeTime } from '@/lib/utils/formatters';
+import { formatRelativeTime, shortUserName } from '@/lib/utils/formatters';
 import { useUserDirectoryEntry } from '@/lib/hooks/use-user-directory-entry';
+import { ConfirmationDialog } from '@/app/(main)/workspace/components/confirmation-dialog';
 import {
   InfoRow,
   DotSeparator,
@@ -15,11 +16,16 @@ import {
   FullSyncButton,
 } from './primitives';
 import { InlineEditableName } from '../inline-editable-name';
-import { InstanceSyncOperationIndicator, InstanceSetupStatusRow } from './instance-status-badges';
-import { deriveSyncStatusState, getSyncStrategyLabel, getSyncIntervalLabel } from './utils';
+import {
+  InstanceActionNeededBadge,
+  InstanceSyncOperationIndicator,
+  InstanceSetupStatusRow,
+} from './instance-status-badges';
+import { deriveSyncStatusState, getSyncStrategyLabel, getSyncIntervalLabel, lastSyncedAt } from './utils';
 import { CONNECTOR_INSTANCE_STATUS } from '../../constants';
 import { usePollInstanceWhileSyncing } from '../../utils/use-poll-instance-while-syncing';
-import type { ConnectorInstance, ConnectorConfig, ConnectorScope } from '../../types';
+import type { ConnectorInstance, ConnectorConfig } from '../../types';
+import { useIsMobile } from '@/lib/hooks/use-is-mobile';
 
 // ========================================
 // Props
@@ -27,8 +33,6 @@ import type { ConnectorInstance, ConnectorConfig, ConnectorScope } from '../../t
 
 interface InstanceCardProps {
   instance: ConnectorInstance;
-  /** Scope: team or personal */
-  scope: ConnectorScope;
   /** Per-instance config from GET /connectors/{id}/config */
   config?: ConnectorConfig;
   onManage?: (instance: ConnectorInstance) => void;
@@ -49,7 +53,6 @@ interface InstanceCardProps {
 
 export function InstanceCard({
   instance,
-  scope,
   config,
   onManage,
   onToggleSyncActive,
@@ -58,51 +61,29 @@ export function InstanceCard({
   isRefreshing = false,
   renderExtraActions,
 }: InstanceCardProps) {
+  const isMobile = useIsMobile();
   const { t } = useTranslation();
-  const [identityIcon, setIdentityIcon] = useState<string | null>(null);
-  const [identityIconError, setIdentityIconError] = useState(false);
-  const [enabledByName, setEnabledByName] = useState<string | null>(null);
-  const [enabledByAvatar, setEnabledByAvatar] = useState<string | null>(null);
   const [syncToggleBusy, setSyncToggleBusy] = useState(false);
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
 
-  const updatedByEntry = useUserDirectoryEntry(instance.updatedBy);
+  const updatedBy = useUserDirectoryEntry(instance.updatedBy);
+  const enabledByName = shortUserName(updatedBy?.name);
+  const enabledByAvatar = updatedBy?.profilePicture;
 
   usePollInstanceWhileSyncing(instance._key, instance.status);
-
-  useEffect(() => {
-    setIdentityIconError(false);
-    if (scope === 'personal') {
-      setIdentityIcon(null);
-    }
-    if (!instance.updatedBy) {
-      setIdentityIcon(null);
-      setEnabledByName(null);
-      setEnabledByAvatar(null);
-      return;
-    }
-    if (!updatedByEntry) {
-      setEnabledByName(null);
-      setEnabledByAvatar(null);
-      return;
-    }
-
-    const { fullName, resolvedUserId } = updatedByEntry;
-    if (scope === 'personal' && resolvedUserId) {
-      setIdentityIcon(`/api/v1/users/${resolvedUserId}/dp`);
-    }
-
-    const parts = fullName.trim().split(/\s+/);
-    const displayName =
-      parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}` : parts[0] || '';
-    setEnabledByName(displayName);
-    if (resolvedUserId) setEnabledByAvatar(`/api/v1/users/${resolvedUserId}/dp`);
-  }, [scope, instance.updatedBy, updatedByEntry]);
 
   const { status: effectiveStatus, oauthAuthIncompleteForSync: oauthAuthIncomplete } =
     deriveSyncStatusState(instance, undefined, config);
   const syncStrategy = getSyncStrategyLabel(t, config);
   const syncInterval = getSyncIntervalLabel(t, config);
-  const lastSynced = formatRelativeTime(instance.updatedAtTimestamp);
+  const lastSyncedTime = formatRelativeTime(lastSyncedAt(instance));
+  const lastSynced =
+    instance.lastSyncOutcome && instance.lastSyncOutcome !== 'succeeded' && lastSyncedTime
+      ? t('workspace.connectors.overview.lastRun.lastSyncedWithOutcome', {
+          time: lastSyncedTime,
+          outcome: t(`workspace.connectors.overview.lastRun.outcome.${instance.lastSyncOutcome}`),
+        })
+      : lastSyncedTime;
 
   const canToggleSync =
     Boolean(instance._key) &&
@@ -130,19 +111,28 @@ export function InstanceCard({
     !oauthAuthIncomplete &&
     instance.status !== CONNECTOR_INSTANCE_STATUS.DELETING;
 
+  const runSyncToggle = async () => {
+    if (!onToggleSyncActive || !instance._key || syncToggleBusy) return;
+    setSyncToggleBusy(true);
+    try {
+      await onToggleSyncActive(instance);
+    } finally {
+      setSyncToggleBusy(false);
+      setDisableConfirmOpen(false);
+    }
+  };
+
   const syncSwitchControl = (
     <Switch
       size="1"
       checked={instance.isActive}
       disabled={syncSwitchDisabled}
-      onCheckedChange={async () => {
-        if (!onToggleSyncActive || !instance._key || syncToggleBusy) return;
-        setSyncToggleBusy(true);
-        try {
-          await onToggleSyncActive(instance);
-        } finally {
-          setSyncToggleBusy(false);
+      onCheckedChange={() => {
+        if (instance.isActive) {
+          if (onToggleSyncActive && instance._key && !syncToggleBusy) setDisableConfirmOpen(true);
+          return;
         }
+        void runSyncToggle();
       }}
     />
   );
@@ -157,7 +147,7 @@ export function InstanceCard({
         overflow: 'hidden',
       }}
     >
-      <Flex direction="column" gap="4" style={{ padding: 16, minWidth: 325 }}>
+      <Flex direction="column" gap="4" style={{ padding: 16 }}>
         <Flex align="center" gap="2" style={{ width: '100%' }}>
           <Flex
             align="center"
@@ -165,25 +155,14 @@ export function InstanceCard({
             style={{
               width: 32,
               height: 32,
-              padding: scope === 'personal' && identityIcon && !identityIconError ? 0 : 8,
+              padding: 8,
               backgroundColor: 'var(--gray-a2)',
               borderRadius: 'var(--radius-2)',
               flexShrink: 0,
               overflow: 'hidden',
             }}
           >
-            {scope === 'personal' && identityIcon && !identityIconError ? (
-              <img
-                src={identityIcon}
-                alt=""
-                width={32}
-                height={32}
-                onError={() => setIdentityIconError(true)}
-                style={{ display: 'block', objectFit: 'cover', width: 32, height: 32 }}
-              />
-            ) : (
-              <ConnectorIcon type={instance.type} size={16} />
-            )}
+            <ConnectorIcon type={instance.type} size={16} />
           </Flex>
 
           <InlineEditableName
@@ -195,8 +174,10 @@ export function InstanceCard({
             style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}
           />
 
+          <InstanceActionNeededBadge instance={instance} onOpen={onChevronClick} />
+
           {onRefresh ? (
-            <IconButton
+            <IconButton className="touch-hit"
               variant="outline"
               color="gray"
               size="1"
@@ -226,10 +207,11 @@ export function InstanceCard({
 
           {renderExtraActions?.(instance)}
 
-          <IconButton
+          <IconButton className="touch-hit"
             variant="outline"
             color="gray"
             size="1"
+            aria-label={t('workspace.skills.cta.manage')}
             onClick={() => onChevronClick?.(instance)}
             style={{ cursor: 'pointer', borderRadius: 'var(--radius-2)', width: 32, height: 32, flexShrink: 0 }}
           >
@@ -242,11 +224,11 @@ export function InstanceCard({
         <InstanceSetupStatusRow instance={instance} config={config} />
 
         {syncStrategy ? (
-          <Flex align="center" gap="4">
+          <Flex direction={isMobile ? 'column' : 'row'} align={isMobile ? 'start' : 'center'} gap={isMobile ? '1' : '4'}>
             <Text
               size="1"
               weight="medium"
-              style={{ color: 'var(--gray-10)', width: 164, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04px', lineHeight: '16px' }}
+              style={{ color: 'var(--gray-10)', width: isMobile ? 'auto' : 164, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04px', lineHeight: '16px' }}
             >
               {t('workspace.connectors.instanceCard.syncStrategy')}
             </Text>
@@ -269,11 +251,11 @@ export function InstanceCard({
         )}
 
         {enabledByName ? (
-          <Flex align="center" gap="4">
+          <Flex direction={isMobile ? 'column' : 'row'} align={isMobile ? 'start' : 'center'} gap={isMobile ? '1' : '4'}>
             <Text
               size="1"
               weight="medium"
-              style={{ color: 'var(--gray-10)', width: 164, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04px', lineHeight: '16px' }}
+              style={{ color: 'var(--gray-10)', width: isMobile ? 'auto' : 164, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04px', lineHeight: '16px' }}
             >
               {t('workspace.connectors.settingsTab.enabledBy')}
             </Text>
@@ -282,7 +264,7 @@ export function InstanceCard({
                 <Avatar
                   size="1"
                   radius="small"
-                  src={enabledByAvatar ?? undefined}
+                  src={enabledByAvatar}
                   fallback={enabledByName?.[0] ?? '?'}
                   style={{ width: 24, height: 24 }}
                 />
@@ -299,13 +281,13 @@ export function InstanceCard({
         <InfoRow label={t('workspace.connectors.instanceCard.lastSynced')} value={lastSynced} />
 
         {instance._key && instance.supportsSync && (
-          <Flex align="center" gap="4" style={{ marginTop: 2 }}>
+          <Flex direction={isMobile ? 'column' : 'row'} align={isMobile ? 'start' : 'center'} gap={isMobile ? '1' : '4'} style={{ marginTop: 2 }}>
             <Text
               size="1"
               weight="medium"
               style={{
                 color: 'var(--gray-10)',
-                width: 164,
+                width: isMobile ? 'auto' : 164,
                 flexShrink: 0,
                 textTransform: 'uppercase',
                 letterSpacing: '0.04px',
@@ -332,6 +314,22 @@ export function InstanceCard({
             )}
           </Flex>
         )}
+
+        <ConfirmationDialog
+          open={disableConfirmOpen}
+          onOpenChange={(open) => {
+            if (!syncToggleBusy) setDisableConfirmOpen(open);
+          }}
+          title={t('workspace.connectors.disableSyncConfirm.title', {
+            name: instance.name?.trim() || instance.type,
+          })}
+          message={t('workspace.connectors.disabledSearchNotice', { source: instance.type })}
+          confirmLabel={t('workspace.connectors.disableSyncConfirm.confirm')}
+          confirmLoadingLabel={t('workspace.connectors.disableSyncConfirm.confirming')}
+          confirmVariant="primary"
+          isLoading={syncToggleBusy}
+          onConfirm={() => void runSyncToggle()}
+        />
 
         {showIndexingActions && (
           <Flex

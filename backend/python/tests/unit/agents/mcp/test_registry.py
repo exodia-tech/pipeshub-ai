@@ -1,9 +1,13 @@
 """Unit tests for app.agents.mcp.mcp_server_decorator, registry, and catalog."""
+import importlib
+import pkgutil
+import re
 from unittest.mock import patch
 
 import pytest
 
 import app.agents.mcp.mcp_server_decorator as decorator_module
+from app.agents.mcp import servers as servers_pkg
 from app.agents.mcp.catalog import paginate, search_templates
 from app.agents.mcp.mcp_server_decorator import get_registered_templates, mcp_server
 from app.agents.mcp.models import MCPAuthMode, MCPServerTemplate, MCPTransport
@@ -70,13 +74,117 @@ class TestMCPRegistry:
         # Active catalog representatives — one per transport/auth combination among
         # currently enabled servers (others are temporarily commented out).
         assert "github" in type_ids
+        assert "microsoft_learn" in type_ids
         assert "atlassian_rovo" in type_ids
         assert "linear" in type_ids
         assert "notion" in type_ids
+        assert "airtable" in type_ids
         assert "slack" in type_ids
         assert "exa" in type_ids
         assert "box" in type_ids
         assert "clickup" in type_ids
+        assert "stripe" in type_ids
+        assert "context7" in type_ids
+        assert "huggingface" in type_ids
+        assert "vercel" in type_ids
+        assert "zapier" in type_ids
+        assert "docusign" in type_ids
+        assert "okta" in type_ids
+        assert "zoom" in type_ids
+        assert "trello" in type_ids
+        assert "paypal" in type_ids
+
+    def test_airtable_catalog_entry(self) -> None:
+        registry = MCPRegistry()
+        registry.auto_discover_templates()
+        airtable = registry.get_template("airtable")
+
+        assert airtable is not None
+        assert airtable.display_name == "Airtable"
+        assert airtable.transport == MCPTransport.STREAMABLE_HTTP
+        assert airtable.default_url == "https://mcp.airtable.com/mcp"
+        assert airtable.default_auth_mode == MCPAuthMode.OAUTH
+        assert airtable.supported_auth_modes == [MCPAuthMode.OAUTH]
+        assert airtable.supports_dcr is True
+        assert airtable.require_oauth_client is False
+        assert airtable.url_editable is False
+        assert airtable.authorization_url == "https://airtable.com/oauth2/v1/authorize"
+        assert airtable.token_url == "https://airtable.com/oauth2/v1/token"
+        assert airtable.default_scopes == []
+        assert airtable.icon == "/icons/connectors/airtable.svg"
+        assert airtable.documentation_url == (
+            "https://airtable.com/developers/agents/mcp/getting-started"
+        )
+
+    def test_okta_and_docusign_catalog_entries(self) -> None:
+        """Okta's address is per org, so it has no fixed URL and always asks for an OAuth app.
+        DocuSign is one production host, and its scopes are the ones that host publishes."""
+        registry = MCPRegistry()
+        registry.auto_discover_templates()
+        okta = registry.get_template("okta")
+        assert okta is not None
+        assert okta.url_editable is True
+        assert okta.require_oauth_client is True
+        assert okta.default_url is None
+        assert okta.supports_dcr is False
+        assert okta.default_scopes == ["okta.users.read", "okta.groups.read"]
+
+        docusign = registry.get_template("docusign")
+        assert docusign is not None
+        assert docusign.url_editable is False
+        assert docusign.default_url == "https://mcp.docusign.com/mcp"
+        assert docusign.supports_dcr is False
+        assert docusign.authorization_url == "https://account.docusign.com/oauth/auth"
+        assert docusign.token_url == "https://account.docusign.com/oauth/token"
+        assert set(docusign.default_scopes) == {
+            "signature",
+            "aow_manage",
+            "adm_store_unified_repo_read",
+            "spring_read",
+            "spring_write",
+            "cors",
+        }
+
+    def test_zoom_catalog_entry(self) -> None:
+        """Zoom is one official host, no DCR, and the admin pastes a Marketplace app."""
+        registry = MCPRegistry()
+        registry.auto_discover_templates()
+        zoom = registry.get_template("zoom")
+        assert zoom is not None
+        assert zoom.default_url == "https://mcp.zoom.us/mcp/zoom/streamable"
+        assert zoom.supports_dcr is False
+        assert zoom.authorization_url == "https://zoom.us/oauth/authorize"
+        assert zoom.token_url == "https://zoom.us/oauth/token"
+        assert set(zoom.default_scopes) == {
+            "meeting:read:search",
+            "meeting:read:assets",
+            "agentic_search:read:search",
+            "cloud_recording:read:list_user_recordings",
+            "cloud_recording:read:content",
+            "docs:read:export",
+            "docs:write:import",
+            "hub:read:content",
+            "hub:write:content",
+        }
+
+    def test_paypal_catalog_entry(self) -> None:
+        """PayPal is the official production host, Streamable HTTP, and it registers clients itself."""
+        registry = MCPRegistry()
+        registry.auto_discover_templates()
+        paypal = registry.get_template("paypal")
+        assert paypal is not None
+        assert paypal.display_name == "PayPal"
+        assert paypal.transport == MCPTransport.STREAMABLE_HTTP
+        assert paypal.default_auth_mode == MCPAuthMode.OAUTH
+        assert paypal.supported_auth_modes == [MCPAuthMode.OAUTH]
+        assert paypal.default_url == "https://mcp.paypal.com/mcp"
+        assert paypal.url_editable is False
+        assert paypal.supports_dcr is True
+        assert paypal.authorization_url == "https://mcp.paypal.com/authorize"
+        assert paypal.token_url == "https://mcp.paypal.com/token"
+        assert paypal.default_scopes == []
+        assert paypal.icon == "/icons/connectors/paypal.svg"
+        assert paypal.documentation_url == "https://developer.paypal.com/tools/mcp-server/"
 
     def test_auto_discover_templates_are_well_formed(self) -> None:
         """Every registered template must carry the fields its own transport/auth mode
@@ -97,14 +205,26 @@ class TestMCPRegistry:
 
             if template.transport == MCPTransport.STDIO:
                 assert template.command, f"{template.type_id}: STDIO template missing command"
+                if template.default_auth_mode == MCPAuthMode.API_TOKEN:
+                    assert template.required_env, f"{template.type_id}: API_TOKEN template missing required_env"
+            elif template.url_editable:
+                assert not template.default_url, f"{template.type_id}: a per-customer URL must not be fixed on the template"
             else:
                 assert template.default_url, f"{template.type_id}: HTTP/SSE template missing default_url"
 
-            if template.default_auth_mode == MCPAuthMode.API_TOKEN:
-                assert template.required_env, f"{template.type_id}: API_TOKEN template missing required_env"
-            if template.default_auth_mode == MCPAuthMode.OAUTH:
+            if template.default_auth_mode == MCPAuthMode.OAUTH and not template.url_editable:
                 assert template.authorization_url, f"{template.type_id}: OAuth template missing authorization_url"
                 assert template.token_url, f"{template.type_id}: OAuth template missing token_url"
+
+    def test_the_google_templates_say_how_their_client_secrets_start(self) -> None:
+        """A secret pasted without `GOCSPX-` failed every sign-in with `invalid_client`."""
+        registry = MCPRegistry()
+        registry.auto_discover_templates()
+        for type_id in ("google_drive", "gmail", "google_calendar"):
+            template = registry.get_template(type_id)
+            assert template is not None and template.client_secret_prefix == "GOCSPX-"
+            assert template.model_dump(by_alias=True)["clientSecretPrefix"] == "GOCSPX-"
+        assert registry.get_template("linear").client_secret_prefix is None
 
     def test_auto_discover_is_idempotent(self) -> None:
         registry = MCPRegistry()
@@ -233,3 +353,24 @@ class TestPaginate:
         page_items, total = paginate(items, 5, 2)
         assert page_items == []
         assert total == 3
+
+
+class TestCatalogPackagesArePinned:
+    """`npx -y pkg` and `uvx pkg` run whatever was published last, so a compromised release
+    would reach every deployment on its next start."""
+
+    def test_every_stdio_template_names_an_exact_version(self) -> None:
+        # Read from the modules, not the registry, which other tests clear.
+        templates = [
+            value.mcp_template
+            for info in pkgutil.iter_modules(servers_pkg.__path__)
+            for value in vars(importlib.import_module(f"{servers_pkg.__name__}.{info.name}")).values()
+            if isinstance(getattr(value, "mcp_template", None), MCPServerTemplate)
+        ]
+        stdio = [t for t in templates if t.transport == MCPTransport.STDIO]
+        assert stdio, "expected at least one STDIO catalog server"
+        exact = {"npx": re.compile(r"^(@[^/]+/)?[^@]+@\d+(\.\d+)*$"), "uvx": re.compile(r"^[^=@]+(==|@)\d+(\.\d+)*$")}
+        for template in stdio:
+            pattern = exact[template.command]
+            package = next(arg for arg in template.args if not arg.startswith("-"))
+            assert pattern.match(package), f"{template.type_id} runs an unpinned package: {package}"

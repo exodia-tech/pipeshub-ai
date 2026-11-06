@@ -67,6 +67,10 @@ spec:
       app.kubernetes.io/component: qdrant
   template:
     metadata:
+      {{- if include "pipeshub-ai.createSecrets" . }}
+      annotations:
+        checksum/qdrant-api-key: {{ include "pipeshub-ai.qdrantApiKeyChecksum" . }}
+      {{- end }}
       labels:
         {{- include "pipeshub-ai.labels" . | nindent 8 }}
         app.kubernetes.io/component: qdrant
@@ -77,6 +81,15 @@ spec:
       {{- if .Values.qdrant.affinity }}
       affinity:
         {{- toYaml .Values.qdrant.affinity | nindent 8 }}
+      {{- else if eq (.Values.qdrant.antiAffinity | default "soft") "hard" }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "pipeshub-ai.selectorLabels" . | nindent 18 }}
+                  app.kubernetes.io/component: qdrant
+              topologyKey: kubernetes.io/hostname
       {{- else }}
       affinity:
         podAntiAffinity:
@@ -166,8 +179,11 @@ spec:
           securityContext:
             {{- toYaml .Values.qdrant.securityContext | nindent 12 }}
       {{- with .Values.qdrant.nodeSelector }}
+      {{- $selector := include "pipeshub-ai.compactMap" . }}
+      {{- if $selector }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- $selector | nindent 8 }}
+      {{- end }}
       {{- end }}
       {{- with .Values.qdrant.tolerations }}
       tolerations:

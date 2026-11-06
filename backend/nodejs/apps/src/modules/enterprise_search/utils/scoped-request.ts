@@ -1,5 +1,4 @@
 import * as crypto from 'crypto';
-import { Types } from 'mongoose';
 import {
   AICommandOptions,
   AIServiceCommand,
@@ -20,8 +19,8 @@ import { KeyValueStoreService } from '../../../libs/services/keyValueStore.servi
 import { Logger } from '../../../libs/services/logger.service';
 import { getSlackBotStore } from '../../configuration_manager/controller/cm_controller';
 import { AppConfig } from '../../tokens_manager/config/config';
-import { Org } from '../../user_management/schema/org.schema';
-import { Users } from '../../user_management/schema/users.schema';
+import { getOrgRepository } from '../../../libs/repositories/org';
+import { getUserRepository } from '../../../libs/repositories/user';
 
 /**
  * Turns a scoped service token (`/internal/...` routes: Slack bot, service
@@ -31,6 +30,27 @@ import { Users } from '../../user_management/schema/users.schema';
 const logger = Logger.getInstance({ service: 'Enterprise Search Service' });
 
 export const STAND_IN_TOKEN_TTL_SECONDS = 60;
+
+/**
+ * The OSS Slack bot configuration carries no orgId, so this edition only has a
+ * safe answer when there is exactly one org. On a multi-org instance the old
+ * `Org.findOne` picked whichever document came back first, which could answer a
+ * Slack workspace with another tenant's data — refuse instead. Multi-org Slack
+ * is an EE feature and resolves the org from the bot config's own orgId.
+ */
+export const resolveSoleOrgId = async (): Promise<string> => {
+  const { count, oldestId } = await getOrgRepository().liveSummary();
+  const soleOrg = count === 1 && oldestId !== null ? oldestId : undefined;
+  if (soleOrg === undefined) {
+    if (count > 1) {
+      throw new UnauthorizedError(
+        'Slack access is limited to single-organization deployments on this edition',
+      );
+    }
+    throw new NotFoundError('Organization not found');
+  }
+  return soleOrg;
+};
 
 /** 24-char hex suitable for Mongo ObjectId; stable per email for Slack/service-account callers without a User row. */
 export const stableObjectIdHexForExternalEmail = (email: string): string =>
@@ -55,10 +75,9 @@ export const hydrateScopedRequestAsUser = async (
     throw new UnauthorizedError('Email not found in scoped token');
   }
 
-  const user = await Users.findOne({
-    email,
-    isDeleted: false,
-  });
+  const orgId = await resolveSoleOrgId();
+
+  const user = await getUserRepository().getLiveByEmail(orgId, email as string);
 
   const authTokenService = new AuthTokenService(
     appConfig.jwtSecret,
@@ -77,7 +96,7 @@ export const hydrateScopedRequestAsUser = async (
             appConfig,
           );
           if (isServiceAccount) {
-            const org = await Org.findOne({ isDeleted: false });
+            const org = await getOrgRepository().getLive(orgId);
             if (!org?._id) {
               throw new NotFoundError('Organization not found');
             }
@@ -94,8 +113,8 @@ export const hydrateScopedRequestAsUser = async (
             );
             (req as AuthenticatedServiceRequest).headers.authorization =
               `Bearer ${scopedJwtToken}`;
-            (req as AuthenticatedServiceRequest).user = {
-              userId: new Types.ObjectId(stableUserIdHex),
+            (req as AuthenticatedUserRequest).user = {
+              userId: stableUserIdHex,
               orgId: org._id,
               email: email,
               scopes: [TokenScopes.CONVERSATION_CREATE],

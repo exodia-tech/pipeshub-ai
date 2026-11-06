@@ -1,6 +1,6 @@
 <div align="center">
 
-**Translations:** [English](../../../README.md) · [Français](../fr/README.md) · [Deutsch](../de/README.md) · [简体中文](../zh-CN/README.md) · [日本語](../ja/README.md) · [Русский](../ru/README.md) · [עברית](../he/README.md) · [한국어](../ko/README.md) · [Español](../es/README.md) · [Português](../pt/README.md) · [Türkçe](../tr/README.md) · [Tiếng Việt](../vi/README.md) · **Italiano**
+**Translations:** [English](../../../README.md) · [Français](../fr/README.md) · [Deutsch](../de/README.md) · [简体中文](../zh-CN/README.md) · [日本語](../ja/README.md) · [Русский](../ru/README.md) · [עברית](../he/README.md) · [한국어](../ko/README.md) · [Español](../es/README.md) · [Português](../pt/README.md) · [Türkçe](../tr/README.md) · [Tiếng Việt](../vi/README.md) · **Italiano** · [Čeština](../cs/README.md)
 
 </div>
 
@@ -52,6 +52,19 @@
 <h2 id="about-pipeshub">PipesHub — Spiegabile ed Estensibile</h2>
 
 <strong>[PipesHub](https://www.pipeshub.com/)</strong> è un livello di esecuzione nativo per l'IA, open source e auto-ospitabile, che collega la conoscenza aziendale, offre una ricerca spiegabile con citazioni e automatizza i flussi di lavoro nei tuoi sistemi.
+
+### Come funziona PipesHub
+
+PipesHub costruisce un **livello di contesto unificato** su documenti, conversazioni, dati strutturati, wiki, ticket e codice. I connettori sincronizzano ogni sorgente insieme ai suoi permessi. La pipeline di indicizzazione analizza, suddivide in chunk e genera gli embedding dei contenuti, e collega record, persone ed entità in un knowledge graph.
+
+Le domande ricevono risposta da un **ciclo agentico**, non da un singolo passaggio "recupera e poi genera". L'agente pianifica, chiama gli strumenti, legge i risultati e prosegue finché non ha le prove:
+
+- **Ricerca ibrida** — recupero semantico e per parole chiave, per trovare sia il significato sia i termini esatti.
+- **Grep / pattern matching** — identificatori esatti, messaggi di errore, chiavi dei ticket e simboli del codice.
+- **Navigazione del knowledge graph** — segue i collegamenti tra documenti, persone, ticket, pull request e thread.
+- **Lettura dei documenti** — apre la fonte completa invece di affidarsi a un singolo chunk corrispondente.
+
+Ogni chiamata a uno strumento è filtrata in base ai permessi dell'utente che pone la domanda, e ogni risposta cita i blocchi da cui proviene.
 
 
 ## Funzionalità

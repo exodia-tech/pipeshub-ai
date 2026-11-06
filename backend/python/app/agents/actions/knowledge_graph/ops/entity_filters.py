@@ -21,15 +21,21 @@ from typing import TYPE_CHECKING, Any
 from app.agents.actions.knowledge_graph.ops.scope import derive_scope
 from app.modules.demo_data.chat import excluded_app_ids
 from app.modules.retrieval.entity_permissions import (
+    ORGANIZATION_ENTITY_TYPE,
+    PERSON_ENTITY_TYPE,
     RECORD_GROUP_ENTITY_TYPE,
     SEARCHABLE_ENTITY_TYPES,
     TAXONOMY_ENTITY_TYPES,
     EntityAccessContext,
+    EntityAccessError,
     get_entity_access_context,
 )
+from app.modules.retrieval.selection_scope import SelectionTooLargeError
 from app.services.graph_db.interface.graph_db_provider import STRICT_SCOPE_FILTER_KEY
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from app.modules.agents.qna.chat_state import ChatState
 
 # EntityType value -> get_accessible_virtual_record_ids() filter key. Graph
@@ -42,29 +48,55 @@ ENTITY_TYPE_TO_FILTER_KEY: dict[str, str] = {
 }
 
 # Scoped through the permission-checked record resolver instead of a name
-# filter: record groups have no filter key, and subcategory entities carry no
-# level while the per-level subcategory filters do.
-RECORD_SCOPED_ENTITY_TYPES: frozenset[str] = frozenset({RECORD_GROUP_ENTITY_TYPE, "subcategory"})
+# filter: record groups, people and organisations have no filter key, and
+# subcategory entities carry no level while the per-level subcategory
+# filters do.
+RECORD_SCOPED_ENTITY_TYPES: frozenset[str] = frozenset(
+    {RECORD_GROUP_ENTITY_TYPE, PERSON_ENTITY_TYPE, ORGANIZATION_ENTITY_TYPE, "subcategory", "named_entity"}
+)
 
 ENTITY_ID_FILTER_KEY_CACHE_KEY = "_kg_entity_id_filter_key"
 RECORD_SCOPED_ENTITY_CACHE_KEY = "_kg_record_scoped_entities"
 ENTITY_INDEX_CACHE_KEY = "_kg_entity_index"
 
+# Appended to an empty result when the turn is limited, so "nothing here" is
+# not read as "nothing anywhere".
+LIMITED_SCOPE_NOTE = (
+    "Only the sources this conversation is limited to were searched; "
+    "it may exist outside them."
+)
 
-async def load_entity_access_context(state: "ChatState") -> EntityAccessContext:
+
+def limited_scope_note(context: EntityAccessContext) -> str:
+    """``LIMITED_SCOPE_NOTE`` when ``context`` is limited to part of its apps."""
+    return LIMITED_SCOPE_NOTE if context.row_scopes else ""
+
+
+async def load_entity_access_context(
+    state: "ChatState", source_ids: "Sequence[str] | None" = None,
+) -> EntityAccessContext:
     """The entity access context for this run's scope, honouring
-    ``strictScope`` and switched-off demo apps as content search does."""
+    ``strictScope``, the turn's selection or bound, and switched-off demo apps
+    as content search does. Every app the turn touches is a source; a
+    selection or bound that covers one only in part limits its records.
+    ``source_ids`` replaces the apps and collections taken from the turn, for
+    a search the model narrowed to some of them."""
     scope = derive_scope(state)
     filters = state.get("filters") or {}
-    return await get_entity_access_context(
-        state,
-        state.get("graph_provider"),
-        org_id=state.get("org_id", ""),
-        user_id=state.get("user_id", ""),
-        source_ids=[*scope.app_ids, *scope.kb_ids],
-        strict=bool(filters.get(STRICT_SCOPE_FILTER_KEY)),
-        exclude_app_ids=excluded_app_ids(state),
-    )
+    try:
+        return await get_entity_access_context(
+            state,
+            state.get("graph_provider"),
+            org_id=state.get("org_id", ""),
+            user_id=state.get("user_id", ""),
+            source_ids=list(source_ids) if source_ids else [*scope.app_ids, *scope.kb_ids],
+            strict=bool(filters.get(STRICT_SCOPE_FILTER_KEY)),
+            exclude_app_ids=excluded_app_ids(state),
+            filters=filters,
+        )
+    except SelectionTooLargeError as exc:
+        # Fail closed: a limit too large to resolve never widens to its whole apps.
+        raise EntityAccessError("The conversation's limit is too large to check") from exc
 
 
 def is_filterable_entity(entity_type: str | None, entity_name: str | None) -> bool:
@@ -75,8 +107,11 @@ def is_filterable_entity(entity_type: str | None, entity_name: str | None) -> bo
 
 
 def remember_entities(state: dict[str, Any], entities: list[dict[str, Any]]) -> None:
-    """Cache ``{entityId, entityType, name}`` dicts returned by
-    ``search_entities`` for ``search(entity_ids)`` and ``find_records_by_entity``."""
+    """Cache ``{entityId, entityType, name[, filterName]}`` dicts returned by
+    ``search_entities`` for ``search(entity_ids)`` and ``find_records_by_entity``.
+
+    ``name`` is what the user was shown; ``filterName``, when given, is the
+    node's stored name, which the graph's name filters match."""
     id_to_key: dict[str, tuple[str, str]] = state.get(ENTITY_ID_FILTER_KEY_CACHE_KEY) or {}
     record_scoped: dict[str, str] = state.get(RECORD_SCOPED_ENTITY_CACHE_KEY) or {}
     index: dict[str, dict[str, str]] = state.get(ENTITY_INDEX_CACHE_KEY) or {}
@@ -91,8 +126,9 @@ def remember_entities(state: dict[str, Any], entities: list[dict[str, Any]]) -> 
             record_scoped[entity_id] = entity_type
             continue
         filter_key = ENTITY_TYPE_TO_FILTER_KEY.get(entity_type)
-        if filter_key and entity_name:
-            id_to_key[entity_id] = (filter_key, entity_name)
+        filter_name = entity.get("filterName") or entity_name
+        if filter_key and filter_name:
+            id_to_key[entity_id] = (filter_key, filter_name)
     state[ENTITY_ID_FILTER_KEY_CACHE_KEY] = id_to_key
     state[RECORD_SCOPED_ENTITY_CACHE_KEY] = record_scoped
     state[ENTITY_INDEX_CACHE_KEY] = index
@@ -103,9 +139,9 @@ def merge_filter_groups(
     extra: dict[str, list[str]] | None,
 ) -> dict[str, list[str]]:
     """Union *extra*'s lists into *base* (new dict; *base* not mutated)."""
-    if not extra:
-        return base
     merged = {k: list(v) for k, v in base.items()}
+    if not extra:
+        return merged
     for key, values in extra.items():
         if not values:
             continue
@@ -125,6 +161,8 @@ __all__ = [
     "SEARCHABLE_ENTITY_TYPES",
     "TAXONOMY_ENTITY_TYPES",
     "is_filterable_entity",
+    "LIMITED_SCOPE_NOTE",
+    "limited_scope_note",
     "load_entity_access_context",
     "merge_filter_groups",
     "remember_entities",

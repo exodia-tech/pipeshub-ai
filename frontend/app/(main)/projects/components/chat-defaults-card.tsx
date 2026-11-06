@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Badge, Box, Dialog, Flex, VisuallyHidden } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,12 +22,6 @@ export function ChatDefaultsCard() {
 
   const settings = useChatStore((s) => s.settings);
   const setSelectedModelForCtx = useChatStore((s) => s.setSelectedModelForCtx);
-  const hydrateReasoningEffortForCtx = useChatStore((s) => s.hydrateReasoningEffortForCtx);
-
-  useEffect(() => {
-    hydrateReasoningEffortForCtx(ASSISTANT_CTX);
-  }, [hydrateReasoningEffortForCtx]);
-
   const displayModel = settings.selectedModels[ASSISTANT_CTX] ?? settings.defaultModels[ASSISTANT_CTX] ?? null;
   const displayModelLabel = displayModel
     ? displayModel.modelFriendlyName || displayModel.modelName
@@ -75,7 +69,7 @@ export function ChatDefaultsCard() {
             <Dialog.Title>{t('chat.aiModelsTooltip', { defaultValue: 'AI model' })}</Dialog.Title>
           </VisuallyHidden>
           <Flex direction="column" style={{ height: '60vh' }}>
-            <ModelSelectorPanel selectedModel={displayModel} onModelSelect={handleModelSelect} />
+            <ModelSelectorPanel selectedModel={displayModel} onModelSelect={handleModelSelect} allowExtraOptions={false} />
           </Flex>
         </Dialog.Content>
       </Dialog.Root>

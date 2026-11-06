@@ -66,6 +66,7 @@ from app.models.entities import (
     RecordGroup,
     RecordGroupType,
     RecordType,
+    SourcePerson,
 )
 from app.models.permission import EntityType, Permission, PermissionType
 from app.sources.client.box.box import (
@@ -82,7 +83,31 @@ from app.connectors.core.base.error.stream_errors import (
 from app.utils.streaming import create_stream_record_response, stream_content
 
 
+ITEM_FIELDS = (
+    'type,id,name,size,created_at,modified_at,path_collection,etag,sha1,shared_link,'
+    'owned_by,created_by,modified_by'
+)
+# Box service accounts and app users sign in under this domain.
+_BOX_APP_LOGIN_DOMAIN = '@boxdevedition.com'
+
+
 # Helper functions
+def box_person(user: dict | None) -> SourcePerson | None:
+    """A Box mini user ({id, name, login}) as a SourcePerson; None for none or the anonymous user."""
+    if not user:
+        return None
+    source_id = str(user.get('id') or '') or None
+    email = user.get('login') or None
+    if not source_id and not email:
+        return None
+    return SourcePerson(
+        source_id=source_id,
+        email=email,
+        display_name=user.get('name') or None,
+        is_service_account=bool(email and email.lower().endswith(_BOX_APP_LOGIN_DOMAIN)),
+    )
+
+
 def get_parent_path_from_path(path: str) -> Optional[str]:
     """Extracts the parent path from a file/folder path."""
     if not path or path == "/" or "/" not in path.lstrip("/"):
@@ -477,37 +502,27 @@ class BoxConnector(BaseConnector):
                 sha1_hash=entry.get('sha1'),
                 external_revision_id=entry.get('etag'),
                 is_shared=is_shared,
+                authored_by=box_person(entry.get('created_by')),
+                last_modified_by=box_person(entry.get('modified_by')),
+                owners=[owner] if (owner := box_person(owned_by)) else [],
             )
 
-            # 1. Fetch explicit API permissions (Collaborators only)
-            api_permissions = await self._get_permissions(entry_id, entry_type)
+            # Collaborations created on an ancestor are not copied here: the child inherits them.
             # None means the collaborator list was only partly read: apply none of it, so stored access stays.
-            final_permissions_map = {p.external_id: p for p in api_permissions or []}
-
-            # 2. Inject Shared Link Permissions (Organization/Public)
-            # This handles files that are "Shared with Company" but users aren't invited explicitly
-            shared_link = entry.get('shared_link')
-            if shared_link:
-                access_level = shared_link.get('access')
-                if access_level == 'company':
-                    # Use Org ID to represent the whole company
-                    org_perm_id = f"ORG_{self.data_entities_processor.org_id}"
-                    final_permissions_map[org_perm_id] = Permission(
-                        external_id=org_perm_id,
-                        email="organization_wide_access",
+            api_permissions = await self._get_permissions(entry_id, entry_type)
+            permissions: list[Permission] | None = None
+            if api_permissions is not None:
+                final_permissions_map = {p.external_id: p for p in api_permissions}
+                shared_link = entry.get('shared_link') or {}
+                if shared_link.get('access') == 'company':
+                    org_id = self.data_entities_processor.org_id
+                    final_permissions_map[org_id] = Permission(
+                        external_id=org_id,
                         type=PermissionType.READ,
-                        entity_type=EntityType.GROUP
+                        entity_type=EntityType.ORG,
                     )
-                elif access_level == 'open':
-                    public_perm_id = "PUBLIC"
-                    final_permissions_map[public_perm_id] = Permission(
-                        external_id=public_perm_id,
-                        email="public_access",
-                        type=PermissionType.READ,
-                        entity_type=EntityType.GROUP
-                    )
-
-            permissions = list(final_permissions_map.values())
+                permissions = list(final_permissions_map.values())
+                file_record.rewrite_permissions = True
 
             # Respect indexing filters for shared / shared_with_me (same as Drive)
             if self.indexing_filters:
@@ -559,8 +574,8 @@ class BoxConnector(BaseConnector):
                     is_deleted=False,
                     metadata_changed=is_content_modified,
                     content_changed=is_content_modified,
-                    permissions_changed=api_permissions is not None,
-                    new_permissions=permissions,
+                    permissions_changed=permissions is not None,
+                    new_permissions=permissions or [],
                     external_record_id=entry_id
                 )
             else:
@@ -572,7 +587,7 @@ class BoxConnector(BaseConnector):
                     metadata_changed=False,
                     content_changed=False,
                     permissions_changed=False,
-                    new_permissions=permissions,
+                    new_permissions=permissions or [],
                     external_record_id=entry_id
                 )
 
@@ -603,11 +618,9 @@ class BoxConnector(BaseConnector):
                     response = await self.data_source.collaborations_get_folder_collaborations(folder_id=item_id, marker=marker)
 
                 if not response.success:
-                    if self._is_final_answer(response.error):
-                        self.logger.debug(f"No collaborations found or accessible for {item_type} {item_id}: {response.error}")
-                        break
                     self.logger.warning(f"Could not read collaborators of {item_type} {item_id}: {response.error}")
-                    self._mark_read_incomplete(response.error)
+                    if not self._is_final_answer(response.error):
+                        self._mark_read_incomplete(response.error)
                     return None
 
                 data = self._to_dict(response.data)
@@ -617,7 +630,18 @@ class BoxConnector(BaseConnector):
                     break
 
             for collab in collaborations:
-                accessible_by = collab.get('accessible_by', {})
+                status = collab.get('status')
+                if status and status != 'accepted':
+                    continue
+                created_on = (collab.get('item') or {}).get('id')
+                if created_on and str(created_on) != str(item_id):
+                    continue
+                # An access-only invite does not waterfall; it stays on the nested file.
+                if item_type != 'file' and collab.get('is_access_only'):
+                    continue
+                accessible_by = collab.get('accessible_by') or {}
+                if not isinstance(accessible_by, dict):
+                    continue
                 role = collab.get('role', 'viewer')
 
                 # Map Box roles to our permission types
@@ -997,10 +1021,15 @@ class BoxConnector(BaseConnector):
                 self.logger.info(f"Deleting stale group: {group.name} ({external_id})")
 
                 # Use existing delete handler
-                await self.data_entities_processor.on_user_group_deleted(
-                    external_group_id=external_id,
-                    connector_id=self.connector_id
-                )
+                try:
+                    await self.data_entities_processor.on_user_group_deleted(
+                        external_group_id=external_id,
+                        connector_id=self.connector_id
+                    )
+                except Exception as e:
+                    # The other stale groups are still deleted; this one is found
+                    # stale again on the next sync.
+                    self.logger.error(f"Failed to delete stale group {group.name} ({external_id}): {e}", exc_info=True)
 
         except Exception as e:
             self.logger.error(f"Error during group reconciliation: {e}", exc_info=True)
@@ -1116,7 +1145,7 @@ class BoxConnector(BaseConnector):
         offset = 0
         limit = 1000
 
-        fields = 'type,id,name,size,created_at,modified_at,path_collection,etag,sha1,shared_link,owned_by'
+        fields = ITEM_FIELDS
 
         if not self.current_user_id:
             try:
@@ -2338,7 +2367,7 @@ class BoxConnector(BaseConnector):
         """
         offset = 0
         limit = 1000
-        fields = 'type,id,name,size,created_at,modified_at,path_collection,etag,sha1,shared_link,owned_by'
+        fields = ITEM_FIELDS
         effective_email = user_email or "incremental_sync_user"
 
         while True:

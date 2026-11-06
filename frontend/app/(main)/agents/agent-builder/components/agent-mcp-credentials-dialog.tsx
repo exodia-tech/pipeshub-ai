@@ -10,10 +10,13 @@ import { McpServersApi } from '../../../workspace/mcp-servers/api';
 import {
   buildMultiEnvAuthPayload,
   isMultiEnvAuthComplete,
+  isSecretFieldName,
   needsMultiEnvAuth,
 } from '../../../workspace/mcp-servers/stdio-env-auth';
 import type { McpMyServerEntry } from '../../../workspace/mcp-servers/types';
-import { useMcpOAuthPopup } from '../../../workspace/mcp-servers/hooks/use-mcp-oauth-popup';
+import { McpLogoImage } from '../../../workspace/mcp-servers/components';
+import { useMcpServerLogo } from '../../../workspace/mcp-servers/logo-store';
+import { mcpOAuthFailureMessage, useMcpOAuthPopup } from '../../../workspace/mcp-servers/hooks/use-mcp-oauth-popup';
 import {
   toolsetDialogBackdropStyle,
   toolsetDialogFooterPrimaryClusterStyle,
@@ -21,6 +24,7 @@ import {
   toolsetDialogPanelStyle,
   toolsetDialogPrimaryActionsStyle,
 } from './toolset-config-dialog-styles';
+import { browserOAuthBaseUrl } from '@/lib/api/frontend-public-url';
 
 function extractErrorDetail(e: unknown): string | undefined {
   return isProcessedError(e) ? e.message : e instanceof Error ? e.message : undefined;
@@ -64,6 +68,7 @@ export function McpCredentialsDialog({
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(instance.isAuthenticated);
+  const logo = useMcpServerLogo(instance._id);
 
   const verifyAuthenticated = useCallback(async (): Promise<boolean> => {
     const found = agentKey
@@ -74,6 +79,7 @@ export function McpCredentialsDialog({
 
   const { startOAuthPopup, status: oauthStatus } = useMcpOAuthPopup({
     verifyAuthenticated,
+    onFailed: (failure) => setError(mcpOAuthFailureMessage(t, failure)),
     onVerified: () => {
       setIsAuthenticated(true);
       onNotify?.(t('agentBuilder.mcpAuthUpdatedNotify'));
@@ -81,7 +87,7 @@ export function McpCredentialsDialog({
       onClose();
     },
     getAuthorizationUrl: agentKey
-      ? (id: string) => McpServersApi.getAgentOAuthAuthorizationUrl(agentKey, id, window.location.origin)
+      ? (id: string) => McpServersApi.getAgentOAuthAuthorizationUrl(agentKey, id, browserOAuthBaseUrl())
       : undefined,
   });
 
@@ -152,17 +158,9 @@ export function McpCredentialsDialog({
     }
   };
 
+  // Reconnecting is a new sign-in: the stored tokens are replaced only when it succeeds.
   const handleOAuthConnect = async () => {
     setError(null);
-    if (isAuthenticated) {
-      try {
-        if (isAgentScoped) await McpServersApi.reauthenticateAgentInstance(agentKey!, instance._id);
-        else await McpServersApi.reauthenticate(instance._id);
-      } catch (e) {
-        setError(extractErrorDetail(e) || t('agentBuilder.mcpAuthSaveError'));
-        return;
-      }
-    }
     await startOAuthPopup(instance._id);
   };
 
@@ -195,7 +193,7 @@ export function McpCredentialsDialog({
                     flexShrink: 0,
                   }}
                 >
-                  <MaterialIcon name="hub" size={28} color="var(--slate-11)" />
+                  {logo ? <McpLogoImage src={logo} size={28} /> : <MaterialIcon name="hub" size={28} color="var(--slate-11)" />}
                 </Box>
                 <Box style={{ minWidth: 0 }}>
                   <Dialog.Title style={{ marginBottom: 4 }}>{t('agentBuilder.mcpCredentialsTitle')}</Dialog.Title>
@@ -274,7 +272,7 @@ export function McpCredentialsDialog({
                       </Text>
                       <TextField.Root
                         size="2"
-                        type={envKey.toLowerCase().includes('token') || envKey.toLowerCase().includes('key') ? 'password' : 'text'}
+                        type={isSecretFieldName(envKey) ? 'password' : 'text'}
                         value={envValues[envKey] ?? ''}
                         onChange={(e) => setEnvValues((prev) => ({ ...prev, [envKey]: e.target.value }))}
                         disabled={busy}

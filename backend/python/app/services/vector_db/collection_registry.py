@@ -25,6 +25,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 
 from app.exceptions.indexing_exceptions import VectorStoreError
+from app.services.permissions.mode import scope_fields_enabled
 from app.services.vector_db.collection_manifest import (
     CollectionManifestStore,
     ManagedCollection,
@@ -33,6 +34,8 @@ from app.services.vector_db.collections import CollectionType, sanitize_collecti
 from app.services.vector_db.const.const import (
     CONNECTOR_IDS_FIELD,
     PAYLOAD_KEYWORD_INDEXES,
+    SCOPE_INTEGER_INDEXES,
+    SCOPE_KEYWORD_INDEXES,
 )
 from app.services.vector_db.interface.vector_db import IVectorDBService
 from app.services.vector_db.models import CollectionConfig
@@ -217,26 +220,31 @@ class CollectionRegistry:
             )
             return
 
-        for collection_type in CollectionType:
-            name = self.resolve_write_collection(
-                RecordContext(org_id="", collection_type=collection_type)
+        # Records only. The entity index is EntityVectorStore's: it creates,
+        # recreates and refills that collection itself. Adopted here, it was
+        # dropped by every rebuild of the records collections, and whether it
+        # was adopted depended on which collections existed at the instant the
+        # manifest was first found empty.
+        collection_type = CollectionType.RECORDS
+        name = self.resolve_write_collection(
+            RecordContext(org_id="", collection_type=collection_type)
+        )
+        dimension = await self._existing_dimension(name)
+        if dimension is None:
+            return
+        await self._manifest_store.record(
+            ManagedCollection(
+                name=name,
+                collection_type=collection_type.value,
+                embedding_dimension=dimension,
+                strategy_name=self.strategy_name,
             )
-            dimension = await self._existing_dimension(name)
-            if dimension is None:
-                continue
-            await self._manifest_store.record(
-                ManagedCollection(
-                    name=name,
-                    collection_type=collection_type.value,
-                    embedding_dimension=dimension,
-                    strategy_name=self.strategy_name,
-                )
-            )
-            self._logger.info(
-                "Adopted pre-existing collection '%s' (dimension %s) into the manifest",
-                name,
-                dimension,
-            )
+        )
+        self._logger.info(
+            "Adopted pre-existing collection '%s' (dimension %s) into the manifest",
+            name,
+            dimension,
+        )
 
     # ------------------------------------------------------------------
     # Write-path lifecycle
@@ -366,7 +374,8 @@ class CollectionRegistry:
         return info.dense_dimension if info.exists else None
 
     async def _ensure_payload_indexes(self, name: str) -> None:
-        for field_name, schema in PAYLOAD_KEYWORD_INDEXES:
+        indexes = PAYLOAD_KEYWORD_INDEXES + ((*SCOPE_KEYWORD_INDEXES, *SCOPE_INTEGER_INDEXES) if scope_fields_enabled() else ())
+        for field_name, schema in indexes:
             try:
                 await self._vector_db_service.create_index(
                     collection_name=name, field_name=field_name, field_schema=schema
@@ -545,19 +554,26 @@ class CollectionRegistry:
     # Model-change rebuild
     # ------------------------------------------------------------------
 
-    async def recreate_all_collections(self, records_dimension: int) -> list[str]:
-        """Drop and recreate every managed collection for a new embedding model.
+    async def recreate_records_collections(self, records_dimension: int) -> list[str]:
+        """Drop and recreate every managed records collection, empty.
 
-        Used by the ``deleteVectorCollection`` rebuild flow. Recreates each
-        collection under its existing name — already resolved by the strategy
-        that created it — rather than re-resolving, so a rebuild triggered mid
-        strategy-change still targets the collections that actually hold data.
+        Used by the ``deleteVectorCollection`` rebuild flow and by an
+        embedding-model change. Recreates each collection under its existing
+        name — already resolved by the strategy that created it — rather than
+        re-resolving, so a rebuild triggered mid strategy-change still targets
+        the collections that actually hold data.
 
-        ``records_dimension`` applies to ``CollectionType.RECORDS`` entries,
-        which is what an embedding-model change moves. Any other dataset keeps
-        the width recorded for it: an entities collection embedded by a
-        different model must not be silently rebuilt at the records model's
-        dimension.
+        Only ``CollectionType.RECORDS`` entries are touched, including on a
+        deployment whose manifest lists the entity index because an earlier
+        release adopted it. That collection is a projection of the graph owned
+        by ``EntityVectorStore``, which recreates it for a new model and
+        refills it; dropped here it stayed empty, since the rebuild that fills
+        it had every pass recorded as done.
+
+        The manifest is read strictly. A store that cannot be read answers
+        like an empty manifest, and both callers act on "nothing to rebuild"
+        as success: the cleanup has by then reset every record for
+        re-indexing into a collection that still holds the old vectors.
 
         The drop deliberately does not go through ``delete_collection``: that
         forgets the manifest entry, and a create failing straight afterwards
@@ -565,31 +581,34 @@ class CollectionRegistry:
         model-change guard and to the next rebuild, with nothing left to find
         it by.
         """
-        managed = await self.list_managed_collections(fresh=True)
+        managed = await self.list_managed_collections(fresh=True, strict=True)
         recreated: list[str] = []
         for entry in managed:
-            dimension = (
-                records_dimension
-                if entry.collection_type == CollectionType.RECORDS.value
-                else entry.embedding_dimension
-            )
+            if entry.collection_type != CollectionType.RECORDS.value:
+                self._logger.info(
+                    "Leaving collection '%s' (%s) as it is: only records "
+                    "collections are rebuilt here",
+                    entry.name,
+                    entry.collection_type,
+                )
+                continue
             await self._drop(entry.name)
             await self._vector_db_service.create_collection(
                 collection_name=entry.name,
-                config=self._collection_config_factory(dimension),
+                config=self._collection_config_factory(records_dimension),
             )
             await self._ensure_payload_indexes(entry.name)
             await self._manifest_store.record(
                 ManagedCollection(
                     name=entry.name,
                     collection_type=entry.collection_type,
-                    embedding_dimension=dimension,
+                    embedding_dimension=records_dimension,
                     strategy_name=self.strategy_name,
                     embedding_model=entry.embedding_model,
                 )
             )
             # Marked only once the manifest holds it, as in ensure_collection.
-            self._existence.mark(entry.name, dimension=dimension)
+            self._existence.mark(entry.name, dimension=records_dimension)
             recreated.append(entry.name)
         return recreated
 

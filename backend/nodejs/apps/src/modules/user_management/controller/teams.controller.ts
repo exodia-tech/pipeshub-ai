@@ -14,7 +14,7 @@ import { HttpMethod } from '../../../libs/enums/http-methods.enum';
 import { HTTP_STATUS } from '../../../libs/enums/http-status.enum';
 import { AppConfig } from '../../tokens_manager/config/config';
 import { inject, injectable } from 'inversify';
-import { UserDisplayPicture } from '../schema/userDp.schema';
+import { getPictureRepository } from '../../../libs/repositories/picture';
 import type {
   TeamCreatedByUser,
   TeamResponse,
@@ -84,13 +84,7 @@ async function enrichTeamsProfilePictures(
   const uniqueIds = [...new Set(userIds)];
   let dpDocs;
   try {
-    dpDocs = await UserDisplayPicture.find({
-      orgId,
-      userId: { $in: uniqueIds },
-      pic: { $ne: null },
-    })
-      .lean()
-      .exec();
+    dpDocs = await getPictureRepository().listSet(orgId, uniqueIds);
   } catch (error) {
     logger.warn('Could not look up team profile pictures', {
       orgId,
@@ -103,7 +97,7 @@ async function enrichTeamsProfilePictures(
   for (const dp of dpDocs) {
     if (dp.userId && dp.pic) {
       const mime = dp.mimeType || 'image/jpeg';
-      dpMap.set(dp.userId.toString(), `data:${mime};base64,${dp.pic}`);
+      dpMap.set(dp.userId, `data:${mime};base64,${dp.pic}`);
     }
   }
 
@@ -226,9 +220,13 @@ export class TeamsController {
         throw new NotFoundError('Getting team failed: Team not found');
       }
       const found = teamIn(teamData);
-      if (found !== undefined) {
-        await enrichTeamsProfilePictures(orgId, [found], this.logger);
+      // Defence in depth: the service scopes by org, but never relay a team
+      // from another org even if that scoping regresses. A team the caller
+      // may not see is reported as missing, not forbidden.
+      if (found === undefined || found.orgId !== orgId) {
+        throw new NotFoundError('Team not found');
       }
+      await enrichTeamsProfilePictures(orgId, [found], this.logger);
       res.status(HTTP_STATUS.OK).json(teamData);
     } catch (error: any) {
       this.logger.error('Error getting team', {
@@ -435,6 +433,10 @@ export class TeamsController {
       const aiResponse = await aiCommand.execute();
       if (!aiResponse) {
         throw new InternalServerError('No response from AI service');
+      }
+      // An unreadable database must not look like a person with no teams.
+      if (aiResponse.statusCode === HTTP_STATUS.SERVICE_UNAVAILABLE) {
+        throw handleBackendError(aiResponse, 'get user teams');
       }
       if (aiResponse.statusCode !== HTTP_STATUS.OK) {
         res.status(HTTP_STATUS.OK).json({

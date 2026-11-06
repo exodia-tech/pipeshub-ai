@@ -25,7 +25,7 @@ import pytest
 import pytest_asyncio
 
 from app.sources.external.jira.jira import JiraDataSource  # type: ignore[import-not-found]
-from connectors.jira.constants import artifact_summary
+from connectors.jira.constants import artifact_summary, connector_base_url
 from connectors.jira.jira_test_utils import (
     can_delete_issues_in,
     check_issue_exists_bool,
@@ -167,7 +167,7 @@ async def scenario_adapter(
         config={
             "auth": {
                 "authType": "API_TOKEN",
-                "baseUrl": (os.getenv("JIRA_TEST_BASE_URL") or "").rstrip("/"),
+                "baseUrl": connector_base_url(),
                 "email": os.getenv("JIRA_TEST_EMAIL"),
                 "apiToken": os.getenv("JIRA_TEST_API_TOKEN"),
             },
@@ -214,16 +214,6 @@ async def scenario_adapter(
 @pytest.mark.jira
 class TestJiraScenarioMatrix(ConnectorScenarioMatrix):
     SOURCE = "Jira"
-    KNOWN_BUGS = {
-        "incr_delete": (
-            "a ticket deleted in Jira keeps its record and vectors on a site whose Jira "
-            "products are all on Free plans, as the CI site's are: the connector learns of "
-            "deletions only from the audit log (JiraConnector._detect_and_handle_deletions, "
-            "sources/atlassian/jira_cloud/connector.py:1059), and Jira refuses that log on "
-            "Free plans ('Audit logs aren't available for this site as all of its Jira Cloud "
-            "products are on Free plans'), so no sync ever finds the delete"
-        ),
-    }
     UNSUPPORTED = {
         Action.CHANGE_PERMISSION.value: (
             "Jira has no per-issue share: tickets inherit their project's browse "

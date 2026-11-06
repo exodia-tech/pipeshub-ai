@@ -58,11 +58,11 @@ class StoredContentCleanup:
     async def release_virtual_records(
         self, virtual_record_ids: Iterable[str], *, org_id: str | None = None
     ) -> list[str]:
-        """Purge the envelopes of virtual records no record uses, then drop their mapping rows.
+        """Purge the envelopes and stage states of virtual records no record uses, then drop their mapping rows.
 
         An id a record still uses, a record in the trash included, is left as it
-        is: the purge releases it with that record. Returns the ids whose purge
-        failed; their mapping rows are kept for a retry.
+        is: the purge releases it with that record. Returns the ids not fully
+        released; their mapping rows are kept for a retry.
         """
         ids = [v for v in dict.fromkeys(virtual_record_ids) if v]
         if not ids:
@@ -84,10 +84,20 @@ class StoredContentCleanup:
                 if row is None:
                     # No mapping row: nothing was filed that this id can reach.
                     return
-                owner = row.get("orgId")
+                owner = row.get("orgId") or await self.graph_provider.stage_state_org_for_virtual_record(
+                    vrid
+                )
                 if not owner:
-                    # The row is the sweeper's only marker for this content; keep it.
-                    raise ValueError(f"mapping row for {vrid} names no organisation")
+                    # Storage is filed by org, so nothing here can be purged, and keeping the
+                    # row would only retry this every sweep. It goes with the stage states;
+                    # what storage holds for it, if anything, is left there.
+                    self.logger.warning(
+                        "Virtual record %s names no organisation on its mapping or its stage "
+                        "states, so its stored content cannot be found to remove; dropping its "
+                        "mapping so it is not retried, and leaving any stored files in place",
+                        vrid,
+                    )
+                    return
             await self.blob_storage.purge_virtual_record_documents(owner, vrid)
 
         failed = await self._run_all(ids, purge, "virtual record")
@@ -98,6 +108,16 @@ class StoredContentCleanup:
             )
         released = [v for v in ids if v not in failed and v not in in_use]
         if released:
+            try:
+                await self.graph_provider.stage_states_delete_for_virtual_records(released)
+            except Exception as exc:
+                self.logger.error(
+                    "Purged the stored content of %d virtual record(s) but could not delete their "
+                    "pipeline stage states; keeping their mapping rows for a retry: %s",
+                    len(released),
+                    exc,
+                )
+                return failed + released
             try:
                 await self.graph_provider.delete_nodes(
                     keys=released,

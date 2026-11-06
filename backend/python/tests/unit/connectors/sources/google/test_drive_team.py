@@ -303,7 +303,7 @@ class TestPermissionMapping:
         assert connector._map_drive_role_to_permission_type("fileOrganizer") == PermissionType.WRITE
 
     def test_commenter_role(self, connector):
-        assert connector._map_drive_role_to_permission_type("commenter") == PermissionType.COMMENT
+        assert connector._map_drive_role_to_permission_type("commenter") == PermissionType.READ
 
     def test_reader_role(self, connector):
         assert connector._map_drive_role_to_permission_type("reader") == PermissionType.READ
@@ -322,13 +322,7 @@ class TestEntityTypeMapping:
         assert connector._map_drive_permission_type_to_entity_type("group") == EntityType.GROUP
 
     def test_domain_type(self, connector):
-        assert connector._map_drive_permission_type_to_entity_type("domain") == EntityType.DOMAIN
-
-    def test_anyone_type(self, connector):
-        assert connector._map_drive_permission_type_to_entity_type("anyone") == EntityType.ANYONE
-
-    def test_anyone_with_link_type(self, connector):
-        assert connector._map_drive_permission_type_to_entity_type("anyoneWithLink") == EntityType.ANYONE_WITH_LINK
+        assert connector._map_drive_permission_type_to_entity_type("domain") is None
 
     def test_unknown_type_defaults_to_user(self, connector):
         assert connector._map_drive_permission_type_to_entity_type("unknown") == EntityType.USER
@@ -584,3 +578,40 @@ class TestTeamInit:
         })
         with pytest.raises(ValueError, match="Admin email not found"):
             await connector.init()
+
+
+class TestTeamDriveItemPeople:
+    async def test_my_drive_file_carries_owner_author_and_last_modifier(self, connector) -> None:
+        connector.drive_data_source.permissions_list = AsyncMock(return_value={"permissions": []})
+        metadata = _make_file_metadata(
+            owners=[{"displayName": "Alice", "emailAddress": "alice@example.com", "permissionId": "p-alice"}],
+            parents=["folder-1"],
+        )
+        metadata["lastModifyingUser"] = {"displayName": "Bob", "emailAddress": "bob@example.com", "permissionId": "p-bob"}
+
+        result = await connector._process_drive_item(
+            metadata=metadata, user_id="u1", user_email="alice@example.com", drive_id="drive-1"
+        )
+
+        record = result.record
+        assert [o.email for o in record.owners] == ["alice@example.com"]
+        assert record.authored_by is not None
+        assert record.authored_by.source_id == "p-alice"
+        assert record.last_modified_by is not None
+        assert record.last_modified_by.email == "bob@example.com"
+
+    async def test_shared_drive_file_has_no_author(self, connector) -> None:
+        connector.drive_data_source.permissions_list = AsyncMock(return_value={"permissions": []})
+        metadata = _make_file_metadata(parents=["sd-1"], owners=[])
+        metadata["driveId"] = "sd-1"
+        metadata["lastModifyingUser"] = {"displayName": "Bob", "emailAddress": "bob@example.com", "permissionId": "p-bob"}
+
+        result = await connector._process_drive_item(
+            metadata=metadata, user_id="u1", user_email="user@example.com", drive_id="sd-1", is_shared_drive=True
+        )
+
+        record = result.record
+        assert record.authored_by is None
+        assert record.owners == []
+        assert record.last_modified_by is not None
+        assert record.last_modified_by.source_id == "p-bob"

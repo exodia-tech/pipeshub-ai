@@ -14,10 +14,9 @@ from app.config.key_value_store import KeyValueStore
 from app.config.key_value_store_factory import KeyValueStoreFactory, StoreConfig
 from app.utils.encryption.encryption_service import EncryptionService
 
-dotenv.load_dotenv()
+dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
 
 # Constants
-ENCRYPTED_KEY_PARTS_COUNT = 2  # Number of colons in encrypted format: "iv:ciphertext:authTag"
 
 UNENCRYPTED_KEYS = (
     config_node_constants.ENDPOINTS.value,
@@ -25,6 +24,13 @@ UNENCRYPTED_KEYS = (
     config_node_constants.MIGRATIONS.value,
     config_node_constants.DEPLOYMENT.value,
 )
+# Directories whose keys are all plaintext: Node reads them without the Python encryption
+# (the artifact-rollout membership entries, which hold no secret).
+UNENCRYPTED_PREFIXES = ("/services/platform/artifactRollout/membership/",)
+
+
+def is_unencrypted_key(key: str) -> bool:
+    return key in UNENCRYPTED_KEYS or key.startswith(UNENCRYPTED_PREFIXES)
 
 T = TypeVar("T")
 
@@ -108,6 +114,10 @@ class EncryptedKeyValueStore(KeyValueStore[T], Generic[T]):
 
         if store_type_str == "redis":
             return self._create_redis_store(serialize, deserialize)
+        elif store_type_str == "postgres":
+            return KeyValueStoreFactory.create_store(
+                store_type=StoreType.POSTGRES, serializer=serialize, deserializer=deserialize, config=StoreConfig(host="", port=0),
+            )
         else:
             return self._create_etcd_store(serialize, deserialize)
 
@@ -203,7 +213,7 @@ class EncryptedKeyValueStore(KeyValueStore[T], Generic[T]):
             # Use datetime-safe encoder to handle any datetime objects that may have leaked into the config
             value_json = json.dumps(value, cls=_DatetimeSafeEncoder)
 
-            encrypt_value = key not in UNENCRYPTED_KEYS
+            encrypt_value = not is_unencrypted_key(key)
 
             if encrypt_value:
                 # Encrypt the value
@@ -267,7 +277,7 @@ class EncryptedKeyValueStore(KeyValueStore[T], Generic[T]):
                     return self._decode_value(key, encrypted_value)
                 except Exception as e:
                     self.logger.error(
-                        f"Failed to process value for key {key}: {str(e)}"
+                        "Failed to process value for key %s: %s", key, type(e).__name__
                     )
                     # A value came back and could not be read: not the same as
                     # no value, so a caller that asked must not see None.
@@ -279,8 +289,7 @@ class EncryptedKeyValueStore(KeyValueStore[T], Generic[T]):
                 return None
 
         except Exception as e:
-            self.logger.error("Failed to get config %s: %s", key, str(e))
-            self.logger.exception("Detailed error:")
+            self.logger.error("Failed to get config %s: %s", key, type(e).__name__)
             if raise_on_error:
                 raise
             return None
@@ -290,7 +299,7 @@ class EncryptedKeyValueStore(KeyValueStore[T], Generic[T]):
         if isinstance(stored, (dict, list, int, float)):
             return stored
 
-        needs_decryption = key not in UNENCRYPTED_KEYS
+        needs_decryption = not is_unencrypted_key(key)
         value = (
             self.encryption_service.decrypt(stored)
             if needs_decryption
@@ -348,57 +357,15 @@ class EncryptedKeyValueStore(KeyValueStore[T], Generic[T]):
         return await self.store.watch_key(key, on_change, error_callback)
 
     async def list_keys_in_directory(self, directory: str) -> List[str]:
-        """
-        List all keys in a directory, decrypting encrypted keys.
-
-        Args:
-            directory: Directory path to filter keys. If empty or "/", returns all keys.
-                      Otherwise, returns keys starting with this path.
-
-        Returns:
-            List of decrypted keys matching the directory prefix.
-        """
+        """Keys under `directory`. Only values are encrypted, never key names, so a directory
+        (ending in "/") is listed by the backend's own prefix scan instead of reading every key.
+        The root ("" or "/") lists every key; a prefix without the trailing slash is matched
+        as given, so "/a/b" still finds "/a/b-2/..." as it always has."""
         try:
-            # Get all keys from etcd (they are stored encrypted)
-            encrypted_keys = await self.store.get_all_keys()
-
-            if not encrypted_keys:
-                return []
-
-            # Kept as given: stripping the trailing slash let "/a/b/" also match "/a/b" and "/a/b-2/...".
-            directory_prefix = directory if directory != "/" else ""
-
-            decrypted_keys = []
-            for encrypted_key in encrypted_keys:
-                try:
-                    # Check if key is unencrypted (excluded from encryption)
-                    is_unencrypted = any(encrypted_key.startswith(prefix) for prefix in UNENCRYPTED_KEYS)
-
-                    if is_unencrypted:
-                        decrypted_key = encrypted_key
-                    else:
-                        # Try to decrypt the key
-                        # Encrypted format: "iv:ciphertext:authTag" (3 parts)
-                        if encrypted_key.count(":") == ENCRYPTED_KEY_PARTS_COUNT:
-                            try:
-                                decrypted_key = self.encryption_service.decrypt(encrypted_key)
-                            except Exception:
-                                # Decryption failed, use as-is (might be unencrypted)
-                                decrypted_key = encrypted_key
-                        else:
-                            # Not in encrypted format, use as-is
-                            decrypted_key = encrypted_key
-
-                    # Filter by directory prefix if provided
-                    if not directory_prefix or decrypted_key.startswith(directory_prefix):
-                        decrypted_keys.append(decrypted_key)
-
-                except Exception as e:
-                    self.logger.debug(f"Skipping key due to error: {e}")
-                    continue
-
-            return decrypted_keys
-
+            if directory not in ("", "/") and directory.endswith("/"):
+                return await self.store.list_keys_in_directory(directory)
+            keys = await self.store.get_all_keys() or []
+            return keys if directory in ("", "/") else [key for key in keys if key.startswith(directory)]
         except Exception as e:
             self.logger.error(
                 "Failed to list keys in directory (%s)", type(e).__name__

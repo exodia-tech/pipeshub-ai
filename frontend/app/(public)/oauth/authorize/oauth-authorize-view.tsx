@@ -1,17 +1,24 @@
 'use client';
 
+import { asArray } from '@/lib/utils/safe';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios, { AxiosError, isAxiosError } from 'axios';
-import { Box, Button, Flex, Separator, Text } from '@radix-ui/themes';
+import { Box, Button, Checkbox, Flex, Separator, Text } from '@radix-ui/themes';
+import type { CheckedState } from '@radix-ui/react-checkbox';
 import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '@/lib/api';
-import { extractApiErrorMessage, processError } from '@/lib/api/api-error';
-import { useAuthStore } from '@/config';
+import { extractApiErrorMessage, isProcessedError, processError } from '@/lib/api/api-error';
+import { useIsMobile, useIsBelowDesktop } from '@/lib/hooks/use-is-mobile';
+import { touchTarget } from '@/app/components/ui/responsive';
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
+import { useAuthStore, switchToSignedInWorkspace } from '@/config';
 import { LoadingScreen } from '@/app/components/ui/auth-guard';
 import { LottieLoader } from '@/app/components/ui/lottie-loader';
 import { LoadingButton } from '@/app/components/ui/loading-button';
+import { KnowledgeLimitNotice } from '@/app/components/knowledge-limit/knowledge-limit-summary';
+import type { KnowledgeLimit } from '@/app/components/knowledge-limit/knowledge-limit';
 import { OAuthConnectionOutcome } from '@/app/(public)/oauth/components/oauth-connection-outcome';
 
 const OAUTH_AUTHORIZE_PATH = '/oauth/authorize';
@@ -30,14 +37,20 @@ interface AppInfo {
   homepageUrl?: string;
   privacyPolicyUrl?: string;
   isDynamic?: boolean;
+  clientIdHost?: string;
+  knowledgeLimit?: KnowledgeLimit;
 }
 
 interface ConsentData {
   app: AppInfo;
   scopes: ScopeInfo[];
+  notGrantedScopes?: ScopeInfo[];
   user: {
     email: string;
     name?: string;
+  };
+  workspace?: {
+    name: string;
   };
   redirectUri: string;
   state?: string;
@@ -52,6 +65,9 @@ interface AuthorizeResponse {
   error?: string;
   error_description?: string;
 }
+
+// OIDC needs openid for the ID token and /userinfo, so the person cannot untick it.
+const REQUIRED_SCOPES = new Set<string>(['openid']);
 
 function normalizeScopeForPost(scopeFromUrl: string | null): string {
   if (!scopeFromUrl) return '';
@@ -71,8 +87,14 @@ function extractOAuthErrorCode(data: unknown): string | null {
   return null;
 }
 
+/** apiClient rejects with a ProcessedError; the server's body is on its originalError. */
+function unwrapApiError(err: unknown): unknown {
+  return isProcessedError(err) && err.originalError ? err.originalError : err;
+}
+
 /** Extract the best human-readable message from an error, preferring error_description. */
-function errorMessageFromUnknown(err: unknown): string {
+function errorMessageFromUnknown(raw: unknown): string {
+  const err = unwrapApiError(raw);
   if (isAxiosError(err)) {
     const data = err.response?.data;
     // Prefer error_description (OAuth-style) over the generic error code
@@ -95,9 +117,26 @@ function errorMessageFromUnknown(err: unknown): string {
 }
 
 /** Extract the OAuth error code from an error, if present. */
-function errorCodeFromUnknown(err: unknown): string | null {
+function errorCodeFromUnknown(raw: unknown): string | null {
+  const err = unwrapApiError(raw);
   if (isAxiosError(err)) {
     return extractOAuthErrorCode(err.response?.data);
+  }
+  return null;
+}
+
+/** The workspace that owns the app, sent when this tab's workspace is a different one. */
+function appOrgIdFromUnknown(raw: unknown): string | null {
+  const err = unwrapApiError(raw);
+  if (!isAxiosError(err)) return null;
+  const data = err.response?.data;
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    'org_id' in data &&
+    typeof (data as { org_id?: string }).org_id === 'string'
+  ) {
+    return (data as { org_id: string }).org_id;
   }
   return null;
 }
@@ -125,6 +164,8 @@ type ConsentOutcome =
 
 export function OAuthAuthorizeView() {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
+  const isBelowDesktop = useIsBelowDesktop();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isHydrated = useAuthStore((s) => s.isHydrated);
@@ -138,6 +179,12 @@ export function OAuthAuthorizeView() {
   const [consentData, setConsentData] = useState<ConsentData | null>(null);
   const [codeChallenge, setCodeChallenge] = useState('');
   const [codeChallengeMethod, setCodeChallengeMethod] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  // Categories start collapsed; the count on each header shows what is ticked inside.
+  const [openCategories, setOpenCategories] = useState<ReadonlySet<string>>(new Set());
+  // Every requested scope starts ticked once the consent data loads; the person unticks what they don't want.
+  const [ticked, setTicked] = useState<Set<string>>(() => new Set());
+  const triedWorkspaceSwitchRef = useRef(false);
 
   const clientId = searchParams.get('client_id');
   const redirectUri = searchParams.get('redirect_uri');
@@ -179,6 +226,7 @@ export function OAuthAuthorizeView() {
     let cancelled = false;
 
     (async () => {
+      let retrying = false;
       setLoading(true);
       setError('');
       try {
@@ -211,6 +259,7 @@ export function OAuthAuthorizeView() {
 
         if (data.requiresConsent && data.consentData) {
           setConsentData(data.consentData);
+          setTicked(new Set(asArray(data.consentData.scopes).map((s) => s.name)));
           setCodeChallenge(data.codeChallenge ?? '');
           setCodeChallengeMethod(data.codeChallengeMethod ?? '');
         } else {
@@ -219,11 +268,23 @@ export function OAuthAuthorizeView() {
       } catch (err) {
         if (axios.isCancel(err)) return;
         if (cancelled) return;
+        // A new tab starts in the person's first workspace, which may not own the app.
+        const appOrgId = appOrgIdFromUnknown(err);
+        if (
+          appOrgId &&
+          !triedWorkspaceSwitchRef.current &&
+          switchToSignedInWorkspace(appOrgId)
+        ) {
+          triedWorkspaceSwitchRef.current = true;
+          retrying = true;
+          setReloadKey((k) => k + 1);
+          return;
+        }
         const code = errorCodeFromUnknown(err);
         if (code) setErrorCode(code);
         setError(errorMessageFromUnknown(err));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !retrying) setLoading(false);
       }
     })();
 
@@ -231,7 +292,7 @@ export function OAuthAuthorizeView() {
       cancelled = true;
       controller.abort();
     };
-  }, [isHydrated, isAuthenticated, clientId, redirectUri, queryParams, t]);
+  }, [isHydrated, isAuthenticated, clientId, redirectUri, queryParams, t, reloadKey]);
 
   const successRedirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -250,8 +311,33 @@ export function OAuthAuthorizeView() {
     };
   }, [outcome]);
 
+  const listedScopes = asArray(consentData?.scopes).map((s) => s.name);
+  const tickedScopes = listedScopes.filter((name) => ticked.has(name));
+  const toggleScopes = (items: ScopeInfo[], on: boolean) => {
+    setTicked((prev) => {
+      const next = new Set(prev);
+      for (const { name } of items) {
+        if (on) next.add(name);
+        else if (!REQUIRED_SCOPES.has(name)) next.delete(name);
+      }
+      return next;
+    });
+  };
+  // Grouped and ordered like the OAuth app form, so the person sees the same layout.
+  const scopeGroups = Object.entries(
+    asArray(consentData?.scopes).reduce<Record<string, ScopeInfo[]>>((acc, s) => {
+      (acc[s.category] ??= []).push(s);
+      return acc;
+    }, {})
+  ).sort(([a], [b]) => a.localeCompare(b));
+
   const handleConsent = async (consent: 'granted' | 'denied') => {
     if (!clientId || !redirectUri) return;
+    // The server re-checks these against the app, so the person can only narrow the request.
+    const postedScope =
+      consent === 'granted' && listedScopes.length > 0
+        ? tickedScopes.join(' ')
+        : normalizeScopeForPost(scope);
 
     setSubmitting(true);
     try {
@@ -267,7 +353,7 @@ export function OAuthAuthorizeView() {
         {
           client_id: clientId,
           redirect_uri: redirectUri,
-          scope: normalizeScopeForPost(scope),
+          scope: postedScope,
           state: state ?? '',
           code_challenge: cc,
           code_challenge_method: ccm,
@@ -441,9 +527,9 @@ export function OAuthAuthorizeView() {
 
   if (outcome.type === 'success') {
     const granted = outcome.consent === 'granted';
-    const scopePermissionSummary = consentData.scopes.map((s) => ({
+    const scopePermissionSummary = asArray(consentData.scopes).map((s) => ({
       name: s.name,
-      granted,
+      granted: granted && ticked.has(s.name),
     }));
     return (
       <OAuthConnectionOutcome
@@ -482,13 +568,14 @@ export function OAuthAuthorizeView() {
   }
 
   const appName = consentData.app.name;
+  const notGrantedScopes = consentData.notGrantedScopes ?? [];
 
   return (
     <Flex
-      align="center"
-      justify="center"
       style={{
-        minHeight: '100vh',
+        // A fixed height, not minHeight: body is overflow: hidden, so this box must be the scroll container.
+        height: '100dvh',
+        overflowY: 'auto',
         padding: 'var(--space-5)',
         background: 'var(--gray-2)',
       }}
@@ -497,6 +584,7 @@ export function OAuthAuthorizeView() {
         style={{
           width: '100%',
           maxWidth: 560,
+          margin: 'auto',
           padding: 'var(--space-5)',
           borderRadius: 'var(--radius-3)',
           border: '1px solid var(--gray-6)',
@@ -550,6 +638,17 @@ export function OAuthAuthorizeView() {
             </Text>
           ) : null}
 
+          {consentData.app.clientIdHost ? (
+            <Text as="p" size="2" color="gray" style={{ wordBreak: 'break-all' }}>
+              {t('oauthConsent.clientIdHost', { host: consentData.app.clientIdHost })}
+            </Text>
+          ) : null}
+
+          {/* In full, port included: a loopback redirect may use any port, so the host alone would not show which program gets the code. */}
+          <Text as="p" size="2" color="gray" style={{ wordBreak: 'break-all' }}>
+            {t('oauthConsent.redirectTo', { uri: consentData.redirectUri })}
+          </Text>
+
           <Separator size="4" />
 
           <Text as="div" size="2" color="gray" style={{ width: '100%' }}>
@@ -559,6 +658,11 @@ export function OAuthAuthorizeView() {
                   ? `${consentData.user.name} (${consentData.user.email})`
                   : consentData.user.name || consentData.user.email,
             })}
+            {consentData.workspace ? (
+              <Text as="div" size="2" color="gray">
+                {t('oauthConsent.workspace', { name: consentData.workspace.name })}
+              </Text>
+            ) : null}
           </Text>
 
           <Separator size="4" />
@@ -569,46 +673,183 @@ export function OAuthAuthorizeView() {
 
           <Box
             style={{
-              maxHeight: 320,
+              // On phones the page scrolls instead of nesting a second scroll area.
+              maxHeight: isMobile ? undefined : 320,
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
               gap: 'var(--space-2)',
             }}
           >
-            {consentData.scopes.map((scopeItem) => (
-              <Flex
-                key={scopeItem.name}
-                direction="column"
-                gap="1"
-                align="start"
-                p="3"
-                width="100%"
+            {scopeGroups.map(([category, items], index) => {
+              const tickedInGroup = items.filter((i) => ticked.has(i.name)).length;
+              const groupChecked: CheckedState =
+                tickedInGroup === items.length ? true : tickedInGroup === 0 ? false : 'indeterminate';
+              const open = openCategories.has(category);
+              const bodyId = `oauth-consent-scopes-${index}`;
+              const toggleOpen = () =>
+                setOpenCategories((prev) => {
+                  const next = new Set(prev);
+                  if (!next.delete(category)) next.add(category);
+                  return next;
+                });
+              return (
+                <Box
+                  key={category}
+                  p="3"
+                  style={{
+                    borderRadius: 'var(--radius-2)',
+                    border: '1px solid var(--gray-6)',
+                    background: 'var(--gray-2)',
+                  }}
+                >
+                  {/* Below desktop the checkbox's 44px tap area already spaces it from the name. */}
+                  <Flex align="center" gap={isBelowDesktop ? '0' : '2'}>
+                    <Text
+                      as="label"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        cursor: 'pointer',
+                        ...touchTarget(isBelowDesktop),
+                      }}
+                    >
+                      <Checkbox
+                        aria-label={category}
+                        checked={groupChecked}
+                        onCheckedChange={(c) => toggleScopes(items, c === true)}
+                        disabled={submitting}
+                      />
+                    </Text>
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-controls={bodyId}
+                      onClick={toggleOpen}
+                      style={{
+                        appearance: 'none',
+                        margin: 0,
+                        padding: 0,
+                        font: 'inherit',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-2)',
+                        flex: 1,
+                        minWidth: 0,
+                        minHeight: 32,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--gray-12)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        ...touchTarget(isBelowDesktop),
+                      }}
+                    >
+                      <Text size="2" weight="medium" style={{ flex: 1, minWidth: 0 }}>
+                        {category}
+                      </Text>
+                      <Text size="2" color="gray">
+                        {tickedInGroup}/{items.length}
+                      </Text>
+                      <span aria-hidden style={{ display: 'inline-flex' }}>
+                        <MaterialIcon
+                          name="expand_more"
+                          size={20}
+                          color="var(--gray-11)"
+                          style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 150ms ease' }}
+                        />
+                      </span>
+                    </button>
+                  </Flex>
+                  {open ? (
+                    <Flex id={bodyId} direction="column" gap="2" mt="3">
+                      {items.map((scopeItem) => (
+                        <Text as="label" key={scopeItem.name} style={{ cursor: 'pointer' }}>
+                          <Flex
+                            align="start"
+                            gap="2"
+                            p="2"
+                            style={{
+                              borderRadius: 'var(--radius-2)',
+                              border: '1px solid var(--gray-5)',
+                            }}
+                          >
+                            <Checkbox
+                              mt="1"
+                              checked={ticked.has(scopeItem.name)}
+                              onCheckedChange={(c) => toggleScopes([scopeItem], c === true)}
+                              disabled={submitting || REQUIRED_SCOPES.has(scopeItem.name)}
+                            />
+                            <Flex direction="column" gap="1" style={{ minWidth: 0, flex: 1 }}>
+                              <Text as="div" size="2" weight="medium">
+                                {scopeItem.name}
+                              </Text>
+                              <Text as="div" size="2" color="gray">
+                                {scopeItem.description}
+                              </Text>
+                            </Flex>
+                          </Flex>
+                        </Text>
+                      ))}
+                    </Flex>
+                  ) : null}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {notGrantedScopes.length > 0 ? (
+            <Flex direction="column" gap="2" width="100%">
+              <Text as="p" size="2" color="gray">
+                {t('oauthConsent.notGrantedHeading')}
+              </Text>
+              <Box
                 style={{
-                  borderRadius: 'var(--radius-2)',
-                  border: '1px solid var(--gray-6)',
-                  background: 'var(--gray-2)',
+                  maxHeight: isMobile ? undefined : 200,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-2)',
                 }}
               >
-                <Text
-                  as="div"
-                  size="2"
-                  weight="medium"
-                  style={{ width: '100%', lineHeight: 'var(--line-height-2)' }}
-                >
-                  {scopeItem.name}
+                {notGrantedScopes.map((scopeItem) => (
+                  <Flex
+                    key={scopeItem.name}
+                    direction="column"
+                    gap="1"
+                    align="start"
+                    p="3"
+                    width="100%"
+                    style={{
+                      borderRadius: 'var(--radius-2)',
+                      border: '1px dashed var(--gray-6)',
+                    }}
+                  >
+                    <Text as="div" size="2" color="gray" style={{ width: '100%' }}>
+                      {scopeItem.name}
+                    </Text>
+                    <Text as="div" size="1" color="gray" style={{ width: '100%' }}>
+                      {scopeItem.description}
+                    </Text>
+                  </Flex>
+                ))}
+              </Box>
+              {/* Dynamically registered apps are hidden from Developer Settings, so nobody can add scopes to them. */}
+              {consentData.app.isDynamic ? null : (
+                <Text as="p" size="2" color="gray">
+                  {t('oauthConsent.notGrantedOwnerHint')}
                 </Text>
-                <Text
-                  as="div"
-                  size="2"
-                  color="gray"
-                  style={{ width: '100%', lineHeight: 'var(--line-height-2)' }}
-                >
-                  {scopeItem.description}
+              )}
+              {notGrantedScopes.some((s) => s.name === 'offline_access') ? (
+                <Text as="p" size="2" color="amber">
+                  {t('oauthConsent.notGrantedOfflineAccess')}
                 </Text>
-              </Flex>
-            ))}
-          </Box>
+              ) : null}
+            </Flex>
+          ) : null}
+
+          <KnowledgeLimitNotice appName={appName} limit={consentData.app.knowledgeLimit} />
 
           <Separator size="4" />
 
@@ -633,9 +874,9 @@ export function OAuthAuthorizeView() {
               type="button"
               variant="outline"
               color="gray"
-              size="2"
+              size={isBelowDesktop ? '3' : '2'}
               disabled={submitting}
-              style={{ flex: 1, minHeight: 32 }}
+              style={{ flex: 1, minHeight: 32, ...touchTarget(isBelowDesktop) }}
               onClick={() => handleConsent('denied')}
             >
               {t('oauthConsent.deny')}
@@ -643,15 +884,11 @@ export function OAuthAuthorizeView() {
             <LoadingButton
               type="button"
               variant="solid"
-              color="green"
-              size="2"
+              size={isBelowDesktop ? '3' : '2'}
               loading={submitting}
+              disabled={listedScopes.length > 0 && tickedScopes.length === 0}
               loadingLabel={t('oauthConsent.submitting')}
-              style={{
-                flex: 1,
-                minHeight: 32,
-                backgroundColor: 'var(--accent-9)',
-              }}
+              style={{ flex: 1, minHeight: 32, ...touchTarget(isBelowDesktop) }}
               onClick={() => handleConsent('granted')}
             >
               {t('oauthConsent.allow')}

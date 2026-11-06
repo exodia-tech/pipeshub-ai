@@ -8,6 +8,7 @@ Encryption is the real AES-GCM service keyed from a throwaway test secret.
 
 import asyncio
 import fnmatch
+import json
 import logging
 from collections.abc import AsyncIterator, Iterator
 from unittest.mock import patch
@@ -42,6 +43,7 @@ class FakeRedisServer:
         self.data: dict = {}
         self.subscribers: dict = {}
         self.down = False
+        self.scans: list = []
 
     def check(self) -> None:
         if self.down:
@@ -81,6 +83,7 @@ class FakeRedisClient:
 
     async def scan_iter(self, match: str) -> AsyncIterator[bytes]:
         self.server.check()
+        self.server.scans.append(match)
         for key in list(self.server.data):
             if fnmatch.fnmatchcase(key, match):
                 yield key.encode("utf-8")
@@ -179,6 +182,7 @@ class FakeEtcdClient:
         self.cancelled: list = []
         self.closed = False
         self.down = False
+        self.full_reads = 0
         self._next_watch_id = 0
 
     def check(self) -> None:
@@ -215,7 +219,13 @@ class FakeEtcdClient:
 
     def get_all(self) -> list:
         self.check()
+        self.full_reads += 1
         return [(value, _Meta(key)) for key, value in self.data.items()]
+
+    def get_prefix(self, prefix: str, keys_only: bool = False) -> list:
+        """(value, metadata) pairs like etcd3's; `keys_only` leaves the values empty."""
+        self.check()
+        return [(b"" if keys_only else value, _Meta(key)) for key, value in self.data.items() if key.startswith(prefix)]
 
     def add_watch_callback(self, key: str, callback) -> int:
         self._next_watch_id += 1
@@ -337,6 +347,22 @@ class TestRoundTrip:
         assert await h.store.create_key(ENDPOINTS_KEY, endpoints) is True
 
         assert await h.store.get_key(ENDPOINTS_KEY) == endpoints
+
+    async def test_membership_entries_are_plain_json_node_can_read_and_a_neighbouring_key_is_not(self, h) -> None:
+        """The artifact-rollout membership directory is plaintext on both backends (Node reads it without
+        the Python encryption); the key above it in the tree is encrypted like any other."""
+        entry = {"checkedAt": 1_700_000_000_000, "untagged": ["indexing-0"], "groupsChecked": ["g"]}
+        key = "/services/platform/artifactRollout/membership/holder-1"
+
+        assert await h.store.create_key(key, entry) is True
+        assert await h.store.create_key("/services/platform/artifactRollout/other", entry) is True
+
+        plain = json.loads(h.raw_value(key).decode("utf-8"))
+        # Redis keeps a dict as a JSON string of JSON; Node's reader parses a string once more.
+        assert (json.loads(plain) if isinstance(plain, str) else plain) == entry
+        assert "indexing-0" not in h.raw_value("/services/platform/artifactRollout/other").decode("utf-8")
+        assert await h.store.get_key(key) == entry
+        assert await h.store.list_keys_in_directory("/services/platform/artifactRollout/membership/") == [key]
 
     async def test_a_missing_key_is_none_even_when_asked_to_raise(self, h) -> None:
         assert await h.store.get_key("/absent") is None
@@ -553,6 +579,22 @@ class TestListKeysInDirectory:
 
         with pytest.raises(ConnectionError):
             await h.store.list_keys_in_directory("/services/toolsets/")
+
+    async def test_listing_a_directory_does_not_read_every_key(self, h) -> None:
+        """SCALE-1: the backend's prefix scan, not the whole store filtered here."""
+        await h.store.create_key("/services/toolsets/i1/u1", {"token": "x"})
+        await h.store.create_key("/services/mcp/x", 2)
+
+        assert await h.store.list_keys_in_directory("/services/toolsets/") == ["/services/toolsets/i1/u1"]
+        if h.kind == "etcd":
+            assert h.backend.full_reads == 0
+        else:
+            assert all(scan.endswith("/services/toolsets/*") for scan in h.backend.scans)
+
+    async def test_etcd_lists_key_names_not_values(self, etcd_harness) -> None:
+        await etcd_harness.store.create_key("/services/toolsets/i1/u1", {"token": "x"})
+
+        assert await etcd_harness.store.list_keys_in_directory("/services/toolsets/") == ["/services/toolsets/i1/u1"]
 
 
 class TestWatchKey:

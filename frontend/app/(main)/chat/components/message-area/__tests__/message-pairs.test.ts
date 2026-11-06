@@ -114,4 +114,27 @@ describe('buildMessagePairs', () => {
     expect(pairs[0].isStreaming).toBe(true);
     expect(pairs[1].isStreaming).toBe(false);
   });
+
+  it("carries a failed reply's error code and details to its pair", () => {
+    const streamError = { code: 'mcp_server_config_missing', details: { servers: [] } };
+    const pairs = buildMessagePairs(
+      [
+        user('u1', 'Q'),
+        { id: 'a1', role: 'assistant', content: [{ type: 'text', text: 'Connect it' }], metadata: { custom: { streamError } } },
+      ],
+      OPTIONS,
+    );
+
+    expect(pairs[0].streamError).toEqual(streamError);
+  });
+
+  it("shows the partial-search note from each answer's own flag, not from the last answer", () => {
+    const flagged = { ...assistant('a1', 'Old.'), metadata: { custom: { messageId: 'a1', searchDegraded: true } } };
+    const pairs = buildMessagePairs(
+      [user('u1', 'Q1'), flagged, user('u2', 'Q2'), assistant('a2', 'New.')],
+      OPTIONS,
+    );
+
+    expect(pairs.map((p) => p.searchDegraded)).toEqual([true, false]);
+  });
 });

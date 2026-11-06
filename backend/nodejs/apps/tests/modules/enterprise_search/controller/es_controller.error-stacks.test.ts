@@ -2,6 +2,7 @@ import 'reflect-metadata'
 import { expect } from 'chai'
 import sinon from 'sinon'
 import * as controller from '../../../../src/modules/enterprise_search/controller/es_controller'
+import * as conversationArtifacts from '../../../../src/modules/artifacts/services/conversation-artifacts.service'
 import { ChatSession } from '../../../../src/modules/enterprise_search/schema/chat.session.schema'
 import { ChatSessionMessage } from '../../../../src/modules/enterprise_search/schema/chat.session.message.schema'
 import { CHAT_ERROR_MESSAGES } from '../../../../src/modules/enterprise_search/utils/chat-error-messages'
@@ -26,7 +27,7 @@ async function respond(
 ): Promise<string> {
   const res = new FakeSSEResponse()
   const next = sinon.stub()
-  const req = { headers: {}, params, query, body, user: { userId: OWNER, orgId: ORG }, context: {} }
+  const req = { headers: {}, params, query, body, user: { userId: OWNER.toString(), orgId: ORG }, context: {} }
   await handler(req as never, res as never, next as never)
   await settle()
   expect(next.called, `handler failed: ${String(next.firstCall?.args[0])}`).to.equal(false)
@@ -58,6 +59,10 @@ const expectNoStack = (json: string): void => {
 }
 
 describe('es_controller: server stack traces saved with a failed answer never reach the browser', () => {
+  beforeEach(() => {
+    sinon.stub(conversationArtifacts, 'deleteConversationArtifacts').resolves()
+  })
+
   afterEach(() => {
     sinon.restore()
   })
@@ -85,7 +90,7 @@ describe('es_controller: server stack traces saved with a failed answer never re
 
   it('deleteAgentConversationById', async () => {
     const { store, agentChatId } = seed()
-    expectNoStack(await respond(controller.deleteAgentConversationById as JsonHandler, { params: { conversationId: agentChatId, agentKey: AGENT_KEY } }))
+    expectNoStack(await respond(controller.deleteAgentConversationById(appConfig) as JsonHandler, { params: { conversationId: agentChatId, agentKey: AGENT_KEY } }))
     expect(store.session(agentChatId)?.conversationErrors?.[0]?.stack, 'the stack stays in the database').to.contain(STACK_FILE)
   })
 
@@ -94,7 +99,7 @@ describe('es_controller: server stack traces saved with a failed answer never re
     for (const id of [chatId, agentChatId]) store.session(id)?.set({ isArchived: true, archivedBy: OWNER })
     const archived = store.sessions.map((s) => s.toObject())
 
-    expectNoStack(await respond(controller.listAllArchivesConversation as JsonHandler, {}))
+    expectNoStack(await respond(controller.listAllArchivesConversation(appConfig) as JsonHandler, {}))
     expectNoStack(await respond(controller.listAllArchivesAgentConversation() as JsonHandler, { params: { agentKey: AGENT_KEY } }))
 
     sinon.stub(ChatSessionMessage, 'aggregate').resolves([])

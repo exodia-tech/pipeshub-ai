@@ -16,6 +16,9 @@ import {
   getStorageConfig,
   createSmtpConfig,
   getSmtpConfig,
+  getSmtpConfigStatus,
+  deleteSmtpConfig,
+  setSmtpConfigEnabled,
   getSlackBotConfigs,
   getInternalSlackBotConfigs,
   createSlackBotConfig,
@@ -25,16 +28,10 @@ import {
   getPlatformSettings,
   getAvailablePlatformFeatureFlags,
   getEffectivePlatformFeatureFlags,
-  getAzureAdAuthConfig,
-  setAzureAdAuthConfig,
   getMicrosoftAuthConfig,
   setMicrosoftAuthConfig,
   getGoogleAuthConfig,
   setGoogleAuthConfig,
-  getOAuthConfig,
-  setOAuthConfig,
-  getSsoAuthConfig,
-  setSsoAuthConfig,
   getGoogleWorkspaceOauthConfig,
   setGoogleWorkspaceOauthConfig,
   getFrontendUrl,
@@ -88,6 +85,9 @@ import {
   updateModelRoles,
 } from '../../../../src/modules/configuration_manager/controller/cm_controller'
 import { Org } from '../../../../src/modules/user_management/schema/org.schema'
+import { startFakeSmtpServer, FakeSmtpServer } from '../../../helpers/fake-smtp-server'
+import * as smtpTransportModule from '../../../../src/modules/mail/utils/smtp-transport'
+import { Logger } from '../../../../src/libs/services/logger.service'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -281,7 +281,7 @@ describe('ConfigurationManager Controller', () => {
       const req = createMockRequest({
         body: {
           storageType: 'local',
-          mountName: 'PipesHub',
+          mountName: 'EXODIA Brain',
         },
       })
       const res = createMockResponse()
@@ -291,6 +291,55 @@ describe('ConfigurationManager Controller', () => {
 
       expect(kvs.set.calledOnce).to.be.true
       expect(res.status.calledWith(200)).to.be.true
+    })
+
+    describe('local storage with several app replicas (Helm)', () => {
+      const saved = process.env.PIPESHUB_APP_MAX_REPLICAS
+      afterEach(() => {
+        if (saved === undefined) delete process.env.PIPESHUB_APP_MAX_REPLICAS
+        else process.env.PIPESHUB_APP_MAX_REPLICAS = saved
+      })
+
+      it('is refused, since each pod would keep its own files', async () => {
+        process.env.PIPESHUB_APP_MAX_REPLICAS = '6'
+        const kvs = createMockKeyValueStore()
+        const handler = createStorageConfig(kvs, { endpoint: 'http://localhost:3003' } as any)
+        const res = createMockResponse()
+        const next = createMockNext()
+
+        await handler(createMockRequest({ body: { storageType: 'local' } }), res, next)
+
+        expect(kvs.set.called).to.be.false
+        expect(next.calledOnce).to.be.true
+        const error = next.firstCall.args[0]
+        expect(error.statusCode ?? error.status).to.equal(400)
+        expect(error.message).to.contain('up to 6 app replicas')
+      })
+
+      it('is still saved for a single replica', async () => {
+        process.env.PIPESHUB_APP_MAX_REPLICAS = '1'
+        const kvs = createMockKeyValueStore()
+        const handler = createStorageConfig(kvs, { endpoint: 'http://localhost:3003' } as any)
+        const res = createMockResponse()
+
+        await handler(createMockRequest({ body: { storageType: 'local' } }), res, createMockNext())
+
+        expect(kvs.set.calledOnce).to.be.true
+        expect(res.status.calledWith(200)).to.be.true
+      })
+
+      it('does not affect S3 with several replicas', async () => {
+        process.env.PIPESHUB_APP_MAX_REPLICAS = '6'
+        const kvs = createMockKeyValueStore()
+        const handler = createStorageConfig(kvs, { endpoint: 'http://localhost:3003' } as any)
+        const res = createMockResponse()
+
+        await handler(createMockRequest({
+          body: { storageType: 's3', s3AccessKeyId: 'a', s3SecretAccessKey: 'b', s3BucketName: 'bucket', s3Region: 'us-east-1' },
+        }), res, createMockNext())
+
+        expect(kvs.set.calledOnce).to.be.true
+      })
     })
 
     it('should save S3 storage config in IAM role mode (no credentials provided)', async () => {
@@ -502,7 +551,7 @@ describe('ConfigurationManager Controller', () => {
 
     it('should return local config when storageType is local', async () => {
       const kvs = createMockKeyValueStore({
-        get: sinon.stub().resolves(JSON.stringify({ storageType: 'local', local: '{"mountName":"PipesHub"}' })),
+        get: sinon.stub().resolves(JSON.stringify({ storageType: 'local', local: '{"mountName":"EXODIA Brain"}' })),
       })
       const handler = getStorageConfig(kvs)
       const req = createMockRequest()
@@ -733,6 +782,21 @@ describe('ConfigurationManager Controller', () => {
       expect(res.json.firstCall.args[0]).to.have.property('flags')
     })
 
+    it('should include ENABLE_MCP, defaulting to enabled', async () => {
+      const handler = getAvailablePlatformFeatureFlags()
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      const flags = res.json.firstCall.args[0].flags
+      const mcpFlag = flags.find((f: any) => f.key === 'ENABLE_MCP')
+      expect(mcpFlag).to.exist
+      expect(mcpFlag.defaultEnabled).to.equal(true)
+      expect(mcpFlag.advanced).to.not.equal(true)
+    })
+
     it('should include ENABLE_SKILLS, defaulting to enabled', async () => {
       const handler = getAvailablePlatformFeatureFlags()
       const req = createMockRequest()
@@ -746,6 +810,67 @@ describe('ConfigurationManager Controller', () => {
       expect(skillsFlag).to.exist
       expect(skillsFlag.defaultEnabled).to.equal(true)
     })
+
+    it('should include ENABLE_NAMED_ENTITY_EXTRACTION, defaulting to disabled', async () => {
+      const handler = getAvailablePlatformFeatureFlags()
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      const flags = res.json.firstCall.args[0].flags
+      const flag = flags.find((f: any) => f.key === 'ENABLE_NAMED_ENTITY_EXTRACTION')
+      expect(flag).to.exist
+      expect(flag.defaultEnabled).to.equal(false)
+    })
+
+    it('should include ENABLE_CLASSIFY_ON_FIRST_USE as an advanced flag, defaulting to disabled', async () => {
+      const handler = getAvailablePlatformFeatureFlags()
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      const flags = res.json.firstCall.args[0].flags
+      const flag = flags.find((f: any) => f.key === 'ENABLE_CLASSIFY_ON_FIRST_USE')
+      expect(flag).to.exist
+      expect(flag.defaultEnabled).to.equal(false)
+      expect(flag.advanced).to.equal(true)
+    })
+
+    it('should include ENABLE_ARTIFACT_WRITE as an advanced flag, defaulting to disabled', async () => {
+      const handler = getAvailablePlatformFeatureFlags()
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      const flags = res.json.firstCall.args[0].flags
+      const flag = flags.find((f: any) => f.key === 'ENABLE_ARTIFACT_WRITE')
+      expect(flag).to.exist
+      expect(flag.defaultEnabled).to.equal(false)
+      expect(flag.advanced).to.equal(true)
+    })
+
+    for (const key of ['ENABLE_ARTIFACT_READ_SHADOW', 'ENABLE_ARTIFACT_READ']) {
+      it(`should include ${key} as an advanced flag, defaulting to disabled`, async () => {
+        const handler = getAvailablePlatformFeatureFlags()
+        const req = createMockRequest()
+        const res = createMockResponse()
+        const next = createMockNext()
+
+        await handler(req, res, next)
+
+        const flags = res.json.firstCall.args[0].flags
+        const flag = flags.find((f: any) => f.key === key)
+        expect(flag).to.exist
+        expect(flag.defaultEnabled).to.equal(false)
+        expect(flag.advanced).to.equal(true)
+      })
+    }
 
     it('should include ENABLE_USER_CONTEXT, defaulting to enabled', async () => {
       const handler = getAvailablePlatformFeatureFlags()
@@ -761,6 +886,21 @@ describe('ConfigurationManager Controller', () => {
       expect(userContextFlag.defaultEnabled).to.equal(true)
     })
 
+    it('should include ENABLE_KH_SCOPE_LISTING in Labs, defaulting to disabled', async () => {
+      const handler = getAvailablePlatformFeatureFlags()
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      const flags = res.json.firstCall.args[0].flags
+      const scopeFlag = flags.find((f: any) => f.key === 'ENABLE_KH_SCOPE_LISTING')
+      expect(scopeFlag).to.exist
+      expect(scopeFlag.defaultEnabled).to.equal(false)
+      expect(scopeFlag.hidden).to.not.equal(true)
+    })
+
     it('should not include hidden flags (e.g. ENABLE_BETA_CONNECTORS)', async () => {
       const handler = getAvailablePlatformFeatureFlags()
       const req = createMockRequest()
@@ -772,9 +912,42 @@ describe('ConfigurationManager Controller', () => {
       const flags = res.json.firstCall.args[0].flags
       expect(flags.find((f: any) => f.key === 'ENABLE_BETA_CONNECTORS')).to.be.undefined
     })
+
+    it('should mark internal flags as advanced and keep them in the list', async () => {
+      const handler = getAvailablePlatformFeatureFlags()
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      const flags = res.json.firstCall.args[0].flags
+      const advancedKeys = flags.filter((f: any) => f.advanced).map((f: any) => f.key)
+      expect(advancedKeys).to.include.members([
+        'ENABLE_VECTOR_STORE_REBUILD',
+        'ENABLE_SOFT_DELETE',
+        'ENABLE_NAMED_ENTITY_EXTRACTION',
+        'ENABLE_USER_CONTEXT',
+      ])
+      expect(flags.find((f: any) => f.key === 'ENABLE_MCP')?.advanced).to.not.equal(true)
+      expect(flags.find((f: any) => f.key === 'ENABLE_NAMED_ENTITY_EXTRACTION')?.defaultEnabled).to.equal(false)
+    })
   })
 
   describe('getEffectivePlatformFeatureFlags', () => {
+    it('should default ENABLE_MCP to true when the store has no entry', async () => {
+      const kvs = createMockKeyValueStore()
+      const handler = getEffectivePlatformFeatureFlags(kvs)
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(res.status.calledWith(200)).to.be.true
+      expect(res.json.firstCall.args[0].featureFlags.ENABLE_MCP).to.equal(true)
+    })
+
     it('should default ENABLE_SKILLS to true when the store has no entry', async () => {
       const kvs = createMockKeyValueStore()
       const handler = getEffectivePlatformFeatureFlags(kvs)
@@ -799,6 +972,19 @@ describe('ConfigurationManager Controller', () => {
 
       expect(res.status.calledWith(200)).to.be.true
       expect(res.json.firstCall.args[0].featureFlags.ENABLE_USER_CONTEXT).to.equal(true)
+    })
+
+    it('should default ENABLE_KH_SCOPE_LISTING to false when the store has no entry', async () => {
+      const kvs = createMockKeyValueStore()
+      const handler = getEffectivePlatformFeatureFlags(kvs)
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(res.status.calledWith(200)).to.be.true
+      expect(res.json.firstCall.args[0].featureFlags.ENABLE_KH_SCOPE_LISTING).to.equal(false)
     })
 
     it('should let a stored false win over the default', async () => {
@@ -832,70 +1018,6 @@ describe('ConfigurationManager Controller', () => {
   // -----------------------------------------------------------------------
   // Azure AD Auth Config
   // -----------------------------------------------------------------------
-  describe('getAzureAdAuthConfig', () => {
-    it('should return empty object when no config exists', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = getAzureAdAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(res.status.calledWith(200)).to.be.true
-      expect(res.json.firstCall.args[0]).to.deep.equal({})
-    })
-
-    it('should decrypt and return config when it exists', async () => {
-      mockEncService.decrypt.returns(JSON.stringify({ clientId: 'cid', tenantId: 'tid' }))
-      const kvs = createMockKeyValueStore({
-        get: sinon.stub().resolves('encrypted:data'),
-      })
-      const handler = getAzureAdAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(res.status.calledWith(200)).to.be.true
-    })
-  })
-
-  describe('setAzureAdAuthConfig', () => {
-    it('should save Azure AD config successfully', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = setAzureAdAuthConfig(kvs)
-      const req = createMockRequest({
-        body: { clientId: 'cid', tenantId: 'tid', enableJit: true },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(kvs.set.calledOnce).to.be.true
-      expect(res.status.calledWith(200)).to.be.true
-      expect(res.json.firstCall.args[0].message).to.equal('Azure AD config created successfully')
-    })
-
-    it('should default enableJit to true when not provided', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = setAzureAdAuthConfig(kvs)
-      const req = createMockRequest({
-        body: { clientId: 'cid', tenantId: 'tid' },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(kvs.set.calledOnce).to.be.true
-      const encryptedArg = mockEncService.encrypt.firstCall.args[0]
-      const parsed = JSON.parse(encryptedArg)
-      expect(parsed.enableJit).to.be.true
-    })
-  })
 
   // -----------------------------------------------------------------------
   // Microsoft Auth Config
@@ -970,111 +1092,10 @@ describe('ConfigurationManager Controller', () => {
   // -----------------------------------------------------------------------
   // OAuth Config
   // -----------------------------------------------------------------------
-  describe('getOAuthConfig', () => {
-    it('should return empty object when no config exists', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = getOAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(res.status.calledWith(200)).to.be.true
-      expect(res.json.firstCall.args[0]).to.deep.equal({})
-    })
-  })
-
-  describe('setOAuthConfig', () => {
-    it('should save OAuth config with all fields', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = setOAuthConfig(kvs)
-      const req = createMockRequest({
-        body: {
-          providerName: 'custom',
-          clientId: 'cid',
-          clientSecret: 'secret',
-          authorizationUrl: 'https://auth.example.com/authorize',
-          tokenEndpoint: 'https://auth.example.com/token',
-          userInfoEndpoint: 'https://auth.example.com/userinfo',
-          scope: 'openid profile email',
-          redirectUri: 'https://app.example.com/callback',
-          enableJit: false,
-        },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(kvs.set.calledOnce).to.be.true
-      expect(res.status.calledWith(200)).to.be.true
-      expect(res.json.firstCall.args[0].message).to.equal('OAuth config created successfully')
-    })
-
-    it('should save OAuth config with only required fields', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = setOAuthConfig(kvs)
-      const req = createMockRequest({
-        body: { providerName: 'minimal', clientId: 'cid' },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(kvs.set.calledOnce).to.be.true
-      const encrypted = mockEncService.encrypt.firstCall.args[0]
-      const parsed = JSON.parse(encrypted)
-      expect(parsed.enableJit).to.be.true
-      expect(parsed).not.to.have.property('clientSecret')
-    })
-  })
 
   // -----------------------------------------------------------------------
   // SSO Auth Config
   // -----------------------------------------------------------------------
-  describe('getSsoAuthConfig', () => {
-    it('should return spEntityId when no config exists', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = getSsoAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(res.status.calledWith(200)).to.be.true
-      expect(res.json.firstCall.args[0]).to.deep.equal({ spEntityId: 'pipeshub' })
-    })
-  })
-
-  describe('setSsoAuthConfig', () => {
-    it('should save SSO config and clean certificate', async () => {
-      const kvs = createMockKeyValueStore()
-      const mockSamlController = { updateSamlStrategiesWithCallback: sinon.stub().resolves() }
-      const handler = setSsoAuthConfig(kvs, mockSamlController as any)
-      const req = createMockRequest({
-        body: {
-          entryPoint: 'https://sso.example.com/saml',
-          certificate: '-----BEGIN CERTIFICATE-----\nABC123\n-----END CERTIFICATE-----',
-          emailKey: 'email',
-          enableJit: true,
-        },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(kvs.set.calledOnce).to.be.true
-      expect(res.status.calledWith(200)).to.be.true
-      // Verify certificate was cleaned
-      const encrypted = mockEncService.encrypt.firstCall.args[0]
-      const parsed = JSON.parse(encrypted)
-      expect(parsed.certificate).to.equal('ABC123')
-    })
-  })
 
   // -----------------------------------------------------------------------
   // Google Workspace OAuth Config
@@ -1412,6 +1433,20 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       expect(res.status.calledWith(200)).to.be.true
+    })
+
+    it('fills buckets a config saved before a model type existed does not have', async () => {
+      mockEncService.decrypt.returns(JSON.stringify({ llm: [{ provider: 'openai' }] }))
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().resolves('encrypted:ai-config'),
+      })
+      const res = createMockResponse()
+
+      await getAIModelsConfig(kvs)(createMockRequest(), res, createMockNext())
+
+      const body = res.json.firstCall.args[0]
+      expect(body.decision).to.deep.equal([])
+      expect(body.llm).to.have.length(1)
     })
   })
 
@@ -1938,9 +1973,57 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       expect(res.status.calledWith(200)).to.be.true
-      expect(kvs.set.calledOnce).to.be.true
+      expect(kvs.compareAndSet.calledOnce).to.be.true
       const response = res.json.firstCall.args[0]
       expect(response.details.wasDefault).to.be.true
+    })
+
+    it('promotes a default that was set while the usage check was running', async () => {
+      const before = {
+        llm: [
+          { modelKey: 'k1', isDefault: false, provider: 'openai', configuration: { model: 'gpt-4' } },
+          { modelKey: 'k2', isDefault: true, provider: 'openai', configuration: { model: 'gpt-3.5' } },
+        ],
+      }
+      const during = {
+        llm: [
+          { modelKey: 'k1', isDefault: true, provider: 'openai', configuration: { model: 'gpt-4' } },
+          { modelKey: 'k2', isDefault: false, provider: 'openai', configuration: { model: 'gpt-3.5' } },
+        ],
+      }
+      let stored = mockEncService.encrypt(JSON.stringify(before))
+      const raced = mockEncService.encrypt(JSON.stringify(during))
+      let attempts = 0
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().callsFake(async () => stored),
+        compareAndSet: sinon.stub().callsFake(async (_key: string, expected: string, next: string) => {
+          attempts += 1
+          if (attempts === 1) {
+            stored = raced
+            return false
+          }
+          if (expected !== stored) return false
+          stored = next
+          return true
+        }),
+      })
+      sinon.stub(AIServiceCommand.prototype, 'execute').resolves({
+        statusCode: 200,
+        data: { success: true, agents: [] },
+      })
+      const handler = deleteAIModelProvider(kvs, createMockEventService(), { cmBackend: 'http://cm', aiBackend: 'http://ai' } as any)
+      const req = createMockRequest({ params: { modelType: 'llm', modelKey: 'k1' } })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(res.status.calledWith(200)).to.be.true
+      const saved = JSON.parse(String(stored).replace(/^encrypted:/, ''))
+      expect(saved.llm).to.have.length(1)
+      expect(saved.llm[0].modelKey).to.equal('k2')
+      expect(saved.llm[0].isDefault).to.equal(true)
+      expect(res.json.firstCall.args[0].details.wasDefault).to.equal(true)
     })
   })
 
@@ -1983,7 +2066,7 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       expect(res.status.calledWith(200)).to.be.true
-      expect(kvs.set.calledOnce).to.be.true
+      expect(kvs.compareAndSet.calledOnce).to.be.true
     })
   })
 
@@ -2979,6 +3062,90 @@ describe('ConfigurationManager Controller', () => {
 
       expect(next.calledOnce).to.be.true
     })
+
+    // The settings are tried against the server before they are stored, so a
+    // rejected login is reported on the form rather than later, by each email
+    // that fails.
+    describe('checking the settings with the mail server', () => {
+      let server: FakeSmtpServer
+
+      beforeEach(async () => {
+        server = await startFakeSmtpServer({ user: 'mailer', pass: 'right' })
+      })
+
+      afterEach(async () => {
+        await server.close()
+        nock.cleanAll()
+      })
+
+      const body = (password: string) => ({
+        host: '127.0.0.1', port: server.port, fromEmail: 'noreply@example.com', username: 'mailer', password,
+      })
+
+      it('refuses settings the server rejects, with a 400 naming the problem, and stores nothing', async () => {
+        const kvs = createMockKeyValueStore()
+        const handler = createSmtpConfig(kvs, 'http://comm-backend:3002', 'jwt-secret')
+        const next = createMockNext()
+
+        await handler(createMockRequest({ body: body('wrong') }), createMockResponse(), next)
+
+        const error = next.firstCall.args[0]
+        expect(error.statusCode).to.equal(400)
+        expect(error.message).to.equal(
+          'The mail (SMTP) server rejected this username or password. Check them, then save again.',
+        )
+        expect(kvs.set.called).to.be.false
+      })
+
+      it('logs the refusal by its codes, never the server text, host or username', async () => {
+        // On the prototype: the controller keeps the instance it got at load,
+        // which another test may since have replaced as the singleton.
+        const warn = sinon.stub(Logger.prototype, 'warn')
+        const handler = createSmtpConfig(createMockKeyValueStore(), 'http://comm-backend:3002', 'jwt-secret')
+
+        await handler(createMockRequest({ body: body('wrong') }), createMockResponse(), createMockNext())
+
+        const call = warn.getCalls().find((c) => c.args[0] === 'SMTP settings refused by the mail server')
+        expect(call?.args[1]).to.deep.equal({ problem: 'auth', code: 'EAUTH', responseCode: 535 })
+        const logged = JSON.stringify(warn.getCalls().map((c) => c.args))
+        expect(logged).to.not.include('mailer')
+        expect(logged).to.not.include('127.0.0.1')
+      })
+
+      it('stores settings the server accepts', async () => {
+        sinon.stub(generateAuthTokenModule, 'generateFetchConfigAuthToken').resolves('token')
+        nock('http://comm-backend:3002').post('/api/v1/mail/updateSmtpConfig').reply(200, {})
+        const kvs = createMockKeyValueStore()
+        const handler = createSmtpConfig(kvs, 'http://comm-backend:3002', 'jwt-secret')
+        const res = createMockResponse()
+        const next = createMockNext()
+
+        await handler(createMockRequest({ body: body('right') }), res, next)
+
+        expect(next.called).to.be.false
+        expect(kvs.set.calledOnce).to.be.true
+        expect(res.status.calledWith(200)).to.be.true
+        expect(server.logins).to.deep.equal(['mailer:right'])
+      })
+
+      it('checks the stored password when the form sends the placeholder for it', async () => {
+        const kvs = createMockKeyValueStore({
+          get: sinon.stub().resolves(`encrypted:${JSON.stringify(body('wrong'))}`),
+        })
+        const handler = createSmtpConfig(kvs, 'http://comm-backend:3002', 'jwt-secret')
+        const next = createMockNext()
+
+        await handler(
+          createMockRequest({ body: { ...body(''), password: CONFIG_SECRET_PLACEHOLDER } }),
+          createMockResponse(),
+          next,
+        )
+
+        expect(next.firstCall.args[0].statusCode).to.equal(400)
+        expect(server.logins).to.deep.equal(['mailer:wrong'])
+        expect(kvs.set.called).to.be.false
+      })
+    })
   })
 
   // -----------------------------------------------------------------------
@@ -3417,7 +3584,7 @@ describe('ConfigurationManager Controller', () => {
     function stubAiService(
       takeoverStatus = 200,
       healthCheck: AiAnswer = healthy,
-      takeoverRefusal: { status: string; message: string } = { status: 'not healthy', message: 'refused' },
+      takeoverRefusal: { status: string; message: string; code?: string; error?: string } = { status: 'not healthy', message: 'refused' },
     ) {
       const calls: SentCommand[] = []
       sinon.stub(AIServiceCommand.prototype, 'execute').callsFake(async function (this: AIServiceCommand<unknown>) {
@@ -3449,6 +3616,10 @@ describe('ConfigurationManager Controller', () => {
       mockEncService.decrypt.returns(JSON.stringify({ llm: [], embedding }))
       return createMockKeyValueStore({ get: sinon.stub().resolves('encrypted:data') })
     }
+
+    // AI model writes go through compare-and-set; count both so a refusal proves nothing was saved.
+    const storeWrites = (kvs: ReturnType<typeof storedModels>): number =>
+      kvs.set.callCount + kvs.compareAndSet.callCount
 
     const openai: StoredModel = { modelKey: 'k1', isDefault: true, provider: 'openai', configuration: { model: 'text-embedding-3-small' } }
     const local: StoredModel = { modelKey: 'k2', isDefault: false, provider: 'sentenceTransformers', configuration: { model: 'BAAI/bge-small-en-v1.5' } }
@@ -3502,10 +3673,27 @@ describe('ConfigurationManager Controller', () => {
       expect(next.calledOnce).to.be.true
       expect(next.firstCall.args[0].statusCode).to.equal(400)
       expect(next.firstCall.args[0].message).to.equal(IN_USE)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
       const [takeover] = takeoverCalls(calls)
       expect(models(takeover)).to.have.length(1)
       expect(models(takeover)?.[0]?.configuration?.model).to.equal('BAAI/bge-small-en-v1.5')
+    })
+
+    it('shows the store\'s own text when it cannot change model in place', async () => {
+      const text = 'The embedding model cannot be changed yet: this installation keeps vectors in PostgreSQL (pgvector).'
+      stubAiService(400, healthy, { status: 'not healthy', code: 'embedding_change_unsupported', error: text, message: text })
+      const kvs = storedModels([openai, local])
+      const next = createMockNext()
+
+      await deleteAIModelProvider(kvs, createMockEventService(), appConfig)(
+        createMockRequest({ params: { modelType: 'embedding', modelKey: 'k1' } }),
+        createMockResponse(),
+        next,
+      )
+
+      expect(next.firstCall.args[0].statusCode).to.equal(400)
+      expect(next.firstCall.args[0].message).to.equal(text)
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it('deletes the default embedding model when nothing is stored, and the next model takes over', async () => {
@@ -3520,7 +3708,7 @@ describe('ConfigurationManager Controller', () => {
       )
 
       expect(res.status.calledWith(200)).to.be.true
-      expect(kvs.set.calledOnce).to.be.true
+      expect(storeWrites(kvs)).to.equal(1)
       expect(takeoverCalls(calls)).to.have.length(1)
     })
 
@@ -3537,7 +3725,7 @@ describe('ConfigurationManager Controller', () => {
 
       expect(models(takeoverCalls(calls)[0])).to.deep.equal([])
       expect(next.firstCall.args[0].message).to.equal(IN_USE)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it('keeps the setup error when the built-in model the delete falls back to cannot be used', async () => {
@@ -3556,7 +3744,7 @@ describe('ConfigurationManager Controller', () => {
       expect(next.called).to.be.false
       expect(res.status.calledWith(400)).to.be.true
       expect(res.json.firstCall.args[0].error.message).to.equal(setupError.message)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it('deletes an embedding model that is not in use without checking the store', async () => {
@@ -3608,7 +3796,7 @@ describe('ConfigurationManager Controller', () => {
 
       expect(res.status.calledWith(400)).to.be.true
       expect(res.json.firstCall.args[0].error.message).to.equal(IN_USE)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it("keeps the health check's own reason when the model being added is misconfigured", async () => {
@@ -3616,7 +3804,7 @@ describe('ConfigurationManager Controller', () => {
 
       expect(res.status.calledWith(400)).to.be.true
       expect(res.json.firstCall.args[0].error.message).to.equal(configError.data?.message)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it('gives the plain refusal when an edit changes the model name of the default while vectors are stored', async () => {
@@ -3624,7 +3812,7 @@ describe('ConfigurationManager Controller', () => {
 
       expect(res.status.calledWith(400)).to.be.true
       expect(res.json.firstCall.args[0].error.message).to.equal(IN_USE)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it("keeps the health check's own reason when an edit to the default is misconfigured", async () => {
@@ -3632,7 +3820,7 @@ describe('ConfigurationManager Controller', () => {
 
       expect(res.status.calledWith(400)).to.be.true
       expect(res.json.firstCall.args[0].error.message).to.equal(configError.data?.message)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it('checks the model that takes over when an edit takes the default off the model that embeds', async () => {
@@ -3653,7 +3841,7 @@ describe('ConfigurationManager Controller', () => {
       expect(payload(check)?.becomesActive).to.equal(false)
       expect(models(takeoverCalls(calls)[0])?.[0]?.configuration?.model).to.equal('BAAI/bge-small-en-v1.5')
       expect(res.status.calledWith(400)).to.be.true
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
     it('gives the same plain refusal when an edit would hand embedding to another model while vectors are stored', async () => {
       stubAiService(400)
@@ -3686,7 +3874,7 @@ describe('ConfigurationManager Controller', () => {
 
       expect(res.status.calledWith(400)).to.be.true
       expect(res.json.firstCall.args[0].error.message).to.equal(IN_USE)
-      expect(kvs.set.called).to.be.false
+      expect(storeWrites(kvs)).to.equal(0)
     })
 
     it("passes on the incoming model's own health failure when setting the default", async () => {
@@ -3996,78 +4184,6 @@ describe('ConfigurationManager Controller', () => {
   // -----------------------------------------------------------------------
   // SSO Auth Config - additional tests
   // -----------------------------------------------------------------------
-  describe('getSsoAuthConfig (additional)', () => {
-    it('should decrypt and return config when it exists', async () => {
-      mockEncService.decrypt.returns(JSON.stringify({ certificate: 'ABC', entryPoint: 'https://sso.example.com', emailKey: 'email' }))
-      const kvs = createMockKeyValueStore({
-        get: sinon.stub().resolves('encrypted:sso-config'),
-      })
-      const handler = getSsoAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(res.status.calledWith(200)).to.be.true
-      expect(res.json.firstCall.args[0]).to.have.property('certificate', 'ABC')
-    })
-
-    it('should call next on error', async () => {
-      const kvs = createMockKeyValueStore({
-        get: sinon.stub().rejects(new Error('fetch failed')),
-      })
-      const handler = getSsoAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(next.calledOnce).to.be.true
-    })
-  })
-
-  describe('setSsoAuthConfig (additional)', () => {
-    it('should default enableJit to true when not provided', async () => {
-      const kvs = createMockKeyValueStore()
-      const mockSamlController = { updateSamlStrategiesWithCallback: sinon.stub().resolves() }
-      const handler = setSsoAuthConfig(kvs, mockSamlController as any)
-      const req = createMockRequest({
-        body: {
-          entryPoint: 'https://sso.example.com/saml',
-          certificate: 'ABC123',
-          emailKey: 'email',
-        },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(kvs.set.calledOnce).to.be.true
-      const encryptedArg = mockEncService.encrypt.firstCall.args[0]
-      const parsed = JSON.parse(encryptedArg)
-      expect(parsed.enableJit).to.be.true
-    })
-
-    it('should call next on error', async () => {
-      const kvs = createMockKeyValueStore({
-        set: sinon.stub().rejects(new Error('store failed')),
-      })
-      const mockSamlController = { updateSamlStrategiesWithCallback: sinon.stub().resolves() }
-      const handler = setSsoAuthConfig(kvs, mockSamlController as any)
-      const req = createMockRequest({
-        body: { entryPoint: 'https://sso.example.com', certificate: 'ABC', emailKey: 'email' },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(next.calledOnce).to.be.true
-    })
-  })
 
   // -----------------------------------------------------------------------
   // OneDrive Credentials - additional tests
@@ -4325,53 +4441,6 @@ describe('ConfigurationManager Controller', () => {
   // -----------------------------------------------------------------------
   // OAuth Config - additional tests
   // -----------------------------------------------------------------------
-  describe('getOAuthConfig (additional)', () => {
-    it('should decrypt and return config when it exists', async () => {
-      mockEncService.decrypt.returns(JSON.stringify({ providerName: 'custom', clientId: 'cid' }))
-      const kvs = createMockKeyValueStore({
-        get: sinon.stub().resolves('encrypted:oauth'),
-      })
-      const handler = getOAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(res.status.calledWith(200)).to.be.true
-      expect(res.json.firstCall.args[0]).to.have.property('providerName', 'custom')
-    })
-
-    it('should call next on error', async () => {
-      const kvs = createMockKeyValueStore({
-        get: sinon.stub().rejects(new Error('fetch failed')),
-      })
-      const handler = getOAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(next.calledOnce).to.be.true
-    })
-  })
-
-  describe('setOAuthConfig (additional)', () => {
-    it('should call next on error', async () => {
-      const kvs = createMockKeyValueStore({
-        set: sinon.stub().rejects(new Error('store failed')),
-      })
-      const handler = setOAuthConfig(kvs)
-      const req = createMockRequest({ body: { providerName: 'custom', clientId: 'cid' } })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(next.calledOnce).to.be.true
-    })
-  })
 
   // -----------------------------------------------------------------------
   // Custom System Prompt - additional tests
@@ -4495,53 +4564,6 @@ describe('ConfigurationManager Controller', () => {
   // -----------------------------------------------------------------------
   // Azure AD Auth Config - additional error tests
   // -----------------------------------------------------------------------
-  describe('getAzureAdAuthConfig (additional)', () => {
-    it('should call next on error', async () => {
-      const kvs = createMockKeyValueStore({
-        get: sinon.stub().rejects(new Error('fetch failed')),
-      })
-      const handler = getAzureAdAuthConfig(kvs)
-      const req = createMockRequest()
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(next.calledOnce).to.be.true
-    })
-  })
-
-  describe('setAzureAdAuthConfig (additional)', () => {
-    it('should call next on error', async () => {
-      const kvs = createMockKeyValueStore({
-        set: sinon.stub().rejects(new Error('store failed')),
-      })
-      const handler = setAzureAdAuthConfig(kvs)
-      const req = createMockRequest({ body: { clientId: 'cid', tenantId: 'tid' } })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      expect(next.calledOnce).to.be.true
-    })
-
-    it('should include authority in encrypted config', async () => {
-      const kvs = createMockKeyValueStore()
-      const handler = setAzureAdAuthConfig(kvs)
-      const req = createMockRequest({
-        body: { clientId: 'cid', tenantId: 'my-tenant' },
-      })
-      const res = createMockResponse()
-      const next = createMockNext()
-
-      await handler(req, res, next)
-
-      const encryptedArg = mockEncService.encrypt.firstCall.args[0]
-      const parsed = JSON.parse(encryptedArg)
-      expect(parsed.authority).to.equal('https://login.microsoftonline.com/my-tenant')
-    })
-  })
 
   // -----------------------------------------------------------------------
   // setPlatformSettings - additional tests
@@ -4718,6 +4740,8 @@ describe('ConfigurationManager Controller', () => {
   // -----------------------------------------------------------------------
   describe('createSmtpConfig (happy path)', () => {
     it('should encrypt and store SMTP config before calling communication backend', async () => {
+      // smtp.test.com is not a real server; the check against it has its own tests.
+      sinon.stub(smtpTransportModule, 'smtpSettingsProblem').resolves(null)
       const kvs = createMockKeyValueStore()
 
       const handler = createSmtpConfig(kvs, 'http://comm-backend:3002', 'jwt-secret')
@@ -4756,7 +4780,11 @@ describe('ConfigurationManager Controller', () => {
       nock.cleanAll()
     })
 
+    let smtpCheck: sinon.SinonStub
+
     beforeEach(() => {
+      // The hosts here are not real servers; the check itself has its own tests.
+      smtpCheck = sinon.stub(smtpTransportModule, 'smtpSettingsProblem').resolves(null)
       sinon.stub(generateAuthTokenModule, 'generateFetchConfigAuthToken').resolves('test-token')
     })
 
@@ -4799,9 +4827,10 @@ describe('ConfigurationManager Controller', () => {
         password: 'real-pass',
         fromEmail: 'real@example.com',
       })
+      expect(smtpCheck.firstCall.args[0]).to.deep.equal(stored, 'the server is asked about what is stored')
     })
 
-    it('does not look up the existing config when the body has no placeholders', async () => {
+    it('stores the body as sent when it has no placeholders', async () => {
       const kvs = createMockKeyValueStore()
       nock('http://comm-backend:3002').post('/api/v1/mail/updateSmtpConfig').reply(200, {})
 
@@ -4814,7 +4843,6 @@ describe('ConfigurationManager Controller', () => {
 
       await handler(req, res, next)
 
-      expect(kvs.get.called).to.be.false
       expect(res.status.calledWith(200)).to.be.true
       const stored = JSON.parse(mockEncService.encrypt.firstCall.args[0])
       expect(stored).to.deep.equal({
@@ -4842,6 +4870,135 @@ describe('ConfigurationManager Controller', () => {
       expect(kvs.get.calledOnce).to.be.true
       const stored = JSON.parse(mockEncService.encrypt.firstCall.args[0])
       expect(stored.host).to.equal('****************')
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // SMTP turned off / deleted
+  // -----------------------------------------------------------------------
+  describe('SMTP off switch and delete', () => {
+    const stored = {
+      host: 'smtp.real.com',
+      port: 587,
+      fromEmail: 'real@example.com',
+    }
+
+    beforeEach(() => {
+      sinon.stub(generateAuthTokenModule, 'generateFetchConfigAuthToken').resolves('test-token')
+      sinon.stub(smtpTransportModule, 'smtpSettingsProblem').resolves(null)
+    })
+
+    afterEach(() => {
+      nock.cleanAll()
+    })
+
+    it('keeps email turned off when the settings are saved again', async () => {
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().resolves(`encrypted:${JSON.stringify({ ...stored, enabled: false })}`),
+      })
+      nock('http://comm-backend:3002').post('/api/v1/mail/updateSmtpConfig').reply(200, {})
+
+      const handler = createSmtpConfig(kvs, 'http://comm-backend:3002', 'jwt-secret')
+      const req = createMockRequest({ body: { ...stored, host: 'smtp.new.com' } })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(next.called).to.be.false
+      const saved = JSON.parse(mockEncService.encrypt.firstCall.args[0])
+      expect(saved).to.include({ host: 'smtp.new.com', enabled: false })
+    })
+
+    it('saves a complete new config even when the stored one cannot be read', async () => {
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().resolves('encrypted:not-json'),
+      })
+      nock('http://comm-backend:3002').post('/api/v1/mail/updateSmtpConfig').reply(200, {})
+
+      const handler = createSmtpConfig(kvs, 'http://comm-backend:3002', 'jwt-secret')
+      const req = createMockRequest({ body: stored })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(next.called).to.be.false
+      expect(res.status.calledWith(200)).to.be.true
+      expect(JSON.parse(mockEncService.encrypt.firstCall.args[0])).to.deep.equal(stored)
+    })
+
+    it('turns email off without dropping the settings, and reloads the mail service', async () => {
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().resolves(`encrypted:${JSON.stringify(stored)}`),
+      })
+      const reload = nock('http://comm-backend:3002').post('/api/v1/mail/updateSmtpConfig').reply(200, {})
+
+      const handler = setSmtpConfigEnabled(kvs, 'http://comm-backend:3002', 'jwt-secret')
+      const req = createMockRequest({ body: { enabled: false } })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(next.called).to.be.false
+      expect(res.status.calledWith(200)).to.be.true
+      expect(res.json.firstCall.args[0]).to.deep.equal({ enabled: false })
+      expect(JSON.parse(mockEncService.encrypt.firstCall.args[0])).to.deep.equal({ ...stored, enabled: false })
+      expect(reload.isDone()).to.be.true
+    })
+
+    it('answers 404 when turning email on or off with nothing configured', async () => {
+      const kvs = createMockKeyValueStore()
+      const handler = setSmtpConfigEnabled(kvs, 'http://comm-backend:3002', 'jwt-secret')
+      const req = createMockRequest({ body: { enabled: true } })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(next.calledOnce).to.be.true
+      expect(next.firstCall.args[0]).to.have.property('statusCode', 404)
+      expect(kvs.set.called).to.be.false
+    })
+
+    it('deletes the stored settings and reloads the mail service', async () => {
+      const kvs = createMockKeyValueStore()
+      const reload = nock('http://comm-backend:3002').post('/api/v1/mail/updateSmtpConfig').reply(200, {})
+
+      const handler = deleteSmtpConfig(kvs, 'http://comm-backend:3002', 'jwt-secret')
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(next.called).to.be.false
+      expect(kvs.delete.calledOnce).to.be.true
+      expect(res.status.calledWith(200)).to.be.true
+      expect(reload.isDone()).to.be.true
+    })
+
+    it('rejects delete and the off switch without a user', async () => {
+      for (const handler of [
+        deleteSmtpConfig(createMockKeyValueStore(), 'http://comm-backend:3002', 'jwt-secret'),
+        setSmtpConfigEnabled(createMockKeyValueStore(), 'http://comm-backend:3002', 'jwt-secret'),
+      ]) {
+        const next = createMockNext()
+        await handler(createMockRequest({ user: undefined, body: { enabled: false } }), createMockResponse(), next)
+        expect(next.calledOnce).to.be.true
+      }
+    })
+
+    it('reports SMTP as not configured while it is turned off', async () => {
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().resolves(`encrypted:${JSON.stringify({ ...stored, enabled: false })}`),
+      })
+      const res = createMockResponse()
+
+      await getSmtpConfigStatus(kvs)(createMockRequest(), res, createMockNext())
+
+      expect(res.json.firstCall.args[0]).to.deep.equal({ configured: false })
     })
   })
 
@@ -4888,6 +5045,76 @@ describe('ConfigurationManager Controller', () => {
       if (!next.called) {
         expect(res.status.calledWith(200)).to.be.true
       }
+    })
+  })
+
+  describe('Slack bot duplicate credentials', () => {
+    const storeWith = (configs: object[]) =>
+      createMockKeyValueStore({
+        get: sinon.stub().resolves(mockEncService.encrypt(JSON.stringify({ configs }))),
+        compareAndSet: sinon.stub().resolves(true),
+      })
+    const bot = (id: string, botToken: string, signingSecret: string) => ({
+      id,
+      name: id,
+      botToken,
+      signingSecret,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+
+    it('rejects creating a bot with an existing signing secret', async () => {
+      const kvs = storeWith([bot('a', 'xoxb-a', 'secret-a')])
+      const next = createMockNext()
+      await createSlackBotConfig(kvs)(
+        createMockRequest({ body: { name: 'B', botToken: 'xoxb-b', signingSecret: 'secret-a' } }),
+        createMockResponse(),
+        next,
+      )
+      expect(next.calledOnce).to.be.true
+      expect(next.firstCall.args[0].message).to.match(/already connected/)
+      expect(kvs.compareAndSet.called).to.be.false
+    })
+
+    it('rejects creating a bot with an existing bot token', async () => {
+      const kvs = storeWith([bot('a', 'xoxb-a', 'secret-a')])
+      const next = createMockNext()
+      await createSlackBotConfig(kvs)(
+        createMockRequest({ body: { name: 'B', botToken: 'xoxb-a', signingSecret: 'secret-b' } }),
+        createMockResponse(),
+        next,
+      )
+      expect(next.firstCall.args[0].message).to.match(/already connected/)
+    })
+
+    it('rejects updating a bot to another bot\'s credentials', async () => {
+      const kvs = storeWith([bot('a', 'xoxb-a', 'secret-a'), bot('b', 'xoxb-b', 'secret-b')])
+      const next = createMockNext()
+      await updateSlackBotConfig(kvs)(
+        createMockRequest({
+          params: { configId: 'b' },
+          body: { name: 'B', botToken: 'xoxb-b', signingSecret: 'secret-a' },
+        }),
+        createMockResponse(),
+        next,
+      )
+      expect(next.firstCall.args[0].message).to.match(/already connected/)
+    })
+
+    it('allows updating a bot with its own unchanged credentials', async () => {
+      const kvs = storeWith([bot('a', 'xoxb-a', 'secret-a'), bot('b', 'xoxb-b', 'secret-b')])
+      const next = createMockNext()
+      const res = createMockResponse()
+      await updateSlackBotConfig(kvs)(
+        createMockRequest({
+          params: { configId: 'b' },
+          body: { name: 'Renamed', botToken: 'xoxb-b', signingSecret: 'secret-b' },
+        }),
+        res,
+        next,
+      )
+      expect(next.called).to.be.false
+      expect(res.status.calledWith(200)).to.be.true
     })
   })
 
@@ -5277,7 +5504,7 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       if (!next.called) {
-        expect(kvs.set.calledOnce).to.be.true
+        expect(kvs.compareAndSet.calledOnce).to.be.true
         expect(res.status.calledWith(200)).to.be.true
         expect(eventService.start.calledOnce).to.be.true
       }
@@ -5306,7 +5533,7 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       if (!next.called) {
-        expect(kvs.set.calledOnce).to.be.true
+        expect(kvs.compareAndSet.calledOnce).to.be.true
         expect(res.status.calledWith(200)).to.be.true
       }
     })
@@ -5480,7 +5707,7 @@ describe('ConfigurationManager Controller', () => {
 
       if (!next.called) {
         expect(res.status.calledWith(200)).to.be.true
-        expect(kvs.set.calledOnce).to.be.true
+        expect(kvs.compareAndSet.calledOnce).to.be.true
       }
     })
 
@@ -5562,6 +5789,114 @@ describe('ConfigurationManager Controller', () => {
         const response = res.json.firstCall.args[0]
         expect(response).to.have.property('status', 'success')
       }
+    })
+
+    it('keeps a key rotated while the health check was running', async () => {
+      const entry = (apiKey: string) => ({
+        llm: [{ provider: 'openai', configuration: { model: 'gpt-3.5', apiKey }, modelKey: 'key-1', isDefault: true, connectionId: 'conn-1' }],
+        embedding: [],
+      })
+      let stored = mockEncService.encrypt(JSON.stringify(entry('old')))
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().callsFake(async () => stored),
+        compareAndSet: sinon.stub().callsFake(async (_key: string, expected: string, next: string) => {
+          if (expected !== stored) return false
+          stored = next
+          return true
+        }),
+      })
+      const checkedKeys: unknown[] = []
+      sinon.stub(AIServiceCommand.prototype, 'execute').callsFake(async function (this: AIServiceCommand<unknown>) {
+        const body = (this as unknown as { body?: string }).body
+        checkedKeys.push(body ? JSON.parse(body).configuration?.apiKey : undefined)
+        stored = mockEncService.encrypt(JSON.stringify(entry('rotated')))
+        return { statusCode: 200, data: { status: 'healthy' } } as any
+      })
+
+      const res = createMockResponse()
+      await updateAIModelProvider(kvs, createMockEventService(), { aiBackend: 'http://ai', cmBackend: 'http://cm' } as any)(
+        createMockRequest({
+          params: { modelType: 'llm', modelKey: 'key-1' },
+          body: { provider: 'openai', configuration: { model: 'gpt-4' }, isDefault: true },
+        }),
+        res,
+        createMockNext(),
+      )
+
+      expect(res.status.calledWith(200)).to.be.true
+      expect(checkedKeys).to.deep.equal(['old'])
+      const saved = JSON.parse(String(stored).replace(/^encrypted:/, ''))
+      expect(saved.llm[0].configuration).to.deep.equal({ model: 'gpt-4', apiKey: 'rotated' })
+    })
+
+    async function updateAzure(configuration: Record<string, unknown>) {
+      let stored = mockEncService.encrypt(JSON.stringify({
+        llm: [{
+          provider: 'azureOpenAI',
+          configuration: { model: 'gpt-5-mini', deploymentName: 'prod-mini', apiKey: 'k', endpoint: 'https://e' },
+          modelKey: 'key-1',
+          isDefault: true,
+        }],
+        embedding: [],
+      }))
+      const kvs = createMockKeyValueStore({
+        get: sinon.stub().callsFake(async () => stored),
+        compareAndSet: sinon.stub().callsFake(async (_key: string, expected: string, next: string) => {
+          if (expected !== stored) return false
+          stored = next
+          return true
+        }),
+      })
+      const checked: Record<string, unknown>[] = []
+      sinon.stub(AIServiceCommand.prototype, 'execute').callsFake(async function (this: AIServiceCommand<unknown>) {
+        const body = (this as unknown as { body?: string }).body
+        checked.push(body ? JSON.parse(body).configuration : undefined)
+        return { statusCode: 200, data: { status: 'healthy' } } as any
+      })
+      const res = createMockResponse()
+      await updateAIModelProvider(kvs, createMockEventService(), { aiBackend: 'http://ai', cmBackend: 'http://cm' } as any)(
+        createMockRequest({
+          params: { modelType: 'llm', modelKey: 'key-1' },
+          body: { provider: 'azureOpenAI', configuration, isDefault: true },
+        }),
+        res,
+        createMockNext(),
+      )
+      const saved = JSON.parse(String(stored).replace(/^encrypted:/, '')).llm[0].configuration
+      return { res, checked, saved }
+    }
+
+    it('refuses to move an Azure entry to a new model on the old model\'s deployment', async () => {
+      const { res, checked, saved } = await updateAzure({ model: 'gpt-5.4' })
+
+      expect(res.status.calledWith(400)).to.be.true
+      expect(checked).to.have.length(0)
+      expect(saved).to.include({ model: 'gpt-5-mini', deploymentName: 'prod-mini' })
+    })
+
+    for (const deploymentName of ['', '  ']) {
+      it(`refuses a new Azure model whose deployment is ${JSON.stringify(deploymentName)}`, async () => {
+        const { res, checked, saved } = await updateAzure({ model: 'gpt-5.4', deploymentName })
+
+        expect(res.status.calledWith(400)).to.be.true
+        expect(checked).to.have.length(0)
+        expect(saved).to.include({ model: 'gpt-5-mini', deploymentName: 'prod-mini' })
+      })
+    }
+
+    it('moves an Azure entry to a new model with the deployment sent for it', async () => {
+      const { res, checked, saved } = await updateAzure({ model: 'gpt-5.4', deploymentName: 'gpt-5.4' })
+
+      expect(res.status.calledWith(200)).to.be.true
+      expect(checked[0]).to.include({ model: 'gpt-5.4', deploymentName: 'gpt-5.4', apiKey: 'k' })
+      expect(saved).to.include({ model: 'gpt-5.4', deploymentName: 'gpt-5.4', apiKey: 'k' })
+    })
+
+    it('keeps the stored Azure deployment when the model is unchanged', async () => {
+      const { res, saved } = await updateAzure({ model: 'gpt-5-mini', modelFriendlyName: 'Mini' })
+
+      expect(res.status.calledWith(200)).to.be.true
+      expect(saved).to.include({ model: 'gpt-5-mini', deploymentName: 'prod-mini' })
     })
 
     it('should return 400 when provider is missing', async () => {
@@ -6751,7 +7086,7 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       expect(res.status.calledWith(200)).to.be.true
-      expect(kvs.set.calledOnce).to.be.true
+      expect(kvs.compareAndSet.calledOnce).to.be.true
     })
 
     it('should call next when no config body', async () => {
@@ -6817,6 +7152,135 @@ describe('ConfigurationManager Controller', () => {
     })
   })
 
+  describe('createAIModelsConfig (endpoint check for every model type)', () => {
+    const appConfig = { aiBackend: 'http://ai:8000', cmBackend: 'http://cm:3001' } as any
+    const calls: Array<{ uri: string; body: unknown }> = []
+
+    const stubAiService = (respond: (uri: string) => { statusCode: number; data: unknown }) => {
+      calls.length = 0
+      sinon.stub(AIServiceCommand.prototype, 'execute').callsFake(function (this: any) {
+        calls.push({ uri: this.uri, body: this.body })
+        return Promise.resolve(respond(this.uri))
+      })
+    }
+
+    const otherTypes = {
+      ocr: [{ provider: 'openAICompatible', configuration: { model: 'o', endpoint: 'http://ocr.example' } }],
+      slm: [{ provider: 'ollama', configuration: { model: 's', endpoint: 'http://slm.example' } }],
+      reasoning: [{ provider: 'openAICompatible', configuration: { model: 'r', endpoint: 'http://r.example' } }],
+      multiModal: [{ provider: 'ollama', configuration: { model: 'm', baseUrl: 'http://mm.example' } }],
+      imageGeneration: [{ provider: 'litellmProxy', configuration: { model: 'i', endpoint: 'http://img.example' } }],
+      tts: [{ provider: 'litellmProxy', configuration: { model: 't', endpoint: 'http://tts.example' } }],
+      stt: [{ provider: 'litellmProxy', configuration: { model: 'st', endpoint: 'http://stt.example' } }],
+    }
+
+    it('sends every model type without its own health check to the endpoint check before saving', async () => {
+      stubAiService(() => ({ statusCode: 200, data: { status: 'healthy' } }))
+      const kvs = createMockKeyValueStore()
+      const handler = createAIModelsConfig(kvs, createMockEventService(), appConfig)
+      const req = createMockRequest({ body: { ...otherTypes } })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      await handler(req, res, next)
+
+      expect(next.called).to.be.false
+      const check = calls.find((call) => call.uri.endsWith('/api/v1/model-endpoint-check'))
+      expect(check).to.not.be.undefined
+      expect(JSON.parse(String(check!.body))).to.deep.equal(Object.values(otherTypes).flat())
+      expect(kvs.compareAndSet.calledOnce).to.be.true
+    })
+
+    it('refuses the save with the AI service reason when an endpoint is refused', async () => {
+      const reason = "Model endpoint 'http://img.example' resolves to a link-local or cloud metadata address, which is never allowed."
+      stubAiService((uri) =>
+        uri.endsWith('/model-endpoint-check')
+          ? { statusCode: 400, data: { status: 'error', message: reason } }
+          : { statusCode: 200, data: { status: 'healthy' } },
+      )
+      const kvs = createMockKeyValueStore()
+      const handler = createAIModelsConfig(kvs, createMockEventService(), appConfig)
+      const req = createMockRequest({
+        body: { llm: [{ provider: 'openai', configuration: { model: 'gpt-4', apiKey: 'k' } }], imageGeneration: otherTypes.imageGeneration },
+      })
+      const next = createMockNext()
+
+      await handler(req, createMockResponse(), next)
+
+      expect(next.calledOnce).to.be.true
+      const error = next.firstCall.args[0]
+      expect(error.statusCode).to.equal(400)
+      expect(error.message).to.equal(reason)
+      expect(kvs.set.called).to.be.false
+    })
+
+    it('does not save when the endpoint check itself fails', async () => {
+      stubAiService(() => ({ statusCode: 503, data: null }))
+      const kvs = createMockKeyValueStore()
+      const handler = createAIModelsConfig(kvs, createMockEventService(), appConfig)
+      const next = createMockNext()
+
+      await handler(createMockRequest({ body: { tts: otherTypes.tts } }), createMockResponse(), next)
+
+      expect(next.calledOnce).to.be.true
+      expect(next.firstCall.args[0].statusCode).to.equal(500)
+      expect(kvs.set.called).to.be.false
+    })
+
+    // The settings refusals the AI service answers with 400 (an empty or rejected
+    // key) used to come back from this route as a generic 500.
+    for (const [modelType, route] of [['llm', 'llm-health-check'], ['embedding', 'embedding-health-check']] as const) {
+      it(`passes the AI service's 400 reason through for ${modelType}, saving nothing`, async () => {
+        const reason = 'The API Key for Azure OpenAI is empty. Enter it in Workspace > AI Models, then try again.'
+        stubAiService((uri) =>
+          uri.endsWith(`/${route}`)
+            ? { statusCode: 400, data: { status: 'error', message: reason } }
+            : { statusCode: 200, data: { status: 'healthy' } },
+        )
+        const kvs = createMockKeyValueStore()
+        const handler = createAIModelsConfig(kvs, createMockEventService(), appConfig)
+        const next = createMockNext()
+        const config = { provider: 'azureOpenAI', configuration: { model: 'gpt-4o', apiKey: '' } }
+
+        await handler(createMockRequest({ body: { [modelType]: [config] } }), createMockResponse(), next)
+
+        const error = next.firstCall.args[0]
+        expect(error.statusCode).to.equal(400)
+        expect(error.message).to.equal(reason)
+        expect(kvs.set.called).to.be.false
+        expect(kvs.compareAndSet.called).to.be.false
+      })
+
+      it(`keeps a ${modelType} health check that failed on our side a 500`, async () => {
+        stubAiService((uri) =>
+          uri.endsWith(`/${route}`)
+            ? { statusCode: 500, data: { status: 'error', message: 'internal detail' } }
+            : { statusCode: 200, data: { status: 'healthy' } },
+        )
+        const handler = createAIModelsConfig(createMockKeyValueStore(), createMockEventService(), appConfig)
+        const next = createMockNext()
+        const config = { provider: 'openai', configuration: { model: 'm', apiKey: 'k' } }
+
+        await handler(createMockRequest({ body: { [modelType]: [config] } }), createMockResponse(), next)
+
+        expect(next.firstCall.args[0].statusCode).to.equal(500)
+        expect(next.firstCall.args[0].message).to.not.include('internal detail')
+      })
+    }
+
+    it('does not call the endpoint check when only llm and embedding are saved', async () => {
+      stubAiService(() => ({ statusCode: 200, data: { status: 'healthy' } }))
+      const handler = createAIModelsConfig(createMockKeyValueStore(), createMockEventService(), appConfig)
+      const req = createMockRequest({
+        body: { llm: [{ provider: 'openai', configuration: { model: 'gpt-4', apiKey: 'k' } }] },
+      })
+
+      await handler(req, createMockResponse(), createMockNext())
+
+      expect(calls.map((call) => call.uri)).to.deep.equal(['http://ai:8000/api/v1/llm-health-check'])
+    })
+  })
+
   // -----------------------------------------------------------------------
   // addAIModelProvider - deep logic
   // -----------------------------------------------------------------------
@@ -6848,7 +7312,7 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       expect(res.status.calledWith(200)).to.be.true
-      expect(kvs.set.calledOnce).to.be.true
+      expect(kvs.compareAndSet.calledOnce).to.be.true
     })
 
     it('should return 400 when required fields are missing', async () => {
@@ -6966,7 +7430,7 @@ describe('ConfigurationManager Controller', () => {
       await handler(req, res, next)
 
       expect(res.status.calledWith(200)).to.be.true
-      expect(kvs.set.calledOnce).to.be.true
+      expect(kvs.compareAndSet.calledOnce).to.be.true
     })
 
     it('should return 400 when provider is missing', async () => {
@@ -7270,7 +7734,7 @@ describe('ConfigurationManager Controller', () => {
 
       await handler(req, res, next)
 
-      expect(res.writeHead.calledWith(200, sinon.match({ 'Content-Type': 'text/event-stream' }))).to.be.true
+      expect(res.writeHead.calledWith(200, sinon.match({ 'Content-Type': 'text/event-stream; charset=utf-8' }))).to.be.true
       expect(res.write.calledOnce).to.be.true
       const written = res.write.firstCall.args[0] as string
       expect(written).to.include('event: progress')
@@ -7544,8 +8008,8 @@ describe('ConfigurationManager Controller', () => {
         embedding: [{ provider: 'openai', modelKey: 'ada-key', configuration: {} }],
       }
       const encData = mockEncService.encrypt(JSON.stringify(aiModels))
-      const setStub = sinon.stub().resolves()
-      const kvs = createMockKeyValueStore({ get: sinon.stub().resolves(encData), set: setStub })
+      const casStub = sinon.stub().resolves(true)
+      const kvs = createMockKeyValueStore({ get: sinon.stub().resolves(encData), compareAndSet: casStub })
       const handler = updateModelRoles(kvs)
       const req = createMockRequest({
         body: { roles: { primary: { modelType: 'llm', modelKey: 'gpt-4-key' } } },
@@ -7559,7 +8023,7 @@ describe('ConfigurationManager Controller', () => {
       const jsonArg = res.json.firstCall.args[0]
       expect(jsonArg.status).to.equal('success')
       expect(jsonArg.modelRoles).to.deep.equal({ primary: { modelType: 'llm', modelKey: 'gpt-4-key' } })
-      expect(setStub.calledOnce).to.be.true
+      expect(casStub.calledOnce).to.be.true
     })
 
     it('should handle empty AI config (no models configured yet)', async () => {

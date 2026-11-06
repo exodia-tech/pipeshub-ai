@@ -8,7 +8,6 @@ import pytest
 from app.config.constants.arangodb import (
     CollectionNames,
     Connectors as ConnectorsEnum,
-    EntityRelations,
     OriginTypes,
     ProgressStatus,
 )
@@ -53,6 +52,8 @@ def _make_processor():
     proc.messaging_producer.send_messages = AsyncMock(
         side_effect=lambda topic, messages: [True] * len(messages)
     )
+    # Title events have their own tests (test_dsp_record_title_events.py); here they would only share send_messages.
+    proc._publish_record_titles = AsyncMock()
     return proc
 
 
@@ -91,7 +92,7 @@ def _make_tx_store():
     tx_store.batch_upsert_record_groups = AsyncMock()
     tx_store.create_record_group_relation = AsyncMock()
     tx_store.create_record_relation = AsyncMock()
-    tx_store.batch_upsert_record_relations = AsyncMock()
+    tx_store.batch_upsert_node_relations = AsyncMock()
     tx_store.get_record_by_key = AsyncMock(return_value=None)
     tx_store.batch_upsert_nodes = AsyncMock()
     tx_store.get_user_by_email = AsyncMock(return_value=None)
@@ -417,6 +418,54 @@ class TestProcessRecord:
         assert result.id == "existing-id"
 
 
+    @pytest.mark.asyncio
+    async def test_unchanged_code_file_keeps_its_updated_stamp(self) -> None:
+        """The code edge build re-resolves every file stamped since its last run;
+        a full code sync re-saves every file, unchanged ones included."""
+        proc = _make_processor()
+        tx_store = _make_tx_store()
+        existing = _make_record(record_type=RecordType.CODE_FILE, updated_at=111)
+        existing.id = "existing-id"
+        existing.external_revision_id = "blob-1"
+        tx_store.get_record_by_external_id.return_value = existing
+
+        record = _make_record(record_type=RecordType.CODE_FILE)
+        record.external_revision_id = "blob-1"
+        result, _ = await proc._process_record(record, [], tx_store)
+
+        assert result.updated_at == 111
+
+    @pytest.mark.asyncio
+    async def test_changed_code_file_gets_a_new_updated_stamp(self) -> None:
+        proc = _make_processor()
+        tx_store = _make_tx_store()
+        existing = _make_record(record_type=RecordType.CODE_FILE, updated_at=111)
+        existing.id = "existing-id"
+        existing.external_revision_id = "blob-1"
+        tx_store.get_record_by_external_id.return_value = existing
+
+        record = _make_record(record_type=RecordType.CODE_FILE)
+        record.external_revision_id = "blob-2"
+        result, _ = await proc._process_record(record, [], tx_store)
+
+        assert result.updated_at > 111
+
+    @pytest.mark.asyncio
+    async def test_other_records_keep_taking_a_new_updated_stamp(self) -> None:
+        proc = _make_processor()
+        tx_store = _make_tx_store()
+        existing = _make_record(updated_at=111)
+        existing.id = "existing-id"
+        existing.external_revision_id = "rev-1"
+        tx_store.get_record_by_external_id.return_value = existing
+
+        record = _make_record()
+        record.external_revision_id = "rev-1"
+        result, _ = await proc._process_record(record, [], tx_store)
+
+        assert result.updated_at > 111
+
+
 # ===========================================================================
 # on_new_records
 # ===========================================================================
@@ -474,6 +523,28 @@ class TestOnNewRecords:
         proc.messaging_producer.send_messages.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_a_record_the_connector_stored_failed_is_not_published(self) -> None:
+        """A page that answered an error is stored FAILED with its reason; indexing must not
+        fetch it again and replace that reason with its own."""
+        proc = _make_processor()
+        tx_store = _make_tx_store()
+
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=tx_store)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        proc.data_store_provider.transaction.return_value = ctx
+
+        record = _make_record()
+        record.id = "rec-1"
+        record.indexing_status = ProgressStatus.FAILED.value
+        record.reason = "The page returned an error (400 Bad Request)."
+
+        await proc.on_new_records([(record, [])])
+
+        proc.messaging_producer.send_messages.assert_not_awaited()
+        assert record.indexing_status == ProgressStatus.FAILED.value
+
+    @pytest.mark.asyncio
     async def test_exception_propagated(self):
         """Transaction errors propagate."""
         proc = _make_processor()
@@ -528,6 +599,88 @@ class TestUnchangedRecordsAreNotRepublished:
 
         proc.messaging_producer.send_messages.assert_not_awaited()
         assert record.indexing_status == ProgressStatus.COMPLETED.value
+
+    @pytest.mark.asyncio
+    async def test_unchanged_password_protected_record_publishes_nothing(self) -> None:
+        """A full re-sync does not queue a locked file again: the same bytes need the same password."""
+        proc, _ = self._proc_with_existing(
+            self._existing("rev-1", ProgressStatus.PASSWORD_PROTECTED.value)
+        )
+        record = _make_record()
+        record.external_revision_id = "rev-1"
+
+        await proc.on_new_records([(record, [])])
+
+        proc.messaging_producer.send_messages.assert_not_awaited()
+        assert record.indexing_status == ProgressStatus.PASSWORD_PROTECTED.value
+
+    @pytest.mark.asyncio
+    async def test_changed_password_protected_record_is_indexed_again(self) -> None:
+        proc, _ = self._proc_with_existing(
+            self._existing("rev-1", ProgressStatus.PASSWORD_PROTECTED.value)
+        )
+        record = _make_record()
+        record.external_revision_id = "rev-2"
+
+        await proc.on_new_records([(record, [])])
+
+        proc.messaging_producer.send_messages.assert_awaited_once()
+        assert record.indexing_status != ProgressStatus.PASSWORD_PROTECTED.value
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [
+            ProgressStatus.FAILED.value,
+            ProgressStatus.FILE_TYPE_NOT_SUPPORTED.value,
+            ProgressStatus.EMPTY.value,
+            ProgressStatus.QUEUED.value,
+            ProgressStatus.IN_PROGRESS.value,
+        ],
+    )
+    async def test_an_unchanged_record_keeps_its_status_and_publishes_nothing(self, status: str) -> None:
+        """A sync is not a retry: an outcome stays until the content changes or someone
+        reindexes, and queued or running work already has its event."""
+        proc, _ = self._proc_with_existing(self._existing("rev-1", status))
+        record = _make_record()
+        record.external_revision_id = "rev-1"
+
+        await proc.on_new_records([(record, [])])
+
+        proc.messaging_producer.send_messages.assert_not_awaited()
+        assert record.indexing_status == status
+
+    @pytest.mark.asyncio
+    async def test_an_unchanged_record_whose_event_was_never_acknowledged_is_published(self) -> None:
+        proc, _ = self._proc_with_existing(
+            self._existing("rev-1", ProgressStatus.NOT_STARTED.value)
+        )
+        record = _make_record()
+        record.external_revision_id = "rev-1"
+
+        await proc.on_new_records([(record, [])])
+
+        proc.messaging_producer.send_messages.assert_awaited_once()
+        assert record.indexing_status == ProgressStatus.NOT_STARTED.value
+
+    @pytest.mark.asyncio
+    async def test_a_changed_record_is_stored_not_started_until_its_event_is_acknowledged(self) -> None:
+        """QUEUED is written only by the compare-and-set after the publish, so a lost
+        publish leaves a NOT_STARTED row the stranded-record sweep sends again."""
+        proc, _ = self._proc_with_existing(
+            self._existing("rev-1", ProgressStatus.FILE_TYPE_NOT_SUPPORTED.value)
+        )
+        proc.messaging_producer.send_messages = AsyncMock(return_value=[True])
+        record = _make_record()
+        record.external_revision_id = "rev-2"
+
+        await proc.on_new_records([(record, [])])
+
+        proc.messaging_producer.send_messages.assert_awaited_once()
+        assert record.indexing_status == ProgressStatus.NOT_STARTED.value
+        proc.data_store_provider.compare_and_set_indexing_status.assert_awaited_once_with(
+            [record.id], ProgressStatus.NOT_STARTED.value, ProgressStatus.QUEUED.value,
+        )
 
     @pytest.mark.asyncio
     async def test_changed_completed_record_is_requeued_and_published(self):
@@ -672,6 +825,49 @@ class TestOnRecordContentUpdate:
             ProgressStatus.QUEUED.value,
         )
 
+    @staticmethod
+    def _stub_process_record(proc: DataSourceEntitiesProcessor) -> AsyncMock:
+        tx_store = _make_tx_store()
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=tx_store)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        proc.data_store_provider.transaction.return_value = ctx
+        proc._process_record = AsyncMock(return_value=(None, []))
+        return proc._process_record
+
+    @pytest.mark.asyncio
+    async def test_content_update_without_permissions_keeps_stored_grants(self) -> None:
+        """A rewrite-flagged record updated with no grant list must not have its grants wiped."""
+        proc = _make_processor()
+        process_record = self._stub_process_record(proc)
+        record = _make_record()
+        record.rewrite_permissions = True
+
+        await proc.on_record_content_update(record)
+
+        args, kwargs = process_record.await_args
+        assert args[1] == []
+        assert kwargs["replace_permissions"] is False
+
+    @pytest.mark.asyncio
+    async def test_content_update_with_permissions_replaces_them(self) -> None:
+        """An explicit grant list (even an empty one) still replaces a rewrite-flagged record's grants."""
+        proc = _make_processor()
+        process_record = self._stub_process_record(proc)
+        record = _make_record()
+        record.rewrite_permissions = True
+        grant = MagicMock()
+
+        await proc.on_record_content_update(record, [grant])
+        args, kwargs = process_record.await_args
+        assert args[1] == [grant]
+        assert kwargs["replace_permissions"] is True
+
+        await proc.on_record_content_update(record, [])
+        args, kwargs = process_record.await_args
+        assert args[1] == []
+        assert kwargs["replace_permissions"] is True
+
 
 # ===========================================================================
 # on_record_metadata_update
@@ -727,8 +923,8 @@ class TestOnRecordDeleted:
 
         await proc.on_record_deleted("rec-1")
 
-        tx_store.delete_record_by_key.assert_awaited_once_with("rec-1")
-        proc.messaging_producer.send_message.assert_not_awaited()
+        tx_store.delete_single_record.assert_awaited_once_with("rec-1")
+        proc.messaging_producer.send_message.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_deletes_record_publishes_when_vrid_present(self):
@@ -738,6 +934,12 @@ class TestOnRecordDeleted:
         existing = {"_key": "rec-1", "orgId": "org-1", "version": 1,
                     "virtualRecordId": "vr-9", "connectorId": "conn-9"}
         tx_store.get_record_by_key = AsyncMock(return_value=existing)
+        tx_store.delete_single_record = AsyncMock(return_value={
+            "success": True,
+            "eventData": {"eventType": "deleteRecord", "topic": "record-events", "payloads": [
+                {"recordId": "rec-1", "virtualRecordId": "vr-9", "orgId": "org-1", "connectorId": "conn-9"},
+            ]},
+        })
 
         ctx = AsyncMock()
         ctx.__aenter__ = AsyncMock(return_value=tx_store)
@@ -749,6 +951,49 @@ class TestOnRecordDeleted:
         proc.messaging_producer.send_message.assert_awaited()
         body = proc.messaging_producer.send_message.await_args.args[1]
         assert body["payload"]["virtualRecordId"] == "vr-9"
+
+
+    @pytest.mark.asyncio
+    async def test_a_code_file_keeps_its_names_before_it_is_deleted(self) -> None:
+        """Its blocks go with it, and with them what its callers bound to."""
+        proc = _make_processor()
+        tx_store = _make_tx_store()
+        existing = {"_key": "rec-1", "orgId": "org-1", "connectorId": "conn-9",
+                    "recordGroupId": "g", "recordType": "CODE_FILE", "connectorName": "GITHUB"}
+        tx_store.get_record_by_key = AsyncMock(return_value=existing)
+        order = []
+        tx_store.delete_single_record = AsyncMock(
+            side_effect=lambda _id: order.append("delete") or {"success": True},
+        )
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=tx_store)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        proc.data_store_provider.transaction.return_value = ctx
+
+        with patch(
+            "app.connectors.core.base.data_processor.data_source_entities_processor.deleted_files.remember",
+            AsyncMock(side_effect=lambda _g, records, _log: order.append(("remember", records))),
+        ):
+            await proc.on_record_deleted("rec-1")
+
+        assert order == [("remember", [existing]), "delete"]
+
+    @pytest.mark.asyncio
+    async def test_a_cascade_reads_its_roots_and_keeps_their_names_first(self) -> None:
+        proc = _make_processor()
+        graph = proc.data_store_provider.graph_provider
+        roots = [{"_key": "rec-1", "recordType": "CODE_FILE"}]
+        graph.get_nodes_by_field_in = AsyncMock(return_value=roots)
+        remember = AsyncMock()
+
+        with patch(
+            "app.connectors.core.base.data_processor.data_source_entities_processor.deleted_files.remember",
+            remember,
+        ):
+            await proc._remember_deleted_code_files(["rec-1"])
+
+        assert graph.get_nodes_by_field_in.await_args.args[1:3] == ("_key", ["rec-1"])
+        remember.assert_awaited_once_with(graph, roots, proc.logger)
 
 
 # ===========================================================================
@@ -1083,9 +1328,10 @@ class TestHandleRecordPermissions:
         permission.entity_type = EntityType.USER.value
         permission.email = "user@example.com"
 
-        await proc._handle_record_permissions(record, [permission], tx_store)
+        with pytest.raises(RuntimeError, match="db error"):
+            await proc._handle_record_permissions(record, [permission], tx_store)
 
-        proc.logger.error.assert_called()
+        tx_store.batch_create_edges.assert_not_awaited()
 
 
 # ===========================================================================
@@ -1096,7 +1342,7 @@ class TestHandleRecordPermissions:
 class TestOnUpdatedRecordPermissions:
     @pytest.mark.asyncio
     async def test_deletes_and_recreates_permissions(self):
-        """Old permissions are deleted and new ones created."""
+        """Old permissions and new ones go to the store in one call."""
         proc = _make_processor()
         tx_store = _make_tx_store()
 
@@ -1122,94 +1368,11 @@ class TestOnUpdatedRecordPermissions:
 
         await proc.on_updated_record_permissions(record, [permission])
 
-        tx_store.delete_edges_to.assert_awaited()
-
-
-# ===========================================================================
-# _prepare_ticket_user_edge
-# ===========================================================================
-
-
-class TestPrepareTicketUserEdge:
-    @pytest.mark.asyncio
-    async def test_no_email_returns_none(self):
-        """Returns None when no email is provided."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-        ticket = MagicMock()
-
-        result = await proc._prepare_ticket_user_edge(
-            ticket, None, EntityRelations.ASSIGNED_TO,
-            "assignee_source_timestamp", "source_updated_at",
-            tx_store, "ASSIGNED_TO"
+        tx_store.replace_record_permissions.assert_awaited_once_with(
+            "rec-1", [{"_from": "u/1", "_to": "r/1"}], None, inherit=False
         )
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_user_not_found_returns_none(self):
-        """Returns None when user is not found by email."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-        tx_store.get_user_by_email.return_value = None
-        ticket = MagicMock()
-
-        result = await proc._prepare_ticket_user_edge(
-            ticket, "unknown@example.com", EntityRelations.ASSIGNED_TO,
-            "assignee_source_timestamp", "source_updated_at",
-            tx_store, "ASSIGNED_TO"
-        )
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_success_returns_edge_data(self):
-        """Returns edge data when user is found."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-
-        mock_user = MagicMock()
-        mock_user.id = "user-1"
-        tx_store.get_user_by_email.return_value = mock_user
-
-        ticket = MagicMock()
-        ticket.id = "ticket-1"
-        ticket.assignee_source_timestamp = 12345
-        ticket.source_updated_at = 10000
-
-        result = await proc._prepare_ticket_user_edge(
-            ticket, "user@example.com", EntityRelations.ASSIGNED_TO,
-            "assignee_source_timestamp", "source_updated_at",
-            tx_store, "ASSIGNED_TO"
-        )
-
-        assert result is not None
-        assert result["edgeType"] == EntityRelations.ASSIGNED_TO.value
-        assert result["sourceTimestamp"] == 12345
-
-    @pytest.mark.asyncio
-    async def test_uses_fallback_timestamp(self):
-        """Uses fallback timestamp when primary is None."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-
-        mock_user = MagicMock()
-        mock_user.id = "user-1"
-        tx_store.get_user_by_email.return_value = mock_user
-
-        ticket = MagicMock()
-        ticket.id = "ticket-1"
-        ticket.assignee_source_timestamp = None
-        ticket.source_updated_at = 10000
-
-        result = await proc._prepare_ticket_user_edge(
-            ticket, "user@example.com", EntityRelations.ASSIGNED_TO,
-            "assignee_source_timestamp", "source_updated_at",
-            tx_store, "ASSIGNED_TO"
-        )
-
-        assert result is not None
-        assert result["sourceTimestamp"] == 10000
+        tx_store.delete_edges_to.assert_not_awaited()
+        tx_store.batch_create_edges.assert_not_awaited()
 
 
 # ===========================================================================
@@ -1399,6 +1562,33 @@ class TestHandleParentRecord:
         tx_store.create_record_relation.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_inherit_from_group_keeps_parent_but_not_its_audience(self) -> None:
+        """A story under an epic stays linked to the epic and inherits the project."""
+        proc = _make_processor()
+        tx_store = _make_tx_store()
+        parent = _make_record(external_record_id="epic")
+        parent.id = "epic-id"
+        parent.record_group_id = "group-1"
+        tx_store.get_record_by_external_id.return_value = parent
+
+        record = _make_record()
+        record.id = "story-id"
+        record.record_group_id = "group-1"
+        record.external_record_group_id = "proj"
+        record.parent_external_record_id = "epic"
+        record.parent_record_type = RecordType.TICKET
+        record.inherit_permissions = True
+        record.inherit_permissions_from_group = True
+
+        permissions_from_group = await proc._handle_parent_record(record, tx_store)
+
+        assert permissions_from_group.permissions_from_group is True
+        assert permissions_from_group.parent_outside_group is False
+        tx_store.create_record_relation.assert_awaited()
+        tx_store.create_inherit_permissions_relation_record.assert_not_awaited()
+        tx_store.delete_inherit_permissions_relation_record.assert_awaited()
+
+    @pytest.mark.asyncio
     async def test_creates_attachment_relation_for_file_with_container_parent(self):
         """Creates ATTACHMENT relation when file record has attachment container parent."""
         from app.config.constants.arangodb import RecordRelations
@@ -1513,7 +1703,7 @@ class TestHandleRelatedExternalRecords:
 
         await proc._handle_related_external_records(record, [rel_ext], tx_store)
 
-        tx_store.batch_upsert_record_relations.assert_awaited()
+        tx_store.batch_upsert_node_relations.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_creates_placeholder_for_missing_related_record(self):
@@ -1577,8 +1767,9 @@ class TestLinkRecordToGroup:
 
         await proc._link_record_to_group(record, "group-1", tx_store)
 
-        tx_store.create_record_group_relation.assert_awaited_once_with("rec-1", "group-1")
-        tx_store.create_inherit_permissions_relation_record_group.assert_awaited_once()
+        tx_store.link_record_to_group.assert_awaited_once_with(
+            "rec-1", "group-1", inherit=True, leaving_group_id=None, browse_root=True
+        )
 
     @pytest.mark.asyncio
     async def test_deletes_inherit_when_no_inherit_on_an_existing_record(self):
@@ -1594,7 +1785,9 @@ class TestLinkRecordToGroup:
 
         await proc._link_record_to_group(record, "group-1", tx_store, existing)
 
-        tx_store.delete_inherit_permissions_relation_record_group.assert_awaited_once()
+        tx_store.link_record_to_group.assert_awaited_once_with(
+            "rec-1", "group-1", inherit=False, leaving_group_id=None, browse_root=True
+        )
 
     @pytest.mark.asyncio
     async def test_a_pre_existing_placeholder_still_gets_its_stale_edge_removed(self):
@@ -1627,7 +1820,9 @@ class TestLinkRecordToGroup:
         ):
             await proc._handle_parent_record(child, tx_store)
 
-        tx_store.delete_inherit_permissions_relation_record_group.assert_awaited()
+        tx_store.link_record_to_group.assert_awaited_once_with(
+            "ph-1", "group-1", inherit=False, leaving_group_id=None, browse_root=True
+        )
 
     @pytest.mark.asyncio
     async def test_no_inherit_delete_for_a_brand_new_record(self):
@@ -1644,7 +1839,9 @@ class TestLinkRecordToGroup:
 
         await proc._link_record_to_group(record, "group-1", tx_store, None)
 
-        tx_store.delete_inherit_permissions_relation_record_group.assert_not_awaited()
+        tx_store.link_record_to_group.assert_awaited_once_with(
+            "rec-1", "group-1", inherit=None, leaving_group_id=None, browse_root=True
+        )
 
     @pytest.mark.asyncio
     async def test_a_new_record_keeps_the_id_its_connector_set(self):
@@ -1670,7 +1867,7 @@ class TestLinkRecordToGroup:
 
     @pytest.mark.asyncio
     async def test_deletes_old_group_edge_when_group_changed(self):
-        """Deletes old edge when group changes."""
+        """Leaving the old group and joining the new one are one call to the store."""
         proc = _make_processor()
         tx_store = _make_tx_store()
         record = _make_record()
@@ -1681,10 +1878,13 @@ class TestLinkRecordToGroup:
         existing.id = "rec-1"
         existing.record_group_id = "old-group"
 
-        await proc._link_record_to_group(record, "new-group", tx_store, existing_record=existing)
+        moved = await proc._link_record_to_group(record, "new-group", tx_store, existing_record=existing)
 
-        # Should delete edge from old group
-        tx_store.delete_edge.assert_awaited()
+        assert moved is True
+        tx_store.link_record_to_group.assert_awaited_once_with(
+            "rec-1", "new-group", inherit=True, leaving_group_id="old-group", browse_root=True
+        )
+        tx_store.delete_edge.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_shared_with_me_group_linked(self):
@@ -1704,154 +1904,10 @@ class TestLinkRecordToGroup:
 
         await proc._link_record_to_group(record, "group-1", tx_store)
 
-        # Should create relation for shared group too
-        assert tx_store.create_record_group_relation.call_count >= 2
-
-
-# ===========================================================================
-# _handle_ticket_user_edges
-# ===========================================================================
-
-
-class TestHandleTicketUserEdges:
-    @pytest.mark.asyncio
-    async def test_creates_all_three_edges(self):
-        """Creates ASSIGNED_TO, CREATED_BY, and REPORTED_BY edges."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-
-        mock_user = MagicMock()
-        mock_user.id = "user-1"
-        tx_store.get_user_by_email.return_value = mock_user
-
-        ticket = TicketRecord(
-            record_name="TEST-1",
-            record_type=RecordType.TICKET,
-            external_record_id="ext-t-1",
-            version=1,
-            origin=OriginTypes.CONNECTOR.value,
-            connector_name=ConnectorsEnum.GOOGLE_MAIL,
-            connector_id="conn-1",
-            assignee_email="a@test.com",
-            creator_email="c@test.com",
-            reporter_email="r@test.com",
-            source_created_at=1000,
-            source_updated_at=2000,
+        tx_store.link_record_to_group.assert_awaited_once_with(
+            "rec-1", "group-1", inherit=True, leaving_group_id=None, browse_root=True
         )
-        ticket.id = "ticket-1"
-
-        await proc._handle_ticket_user_edges(ticket, tx_store)
-
-        tx_store.batch_create_entity_relations.assert_awaited_once()
-        edges = tx_store.batch_create_entity_relations.call_args[0][0]
-        assert len(edges) == 3
-
-    @pytest.mark.asyncio
-    async def test_no_edges_when_no_emails(self):
-        """Creates no edges when no emails are set."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-
-        ticket = TicketRecord(
-            record_name="TEST-1",
-            record_type=RecordType.TICKET,
-            external_record_id="ext-t-1",
-            version=1,
-            origin=OriginTypes.CONNECTOR.value,
-            connector_name=ConnectorsEnum.GOOGLE_MAIL,
-            connector_id="conn-1",
-            source_created_at=1000,
-            source_updated_at=2000,
-        )
-        ticket.id = "ticket-1"
-
-        await proc._handle_ticket_user_edges(ticket, tx_store)
-
-        tx_store.batch_create_entity_relations.assert_not_awaited()
-
-
-# ===========================================================================
-# _handle_project_lead_edge
-# ===========================================================================
-
-
-class TestHandleProjectLeadEdge:
-    @pytest.mark.asyncio
-    async def test_creates_lead_edge(self):
-        """Creates LEAD_BY edge for project with lead."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-
-        mock_user = MagicMock()
-        mock_user.id = "user-1"
-        tx_store.get_user_by_email.return_value = mock_user
-
-        project = ProjectRecord(
-            record_name="Proj-1",
-            record_type=RecordType.PROJECT,
-            external_record_id="ext-p-1",
-            version=1,
-            origin=OriginTypes.CONNECTOR.value,
-            connector_name=ConnectorsEnum.GOOGLE_MAIL,
-            connector_id="conn-1",
-            source_created_at=1000,
-            source_updated_at=2000,
-        )
-        project.id = "proj-1"
-        project.lead_email = "lead@test.com"
-
-        await proc._handle_project_lead_edge(project, tx_store)
-
-        tx_store.batch_create_entity_relations.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_no_edge_when_no_lead_email(self):
-        """No edge created when project has no lead email."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-
-        project = ProjectRecord(
-            record_name="Proj-1",
-            record_type=RecordType.PROJECT,
-            external_record_id="ext-p-1",
-            version=1,
-            origin=OriginTypes.CONNECTOR.value,
-            connector_name=ConnectorsEnum.GOOGLE_MAIL,
-            connector_id="conn-1",
-            source_created_at=1000,
-            source_updated_at=2000,
-        )
-        project.id = "proj-1"
-        project.lead_email = None
-
-        await proc._handle_project_lead_edge(project, tx_store)
-
-        tx_store.batch_create_entity_relations.assert_not_awaited()
-
-    @pytest.mark.asyncio
-    async def test_no_edge_when_user_not_found(self):
-        """No edge created when lead user not found in DB."""
-        proc = _make_processor()
-        tx_store = _make_tx_store()
-        tx_store.get_user_by_email.return_value = None
-
-        project = ProjectRecord(
-            record_name="Proj-1",
-            record_type=RecordType.PROJECT,
-            external_record_id="ext-p-1",
-            version=1,
-            origin=OriginTypes.CONNECTOR.value,
-            connector_name=ConnectorsEnum.GOOGLE_MAIL,
-            connector_id="conn-1",
-            source_created_at=1000,
-            source_updated_at=2000,
-        )
-        project.id = "proj-1"
-        project.lead_email = "missing@test.com"
-
-        await proc._handle_project_lead_edge(project, tx_store)
-
-        tx_store.batch_create_entity_relations.assert_not_awaited()
+        tx_store.create_record_group_relation.assert_awaited_once_with("rec-1", "shared-group-internal-id")
 
 
 # ===========================================================================
@@ -1940,7 +1996,50 @@ class TestOnNewUserGroups:
         )
         await proc.on_new_user_groups([(group, [])])
         assert group.id == "existing-ug-id"
-        tx_store.delete_edges_to.assert_awaited()
+        tx_store.replace_edges_to.assert_awaited_once_with(
+            "existing-ug-id", CollectionNames.GROUPS.value, [], CollectionNames.PERMISSION.value
+        )
+        tx_store.delete_edges_to.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_keeps_existing_members_when_not_replacing(self) -> None:
+        """A caller that sees only part of a group's members must not wipe the rest."""
+        proc = _make_processor()
+        tx_store = _make_tx_store()
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=tx_store)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        proc.data_store_provider.transaction.return_value = ctx
+
+        existing = MagicMock()
+        existing.id = "existing-ug-id"
+        tx_store.get_user_group_by_external_id.return_value = existing
+        user = MagicMock()
+        user.id = "user-1"
+        tx_store.get_user_by_email.return_value = user
+
+        from app.models.entities import AppUser, AppUserGroup, Connectors
+        group = AppUserGroup(
+            app_name=Connectors.GOOGLE_MAIL,
+            connector_id="conn-1",
+            source_user_group_id="sg-1",
+            name="Test Group",
+        )
+        member = AppUser(
+            app_name=Connectors.GOOGLE_MAIL,
+            connector_id="conn-1",
+            source_user_id="u-1",
+            org_id="org-1",
+            email="m@acme.com",
+            full_name="M",
+        )
+        await proc.on_new_user_groups([(group, [member])], replace_members=False)
+
+        assert group.id == "existing-ug-id"
+        tx_store.replace_edges_to.assert_not_awaited()
+        tx_store.delete_edges_to.assert_not_awaited()
+        tx_store.batch_upsert_user_groups.assert_awaited()
+        tx_store.batch_create_edges.assert_awaited()
 
 
 # ===========================================================================
@@ -1993,13 +2092,13 @@ class TestResolvePrincipal:
         assert result == ("person-1", CollectionNames.PEOPLE.value)
 
     @pytest.mark.asyncio
-    async def test_returns_none_on_error(self):
+    async def test_a_failed_lookup_is_raised(self) -> None:
         proc = _make_processor()
         tx_store = _make_tx_store()
         tx_store.get_user_by_email.side_effect = Exception("db fail")
 
-        result = await proc._resolve_principal("ext@test.com", tx_store)
-        assert result is None
+        with pytest.raises(Exception, match="db fail"):
+            await proc._resolve_principal("ext@test.com", tx_store)
 
 
 # ===========================================================================
@@ -2156,7 +2255,7 @@ class TestOnUserGroupMemberRemoved:
         mock_group.id = "g1"
         mock_group.name = "Group"
         tx_store.get_user_group_by_external_id.return_value = mock_group
-        tx_store.delete_edge.return_value = True
+        tx_store.batch_delete_edges.return_value = 1
 
         result = await proc.on_user_group_member_removed("ext-g", "user@test.com", "conn-1")
         assert result is True
@@ -2397,7 +2496,7 @@ class TestOnUpdatedRecordPermissionsAdditional:
 
         await proc.on_updated_record_permissions(record, [])
 
-        tx_store.create_inherit_permissions_relation_record_group.assert_awaited()
+        tx_store.replace_record_permissions.assert_awaited_once_with("rec-1", [], "rg-1", inherit=True)
 
     @pytest.mark.asyncio
     async def test_no_belongs_to_triggers_process_record(self):
@@ -2995,3 +3094,59 @@ class TestUpsertDoesNotDuplicateOnAFailedLookup:
             await proc.on_new_app_roles([(role, [])])
 
         assert len(calls) == 1, f"a write followed the failed lookup: {calls[1:]}"
+
+
+class TestStageRerunEvents:
+    def test_the_event_payload_names_the_stages(self) -> None:
+        proc = _make_processor()
+        record = _make_record()
+        record.id = "rec-1"
+        assert proc._reindex_event_payload(record, vector_db_only=False, stages=["classify"])["stages"] == ["classify"]
+        assert "stages" not in proc._reindex_event_payload(record, vector_db_only=False)
+
+    @pytest.mark.asyncio
+    async def test_a_stage_rerun_leaves_the_record_searchable(self) -> None:
+        proc = _make_processor()
+        record = _make_record()
+        record.id = "rec-1"
+        proc.data_store_provider.get_existing_record_keys = AsyncMock(return_value={"rec-1"})
+        proc.messaging_producer.send_messages = AsyncMock(return_value=[True])
+        proc._mark_queued_after_publish = AsyncMock()
+
+        published = await proc.reindex_existing_records([record], stages=["classify"])
+
+        assert published == ["rec-1"]
+        _topic, messages = proc.messaging_producer.send_messages.await_args.args
+        assert messages[0][1]["payload"]["stages"] == ["classify"]
+        proc._mark_queued_after_publish.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_stage_rerun_carries_the_revision_each_record_was_selected_on(self) -> None:
+        proc = _make_processor()
+        first, second = _make_record(), _make_record()
+        first.id, second.id = "rec-1", "rec-2"
+        proc.data_store_provider.get_existing_record_keys = AsyncMock(return_value={"rec-1", "rec-2"})
+        proc.messaging_producer.send_messages = AsyncMock(return_value=[True, True])
+        proc._mark_queued_after_publish = AsyncMock()
+
+        third = _make_record()
+        third.id = "rec-3"
+        proc.data_store_provider.get_existing_record_keys = AsyncMock(return_value={"rec-1", "rec-2", "rec-3"})
+        proc.messaging_producer.send_messages = AsyncMock(return_value=[True, True, True])
+
+        await proc.reindex_existing_records(
+            [first, second, third], stages=["classify"], stage_revisions={"rec-1": "rev-a", "rec-2": None},
+        )
+
+        _topic, messages = proc.messaging_producer.send_messages.await_args.args
+        assert messages[0][1]["payload"]["stageRev"] == "rev-a"
+        # Selected before it had a revision: an explicit null, so a revision it gains later is not re-run.
+        assert "stageRev" in messages[1][1]["payload"] and messages[1][1]["payload"]["stageRev"] is None
+        assert "stageRev" not in messages[2][1]["payload"]
+
+    def test_a_revision_is_sent_only_with_stages(self) -> None:
+        proc = _make_processor()
+        record = _make_record()
+        assert "stageRev" not in proc._reindex_event_payload(
+            record, vector_db_only=False, stage_rev="rev-a", selected=True
+        )

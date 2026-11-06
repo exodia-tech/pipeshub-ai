@@ -75,10 +75,14 @@ class _Producer:
         self.events: list[dict] = []
 
     async def send_message(self, topic: str, message: dict, key: str | None = None) -> bool:
+        if topic == "record-title-events":
+            return True
         self.events.append(message)
         return True
 
     async def send_messages(self, topic: str, messages: list) -> list[bool]:
+        if topic == "record-title-events":
+            return [True] * len(messages)
         self.events.extend(m for _key, m in messages)
         return [True] * len(messages)
 
@@ -137,7 +141,7 @@ async def _remove(graph: IGraphDBProvider, w: _World) -> None:
             f"FOR d IN {collection} FILTER d._key IN @ids REMOVE d IN {collection}", {"ids": ids}
         )
     for edges in (CollectionNames.PERMISSION.value, CollectionNames.IS_OF_TYPE.value,
-                  CollectionNames.RECORD_RELATIONS.value):
+                  CollectionNames.NODE_RELATIONS.value):
         await graph.http_client.execute_aql(
             f"FOR e IN {edges} FILTER PARSE_IDENTIFIER(e._from).key IN @ids "
             f"OR PARSE_IDENTIFIER(e._to).key IN @ids REMOVE e IN {edges}",
@@ -229,7 +233,7 @@ async def _seed(w: _World) -> None:
           "createdAtTimestamp": now, "updatedAtTimestamp": now}
          for mail, attachment in (("email", "attachment"), ("email", "attachment_2"),
                                   ("gmail_email", "gmail_attachment"))],
-        collection=CollectionNames.RECORD_RELATIONS.value,
+        collection=CollectionNames.NODE_RELATIONS.value,
     )
 
 
@@ -356,7 +360,7 @@ async def _seed_personal_mailbox(w: _World) -> str:
         [{"from_id": w.ids["personal_email"], "from_collection": records, "to_id": w.ids["personal_attachment"],
           "to_collection": records, "relationshipType": "ATTACHMENT",
           "createdAtTimestamp": now, "updatedAtTimestamp": now}],
-        collection=CollectionNames.RECORD_RELATIONS.value,
+        collection=CollectionNames.NODE_RELATIONS.value,
     )
     return app_id
 

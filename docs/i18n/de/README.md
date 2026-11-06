@@ -1,6 +1,6 @@
 <div align="center">
 
-**Translations:** [English](../../../README.md) · [Français](../fr/README.md) · **Deutsch** · [简体中文](../zh-CN/README.md) · [日本語](../ja/README.md) · [Русский](../ru/README.md) · [עברית](../he/README.md) · [한국어](../ko/README.md) · [Español](../es/README.md) · [Português](../pt/README.md) · [Türkçe](../tr/README.md) · [Tiếng Việt](../vi/README.md) · [Italiano](../it/README.md)
+**Translations:** [English](../../../README.md) · [Français](../fr/README.md) · **Deutsch** · [简体中文](../zh-CN/README.md) · [日本語](../ja/README.md) · [Русский](../ru/README.md) · [עברית](../he/README.md) · [한국어](../ko/README.md) · [Español](../es/README.md) · [Português](../pt/README.md) · [Türkçe](../tr/README.md) · [Tiếng Việt](../vi/README.md) · [Italiano](../it/README.md) · [Čeština](../cs/README.md)
 
 </div>
 
@@ -52,6 +52,19 @@
 <h2 id="about-pipeshub">PipesHub – Erklärbar & Erweiterbar</h2>
 
 <strong>[PipesHub](https://www.pipeshub.com/)</strong> ist eine quelloffene, selbst hostbare, KI-native Ausführungsschicht, die Unternehmenswissen verbindet, erklärbare Suche mit Quellenangaben liefert und Arbeitsabläufe über alle Systeme hinweg automatisiert.
+
+### So funktioniert PipesHub
+
+PipesHub baut eine **einheitliche Kontextschicht** über Dokumente, Unterhaltungen, strukturierte Daten, Wikis, Tickets und Code. Konnektoren synchronisieren jede Quelle samt ihren Berechtigungen. Die Indexierungspipeline parst, zerlegt und embeddet die Inhalte und verknüpft Datensätze, Personen und Entitäten in einem Knowledge Graph.
+
+Fragen beantwortet eine **Agent-Schleife** statt eines einzelnen Retrieve-then-Generate-Durchlaufs. Der Agent plant, ruft Tools auf, liest die Ergebnisse und macht weiter, bis die Belege vorliegen:
+
+- **Hybride Suche** — semantisches und Keyword-Retrieval, damit sowohl Bedeutung als auch exakte Begriffe gefunden werden.
+- **Grep / Mustersuche** — exakte Bezeichner, Fehlermeldungen, Ticket-Schlüssel und Code-Symbole.
+- **Navigation im Knowledge Graph** — folgt Verknüpfungen zwischen Dokumenten, Personen, Tickets, Pull Requests und Threads.
+- **Dokumente lesen** — öffnet die vollständige Quelle, statt sich auf einen einzelnen Treffer-Chunk zu verlassen.
+
+Jeder Tool-Aufruf wird nach den Berechtigungen der fragenden Person gefiltert, und jede Antwort zitiert die Blöcke, aus denen sie stammt.
 
 
 ## Funktionen

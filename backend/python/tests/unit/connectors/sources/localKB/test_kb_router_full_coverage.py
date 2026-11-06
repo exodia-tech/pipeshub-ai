@@ -414,34 +414,6 @@ class TestCreateNestedFolder:
         assert resp.status_code == 500
 
 
-class TestGetFolderContents:
-    def test_success(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.get_folder_contents = AsyncMock(return_value={
-            "folder": {"id": "f1", "name": "F"},
-            "contents": [], "totalItems": 0
-        })
-        client = TestClient(app)
-        resp = client.get("/api/v1/kb/kb1/folder/f1/user/user1")
-        assert resp.status_code == 200
-
-    def test_failure(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.get_folder_contents = AsyncMock(return_value={
-            "success": False, "code": 404, "reason": "Not found"
-        })
-        client = TestClient(app)
-        resp = client.get("/api/v1/kb/kb1/folder/f1/user/user1")
-        assert resp.status_code == 404
-
-    def test_unexpected_exception(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.get_folder_contents = AsyncMock(side_effect=RuntimeError("err"))
-        client = TestClient(app)
-        resp = client.get("/api/v1/kb/kb1/folder/f1/user/user1")
-        assert resp.status_code == 500
-
-
 class TestUpdateFolder:
     def test_success(self):
         app, kb_svc, _ = _make_app()
@@ -818,65 +790,6 @@ class TestFolderUploadRouteGaps:
         logger.error.assert_called()
 
 
-class TestCreateRecordsInKb:
-    def test_success(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.create_records_in_kb = AsyncMock(return_value={
-            "success": True, "recordCount": 1, "insertedRecordIds": ["r1"],
-            "insertedFileIds": ["f1"], "kbId": "kb1"
-        })
-        client = TestClient(app)
-        resp = client.post("/api/v1/kb/kb1/records", json={"records": [{}], "fileRecords": [{}]})
-        assert resp.status_code == 200
-
-    def test_invalid_body(self):
-        app, kb_svc, _ = _make_app()
-        client = TestClient(app)
-        resp = client.post("/api/v1/kb/kb1/records", content="bad", headers={"content-type": "application/json"})
-        assert resp.status_code == 400
-
-    def test_failure(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.create_records_in_kb = AsyncMock(return_value={
-            "success": False, "code": 403, "reason": "Forbidden"
-        })
-        client = TestClient(app)
-        resp = client.post("/api/v1/kb/kb1/records", json={"records": [{}], "fileRecords": [{}]})
-        assert resp.status_code == 403
-
-    def test_unexpected_exception(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.create_records_in_kb = AsyncMock(side_effect=RuntimeError("err"))
-        client = TestClient(app)
-        resp = client.post("/api/v1/kb/kb1/records", json={"records": [{}]})
-        assert resp.status_code == 500
-
-
-class TestCreateRecordsInFolder:
-    def test_success(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.create_records_in_folder = AsyncMock(return_value={
-            "success": True, "recordCount": 1, "insertedRecordIds": ["r1"],
-            "insertedFileIds": ["f1"], "kbId": "kb1", "folderId": "f1"
-        })
-        client = TestClient(app)
-        resp = client.post("/api/v1/kb/kb1/folder/f1/records", json={"records": [{}], "fileRecords": [{}]})
-        assert resp.status_code == 200
-
-    def test_invalid_body(self):
-        app, kb_svc, _ = _make_app()
-        client = TestClient(app)
-        resp = client.post("/api/v1/kb/kb1/folder/f1/records", content="bad", headers={"content-type": "application/json"})
-        assert resp.status_code == 400
-
-    def test_unexpected_exception(self):
-        app, kb_svc, _ = _make_app()
-        kb_svc.create_records_in_folder = AsyncMock(side_effect=RuntimeError("err"))
-        client = TestClient(app)
-        resp = client.post("/api/v1/kb/kb1/folder/f1/records", json={"records": [{}]})
-        assert resp.status_code == 500
-
-
 class TestListKbRecords:
     def test_success(self):
         app, kb_svc, _ = _make_app()
@@ -1169,7 +1082,7 @@ class TestUpdateRecord:
         resp = client.put("/api/v1/kb/record/r1", json={"updates": {"recordName": "new"}})
         assert resp.status_code == 200
         assert resp.json()["location"] == "kb_root"
-        assert resp.json()["userPermission"] == "NONE"
+        assert resp.json()["userPermission"] is None
 
     def test_publishes_event_data_from_service_result(self):
         app, kb_svc, kafka = _make_app()

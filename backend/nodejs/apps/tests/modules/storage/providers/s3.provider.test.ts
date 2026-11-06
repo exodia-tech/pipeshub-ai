@@ -11,7 +11,7 @@ import {
   PresignedUrlError,
 } from '../../../../src/libs/errors/storage.errors'
 
-import { S3 } from 'aws-sdk'
+import type { S3Service as S3 } from '../../../../src/modules/storage/providers/s3-client'
 import mongoose from 'mongoose'
 import AmazonS3Adapter from '../../../../src/modules/storage/providers/s3.provider'
 import {
@@ -948,7 +948,7 @@ describe('AmazonS3Adapter', () => {
         promise: () => Promise.resolve({}),
       })
 
-      const specialPath = 'records/Space Summary — PipesHub Deployment, Agent Testing Dashboard, and Key Reference Docs/file.json'
+      const specialPath = 'records/Space Summary — EXODIA Brain Deployment, Agent Testing Dashboard, and Key Reference Docs/file.json'
       await adapter.copyObject(specialPath, 'records/dst/file.json')
 
       const params = copyStub.firstCall.args[0]
@@ -1006,10 +1006,10 @@ describe('AmazonS3Adapter', () => {
     it('should percent-encode special characters within a segment', () => {
       const adapter = createAdapter()
       const result = (adapter as any).encodeCopySource(
-        'records/Space Summary — PipesHub Deployment, Agent Testing Dashboard, and Key Reference Docs/file.json',
+        'records/Space Summary — EXODIA Brain Deployment, Agent Testing Dashboard, and Key Reference Docs/file.json',
       )
       expect(result).to.equal(
-        `my-bucket/records/${encodeURIComponent('Space Summary — PipesHub Deployment, Agent Testing Dashboard, and Key Reference Docs')}/file.json`,
+        `my-bucket/records/${encodeURIComponent('Space Summary — EXODIA Brain Deployment, Agent Testing Dashboard, and Key Reference Docs')}/file.json`,
       )
       expect(result).to.not.include(' ')
     })
@@ -1050,7 +1050,7 @@ describe('AmazonS3Adapter', () => {
       const adapter = createAdapter()
       const s3 = (adapter as any).s3
 
-      const specialKey = 'org1/Space Summary — PipesHub Deployment, Agent Testing Dashboard, and Key Reference Docs/file.pdf'
+      const specialKey = 'org1/Space Summary — EXODIA Brain Deployment, Agent Testing Dashboard, and Key Reference Docs/file.pdf'
       sinon.stub(s3, 'listObjectsV2').returns({
         promise: sinon.stub().resolves({
           Contents: [{ Key: specialKey }],
@@ -1150,7 +1150,7 @@ describe('AmazonS3Adapter', () => {
         promise: () => Promise.resolve({}),
       })
 
-      const specialPath = 'records/Space Summary — PipesHub Deployment, Agent Testing Dashboard, and Key Reference Docs/file.json'
+      const specialPath = 'records/Space Summary — EXODIA Brain Deployment, Agent Testing Dashboard, and Key Reference Docs/file.json'
       await adapter.renameObject(specialPath, 'records/dst/file.json')
 
       const copyParams = copyStub.firstCall.args[0]
@@ -1225,7 +1225,7 @@ describe('AmazonS3Adapter', () => {
       const adapter = createAdapter()
       const s3 = (adapter as any).s3
 
-      const specialKey = 'org1/Space Summary — PipesHub Deployment, Agent Testing Dashboard, and Key Reference Docs/file.pdf'
+      const specialKey = 'org1/Space Summary — EXODIA Brain Deployment, Agent Testing Dashboard, and Key Reference Docs/file.pdf'
       sinon.stub(s3, 'listObjectsV2').returns({
         promise: sinon.stub().resolves({
           Contents: [{ Key: specialKey }],

@@ -24,6 +24,12 @@ if TYPE_CHECKING:
 # wakeup is ever missed, a waiter re-checks admission at worst this often
 # instead of stalling indefinitely.
 _SAFETY_NET_INTERVAL_SECONDS = 1.0
+# Reported permit hold times are kept per sample interval for the last this
+# many intervals (PoolDemand.hold_seconds_by_sample), so the policy can widen
+# its view past a sample that released only one or two permits.
+_HOLD_SAMPLES_KEPT = 4
+# Bound on one interval's hold times; past it the oldest of that interval go.
+_MAX_HOLDS_PER_SAMPLE = 1024
 
 
 class StartRateLimiter:
@@ -109,6 +115,8 @@ class AdmissionGate:
         # permit, and one could lose that race for the whole of its
         # processing budget while newer arrivals went ahead of it.
         self._waiters: deque[_Waiter] = deque()
+        # Priority waiters sit at the front, in arrival order among themselves.
+        self._priority_waiting = 0
         self._unsubscribe: Callable[[], None] | None = None
 
         self._in_use = 0
@@ -118,6 +126,8 @@ class AdmissionGate:
         self._completions = 0
         self._max_in_use = 0
         self._rate_limited_acquires = 0
+        self._sample_holds: deque[float] = deque(maxlen=_MAX_HOLDS_PER_SAMPLE)
+        self._holds_by_sample: deque[tuple[float, ...]] = deque(maxlen=_HOLD_SAMPLES_KEPT)
         self._last_change = clock()
 
     # -- loop binding ---------------------------------------------------
@@ -160,8 +170,8 @@ class AdmissionGate:
             self._permit_seconds += self._in_use * elapsed
         self._last_change = now
 
-    def _try_admit(self, cost: int) -> bool:
-        limit = self._registry.get(self._pool)
+    def _try_admit(self, cost: int, cap: int | None = None) -> bool:
+        limit = self._registry.get(self._pool) if cap is None else cap
         # Deadlock guard: an oversized request (cost > limit, or limit fully
         # shrunk to 0) is still admitted alone rather than waiting forever.
         has_room = self._in_use == 0 or (self._in_use + cost <= limit)
@@ -182,8 +192,18 @@ class AdmissionGate:
 
     # -- public API ----------------------------------------------------
 
-    async def acquire(self, cost: int = 1, timeout: float | None = None) -> bool:
-        """Acquire *cost* permits.
+    async def acquire(
+        self, cost: int = 1, timeout: float | None = None, *, cap: int | None = None, priority: bool = False
+    ) -> bool:
+        """Acquire *cost* permits, against the pool's current limit or, when given, *cap*.
+
+        *priority* puts the acquire ahead of every waiting normal acquire (behind earlier priority
+        ones). It never exceeds the limit and takes nothing already granted: it only decides who is
+        next when a permit frees. Callers bound how many priority acquires they have outstanding.
+
+        *cap* is for work a process sharing this one's memory already admitted under its
+        memory brake (``memory_domain.parse_admission_cap``): the pool's ceiling still
+        bounds it, the brake does not apply twice.
 
         Returns ``False`` on timeout rather than raising, so callers can
         respond with backpressure instead of an exception (plan section
@@ -191,15 +211,23 @@ class AdmissionGate:
         """
         loop = self._bind()
         # Nobody may overtake a queued waiter, so a fresh arrival only takes
-        # the fast path while the queue is empty.
-        if not self._waiters and self._try_admit(cost):
+        # the fast path while the queue is empty. A priority acquire goes ahead of the
+        # normal ones, so it may take free room even while they are queued, but not
+        # ahead of an earlier priority waiter.
+        if (not self._waiters or (priority and not self._priority_waiting)) and self._try_admit(cost, cap):
             return True
 
         wait_start = self._clock()
         self._blocked_acquires += 1
         deadline = None if timeout is None else wait_start + timeout
         waiter = _Waiter(loop)
-        self._waiters.append(waiter)
+        if priority:
+            self._waiters.insert(self._priority_waiting, waiter)
+            self._priority_waiting += 1
+            # Wake the head, which may be this waiter, so it checks admission without waiting out the poll.
+            self._wake_head()
+        else:
+            self._waiters.append(waiter)
         try:
             while True:
                 remaining = None if deadline is None else deadline - self._clock()
@@ -211,23 +239,30 @@ class AdmissionGate:
                     else min(_SAFETY_NET_INTERVAL_SECONDS, remaining)
                 )
                 await waiter.wait(poll)
-                if self._waiters[0] is waiter and self._try_admit(cost):
+                if self._waiters[0] is waiter and self._try_admit(cost, cap):
                     return True
         finally:
             self._total_wait_seconds += self._clock() - wait_start
             with contextlib.suppress(ValueError):
                 self._waiters.remove(waiter)
+                if priority:
+                    self._priority_waiting -= 1
             # Whether admitted or given up, the next in line gets its turn:
             # a limit that grew by several permits admits several waiters,
             # one wake at a time.
             self._wake_head()
 
-    def release(self, cost: int = 1) -> None:
+    def release(self, cost: int = 1, held_seconds: float | None = None) -> None:
+        """Return *cost* permits. ``held_seconds``, when the holder knows it,
+        is how long this permit was held; it feeds the pool's typical hold
+        time (``PoolDemand.hold_seconds_by_sample``)."""
         now = self._clock()
         self._fold_permit_seconds(now)
         released = min(cost, self._in_use)
         self._in_use -= released
         self._completions += 1
+        if held_seconds is not None and held_seconds >= 0:
+            self._sample_holds.append(held_seconds)
         self._wake_head()
 
     @contextlib.asynccontextmanager
@@ -256,7 +291,10 @@ class AdmissionGate:
             completions=self._completions,
             max_in_use=self._max_in_use,
             rate_limited_acquires=self._rate_limited_acquires,
+            hold_seconds_by_sample=(*self._holds_by_sample, tuple(self._sample_holds)),
         )
+        self._holds_by_sample.append(tuple(self._sample_holds))
+        self._sample_holds.clear()
         self._permit_seconds = 0.0
         self._blocked_acquires = 0
         self._total_wait_seconds = 0.0

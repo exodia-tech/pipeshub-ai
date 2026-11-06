@@ -14,11 +14,11 @@ import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import jwt
 import pytest
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
-from jose import jwt
 
 from app.api.middlewares import auth as auth_module
 from app.api.middlewares.auth import (
@@ -192,6 +192,13 @@ def test_service_token_claiming_admin_oauth_gets_no_oauth_access(client):
         SCOPED_SECRET,
     )
     assert _status(client, "/user", token) == 403
+
+
+def test_token_with_an_audience_reaches_the_same_routes(client) -> None:
+    """Node stamps /mcp tokens with an audience; their API calls pass here as before."""
+    token = _sign({**_SESSION_CLAIMS, "aud": "https://pipeshub.example.com/mcp"}, JWT_SECRET)
+    assert _status(client, "/user", token) == 200
+    assert _status(client, "/internal", token) == 403
 
 
 def test_expired_service_token_is_rejected(client):

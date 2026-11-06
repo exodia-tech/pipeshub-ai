@@ -37,6 +37,7 @@ _TAXONOMY_COLLECTIONS: dict[tuple[str, str | None], str] = {
     ("subcategory", "2"): CollectionNames.SUBCATEGORIES2.value,
     ("subcategory", "3"): CollectionNames.SUBCATEGORIES3.value,
 }
+_ORGS = CollectionNames.ORGS.value
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +62,8 @@ class FakeEntityVectorStore:
         self.upserts: list[list[Any]] = []
         self.match_calls: list[tuple[list[str], str, str, str | None]] = []
         self.fail_matches = False
+        # Fails this many searches, then answers: a blip rather than an outage.
+        self.fail_next_matches = 0
         self.force_winner: dict[str, str] = {}
         self.graph = graph
 
@@ -68,6 +71,10 @@ class FakeEntityVectorStore:
         """Every real entity point is projected from a graph node; seeding a
         point creates its per-org node so the resolver's winner check finds it."""
         if self.graph is None:
+            return
+        if entity.entity_type.value == "organization":
+            if (_ORGS, entity.entity_id) not in self.graph.nodes:
+                self.graph.add_account(entity.org_id, entity.entity_id, entity.name)
             return
         collection = _TAXONOMY_COLLECTIONS.get((entity.entity_type.value, entity.level))
         if collection is None or (collection, entity.entity_id) in self.graph.nodes:
@@ -111,46 +118,46 @@ class FakeEntityVectorStore:
             }
         return EntityWriteOutcome(written=len(entities))
 
-    async def find_best_matches(self, names, org_id, entity_type, level=None) -> list[dict[str, Any] | None]:
+    async def find_candidates(self, names, org_id, entity_type, level=None, *, k=3) -> list[list[dict[str, Any]]]:
+        """Token-overlap ranking over the canonical names, best first.
+        ``force_winner`` pins the first candidate for a name."""
         self.match_calls.append((list(names), org_id, entity_type, level))
         if self.fail_matches:
             raise RuntimeError("vector store down")
+        if self.fail_next_matches:
+            self.fail_next_matches -= 1
+            raise TimeoutError("vector store timed out")
         candidates = [
             p for (o, t, _k), p in self.points.items()
             if o == org_id and t == entity_type and (p.get("level") or None) == (level or None)
         ]
-        results: list[dict[str, Any] | None] = []
+        results: list[list[dict[str, Any]]] = []
         for name in names:
             if not candidates or not name.strip():
-                results.append(None)
+                results.append([])
                 continue
-            forced = self.force_winner.get(name.casefold())
-            best = None
-            best_score = -1.0
-            for candidate in candidates:
-                if forced is not None:
-                    if candidate["name"].casefold() == forced:
-                        best = candidate
-                        break
-                    continue
+
+            def _score(candidate: dict[str, Any], name: str = name) -> float:
                 # Mirrors the real store: only the canonical name is searchable.
-                haystack = candidate["name"]
-                overlap = _tokens(name) & _tokens(haystack)
-                union = _tokens(name) | _tokens(haystack)
-                score = len(overlap) / len(union) if union else 0.0
-                if score > best_score:
-                    best, best_score = candidate, score
-            if best is None:
-                results.append(None)
-                continue
-            results.append({
-                "entityId": best["entityId"],
-                "entityType": best["entityType"],
-                "name": best["name"],
-                "aliases": list(best["aliases"]),
-                "level": best.get("level"),
-                "score": round(max(best_score, 0.0), 4),
-            })
+                overlap = _tokens(name) & _tokens(candidate["name"])
+                union = _tokens(name) | _tokens(candidate["name"])
+                return len(overlap) / len(union) if union else 0.0
+
+            ranked = sorted(candidates, key=lambda c: (-_score(c), c["entityId"]))
+            forced = self.force_winner.get(name.casefold())
+            if forced is not None:
+                ranked = [c for c in ranked if c["name"].casefold() == forced]
+            results.append([
+                {
+                    "entityId": c["entityId"],
+                    "entityType": c["entityType"],
+                    "name": c["name"],
+                    "aliases": list(c["aliases"]),
+                    "level": c.get("level"),
+                    "score": round(_score(c), 4),
+                }
+                for c in ranked[:k]
+            ])
         return results
 
 
@@ -201,12 +208,11 @@ class ScriptedModel:
                 continue
             kind, value = spec
             if kind == "same":
-                match = item.get("match") or {}
-                assert (match.get("name") or "").casefold() == value.casefold(), (
-                    f"scenario expected winner {value!r} for {item['name']!r}, "
-                    f"got {match.get('name')!r}"
+                offered = {m["name"].casefold(): m["id"] for m in item.get("matches") or []}
+                assert value.casefold() in offered, (
+                    f"scenario expected winner {value!r} for {item['name']!r} among {sorted(offered)}"
                 )
-                decisions.append(MergeDecision(i=item["i"], same=True, target=match["id"]))
+                decisions.append(MergeDecision(i=item["i"], same=True, target=offered[value.casefold()]))
             elif kind == "same_as":
                 other = by_name[value.casefold()]
                 decisions.append(
@@ -220,6 +226,11 @@ class ScriptedModel:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _no_lookup_retry_delay(monkeypatch) -> None:
+    monkeypatch.setattr("app.modules.entity_resolution.lookup.LOOKUP_RETRY_DELAY_SECONDS", 0.0)
 
 
 @pytest.fixture
@@ -290,11 +301,13 @@ def make_metadata(**kwargs) -> SemanticMetadata:
 
 
 def make_ctx(record_id: str, org_id: str, metadata: SemanticMetadata | None,
-             connector_id: str = "conn-1", record_group_id: str = "rg-1") -> SimpleNamespace:
+             connector_id: str = "conn-1", record_group_id: str = "rg-1",
+             connector_name: object = "DRIVE") -> SimpleNamespace:
     record = SimpleNamespace(
         id=record_id,
         org_id=org_id,
         connector_id=connector_id,
+        connector_name=connector_name,
         record_group_id=record_group_id,
         virtual_record_id=f"vr-{record_id}",
         semantic_metadata=metadata,
@@ -329,7 +342,7 @@ def make_transformer(fake_graph) -> Callable[[], GraphDBTransformer]:
 
         transformer.graph_data_store = MagicMock()
         transformer.graph_data_store.graph_provider = fake_graph
-        transformer.graph_data_store.transaction = MagicMock(side_effect=lambda: _Txn())
+        transformer.graph_data_store.transaction = MagicMock(side_effect=lambda explicit=None: _Txn())
         transformer.graph_data_store.execute_idempotent_in_transaction = partial(
             GraphDataStore.execute_idempotent_in_transaction, transformer.graph_data_store,
         )

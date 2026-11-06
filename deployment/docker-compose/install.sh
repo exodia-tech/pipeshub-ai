@@ -76,6 +76,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 ENV_FILE="${SCRIPT_DIR}/.env"
 COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.yml"
+# PIPESHUB_IMAGE and PIPESHUB_COMPOSE_OVERRIDES are saved in .env when the
+# installer writes it, so later runs (--stop, --upgrade, ...) keep using them.
+_saved_env_val() { [[ -f "$ENV_FILE" ]] && grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- || true; }
+PIPESHUB_IMAGE="${PIPESHUB_IMAGE:-$(_saved_env_val PIPESHUB_IMAGE)}"
+PIPESHUB_COMPOSE_OVERRIDES="${PIPESHUB_COMPOSE_OVERRIDES:-$(_saved_env_val PIPESHUB_COMPOSE_OVERRIDES)}"
+
+# Every compose call reads docker-compose.yml plus the files listed in
+# PIPESHUB_COMPOSE_OVERRIDES (colon-separated; relative paths start here).
+COMPOSE_FILES=(-f "$COMPOSE_FILE")
+if [[ -n "${PIPESHUB_COMPOSE_OVERRIDES:-}" ]]; then
+  IFS=':' read -r -a _compose_overrides <<< "$PIPESHUB_COMPOSE_OVERRIDES"
+  for _override in "${_compose_overrides[@]}"; do
+    [[ -n "$_override" ]] || continue
+    [[ -f "$_override" ]] || die "PIPESHUB_COMPOSE_OVERRIDES: $_override not found"
+    COMPOSE_FILES+=(-f "$_override")
+  done
+fi
+APP_IMAGE_REPO="${PIPESHUB_IMAGE:-pipeshubai/pipeshub-ai}"
 DEFAULT_PROJECT="pipeshub-ai"
 PROJECT_NAME="$DEFAULT_PROJECT"
 INSTALL_SEPARATE=false
@@ -135,6 +153,11 @@ Environment overrides (bypass prompts in CI):
   PIPESHUB_VERSION       image tag (prebuilt) or local build tag (default: local)
   PIPESHUB_PORT          host port (default: 3000; 3200 when installing a second copy)
   PIPESHUB_PROJECT       Compose project name (default: pipeshub-ai)
+  PIPESHUB_IMAGE         app image repository (default: pipeshubai/pipeshub-ai)
+  PIPESHUB_COMPOSE_OVERRIDES  extra compose files, colon-separated, layered over docker-compose.yml
+                         (relative paths start in this directory; saved in .env with PIPESHUB_IMAGE)
+  PIPESHUB_ENV_EXTRA     file whose lines are appended to a newly written .env (no keys the
+                         installer writes itself; relative paths start in this directory)
   PIPESHUB_PUBLIC_URL    public HTTPS URL (e.g. https://pipeshub.yourdomain.com)
 EOF
 }
@@ -421,7 +444,7 @@ warn_pinned_container_rename() {
 
 # Exec in the app service (Compose name, not a pinned container_name).
 compose_app_exec() {
-  docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file "$ENV_FILE" exec -T pipeshub-ai "$@"
+  docker compose "${COMPOSE_FILES[@]}" -p "$PROJECT_NAME" --env-file "$ENV_FILE" exec -T pipeshub-ai "$@"
 }
 
 app_service_is_running() {
@@ -442,7 +465,8 @@ port_owned_by_project() {
 
 # Check if a Docker volume (by exact name) exists.
 volume_exists() {
-  docker volume ls --format '{{.Name}}' 2>/dev/null | grep -qx "$1"
+  # an exact lookup, not `volume ls | grep -q`: under pipefail grep's early exit can SIGPIPE docker and read as "absent"
+  docker volume inspect "$1" >/dev/null 2>&1
 }
 
 # Check if a TCP port is bound on localhost.
@@ -641,7 +665,7 @@ if $FLAG_STOP; then
   # ("Resource is still in use"). --remove-orphans clears containers left by a
   # previously-active profile too.
   export COMPOSE_PROFILES="graph-arango,graph-neo4j,kv-etcd,broker-kafka,sandbox"
-  docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" down --remove-orphans
+  docker compose "${COMPOSE_FILES[@]}" -p "$PROJECT_NAME" down --remove-orphans
   success "PipesHub stopped (project ${PROJECT_NAME}). Data volumes are preserved."
   info "To start again: ./install.sh"
   exit 0
@@ -664,7 +688,7 @@ if $FLAG_UNINSTALL; then
   # previously-used profile (e.g. arango_data after switching to neo4j) would
   # be silently left behind.
   export COMPOSE_PROFILES="graph-arango,graph-neo4j,kv-etcd,broker-kafka,sandbox"
-  docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" down -v --remove-orphans
+  docker compose "${COMPOSE_FILES[@]}" -p "$PROJECT_NAME" down -v --remove-orphans
   success "PipesHub stopped and all data volumes removed (project ${PROJECT_NAME})."
   exit 0
 fi
@@ -923,7 +947,7 @@ if ! ${SKIP_WIZARD:-false}; then
   # ── 5. EXISTING VOLUME DETECTION ────────────────────────────────────────────
   header "Existing data detection"
 
-  DETECTED_ARANGO=false; DETECTED_NEO4J=false; DETECTED_ETCD=false
+  DETECTED_ARANGO=false; DETECTED_NEO4J=false; DETECTED_ETCD=false; DETECTED_KAFKA=false
 
   if volume_exists "${PROJECT_NAME}_arango_data"; then
     DETECTED_ARANGO=true
@@ -937,6 +961,10 @@ if ! ${SKIP_WIZARD:-false}; then
     DETECTED_ETCD=true
     success "Found existing etcd volume: ${PROJECT_NAME}_etcd_data"
   fi
+  if volume_exists "${PROJECT_NAME}_kafka_data" || volume_exists "${PROJECT_NAME}_zookeeper_data"; then
+    DETECTED_KAFKA=true
+    success "Found existing Kafka volume: ${PROJECT_NAME}_kafka_data"
+  fi
   if ! $DETECTED_ARANGO && ! $DETECTED_NEO4J; then
     info "No existing graph database volumes found — starting fresh."
   fi
@@ -948,8 +976,8 @@ if ! ${SKIP_WIZARD:-false}; then
   printf "  ${GREEN}[1] Slim${RESET}  — Smaller image (model downloads on first use), fewer containers.\n"
   printf "         Broker: Redis Streams  |  KV store: Redis  |  Graph: Neo4j  |  Sandbox: yes\n"
   printf "         Recommended for: laptops, low-resource servers.\n\n"
-  printf "  [2] Full  — Larger image with the embedding model bundled; uses Kafka.\n"
-  printf "         Broker: Kafka  |  KV store: Redis  |  Graph: Neo4j  |  Sandbox: yes\n"
+  printf "  [2] Full  — Larger image with the embedding model bundled.\n"
+  printf "         Broker: Redis Streams (Kafka kept if already installed)  |  KV store: Redis  |  Graph: Neo4j  |  Sandbox: yes\n"
   printf "         Recommended for: production servers, air-gapped deployments.\n\n"
   printf "  [3] Eval  — Slim image without the coding-sandbox pull or Slack bot.\n"
   printf "         Broker: Redis Streams  |  KV store: Redis  |  Graph: Neo4j  |  Sandbox: no\n"
@@ -964,7 +992,7 @@ if ! ${SKIP_WIZARD:-false}; then
   fi
 
   case "$DEPLOY_TYPE" in
-    full) DEFAULT_IMAGE_TAG="latest"; DEFAULT_GRAPH="neo4j";  DEFAULT_BROKER="kafka"; DEFAULT_KV="redis" ;;
+    full) DEFAULT_IMAGE_TAG="latest"; DEFAULT_GRAPH="neo4j";  DEFAULT_BROKER="redis"; DEFAULT_KV="redis" ;;
     eval) DEFAULT_IMAGE_TAG="slim";   DEFAULT_GRAPH="neo4j";  DEFAULT_BROKER="redis"; DEFAULT_KV="redis" ;;
     *)    DEPLOY_TYPE="slim"
           DEFAULT_IMAGE_TAG="slim";   DEFAULT_GRAPH="neo4j";  DEFAULT_BROKER="redis"; DEFAULT_KV="redis" ;;
@@ -975,6 +1003,9 @@ if ! ${SKIP_WIZARD:-false}; then
     DEFAULT_GRAPH="arango"; info "Defaulting graph DB to ArangoDB to reuse existing data volume."
   elif $DETECTED_NEO4J && ! $DETECTED_ARANGO; then
     DEFAULT_GRAPH="neo4j";  info "Defaulting graph DB to Neo4j to reuse existing data volume."
+  fi
+  if $DETECTED_KAFKA; then
+    DEFAULT_BROKER="kafka"; info "Keeping Kafka to reuse the existing broker volume."
   fi
   if $DETECTED_ETCD; then
     DEFAULT_KV="etcd"; info "Defaulting KV store to etcd to reuse existing data volume."
@@ -1022,12 +1053,12 @@ if ! ${SKIP_WIZARD:-false}; then
     # Default: "local". Can be overridden with --version for versioned dev builds.
     if [[ -n "$CLI_VERSION" ]]; then
       IMAGE_TAG="$CLI_VERSION"
-      info "Building from source, image will be tagged: pipeshubai/pipeshub-ai:${IMAGE_TAG}"
+      info "Building from source, image will be tagged: ${APP_IMAGE_REPO}:${IMAGE_TAG}"
     elif [[ -n "${PIPESHUB_VERSION:-}" ]]; then
       IMAGE_TAG="$PIPESHUB_VERSION"
     else
       IMAGE_TAG="local"
-      info "Building from source — image will be tagged: pipeshubai/pipeshub-ai:local"
+      info "Building from source — image will be tagged: ${APP_IMAGE_REPO}:local"
     fi
     SANDBOX_DOCKER_IMAGE="pipeshubai/pipeshub-sandbox:${IMAGE_TAG}"
     warn "First local build can take 10–30+ minutes depending on your machine."
@@ -1171,6 +1202,18 @@ if ! ${SKIP_WIZARD:-false}; then
   MONGO_IMAGE_TAG="$(get_existing_val MONGO_IMAGE_TAG "")"
   MONGO_CACHE_GB="$(get_existing_val MONGO_CACHE_GB "")"
   MONGO_MEMORY_LIMIT="$(get_existing_val MONGO_MEMORY_LIMIT "")"
+  MONGO_MEMORY_RESERVATION="$(get_existing_val MONGO_MEMORY_RESERVATION "")"
+  # Datastore memory sizing (docs/deployment/vector-db-sizing.md): an operator
+  # lowers these on a small machine, so a rewrite must not put the defaults back.
+  NEO4J_HEAP_INITIAL="$(get_existing_val NEO4J_HEAP_INITIAL "")"
+  NEO4J_HEAP_MAX="$(get_existing_val NEO4J_HEAP_MAX "")"
+  NEO4J_PAGECACHE="$(get_existing_val NEO4J_PAGECACHE "")"
+  NEO4J_MEMORY_LIMIT="$(get_existing_val NEO4J_MEMORY_LIMIT "")"
+  NEO4J_MEMORY_RESERVATION="$(get_existing_val NEO4J_MEMORY_RESERVATION "")"
+  QDRANT_MEMORY_RESERVATION="$(get_existing_val QDRANT_MEMORY_RESERVATION "")"
+  # Qdrant's memory limit decides search speed once the index grows
+  # (docs/deployment/vector-db-sizing.md); keep an operator's value.
+  QDRANT_MEMORY_LIMIT="$(get_existing_val QDRANT_MEMORY_LIMIT "${QDRANT_MEMORY_LIMIT:-}")"
 
   # Same for the private-address switch: dropping it on --reconfigure would let AI
   # model endpoints reach internal addresses again without anyone noticing.
@@ -1293,6 +1336,13 @@ ARANGO_PASSWORD=${ARANGO_PASSWORD}
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=${NEO4J_PASSWORD}
 NEO4J_DATABASE=neo4j
+# Neo4j memory. Keep heap max + page cache clearly below the container limit,
+# and the initial heap no larger than the maximum.
+$(optional_env_line NEO4J_HEAP_INITIAL "$NEO4J_HEAP_INITIAL" "1G")
+$(optional_env_line NEO4J_HEAP_MAX "$NEO4J_HEAP_MAX" "2G")
+$(optional_env_line NEO4J_PAGECACHE "$NEO4J_PAGECACHE" "1G")
+$(optional_env_line NEO4J_MEMORY_LIMIT "$NEO4J_MEMORY_LIMIT" "3G")
+$(optional_env_line NEO4J_MEMORY_RESERVATION "$NEO4J_MEMORY_RESERVATION" "2G")
 
 # ── Key-value / config store ─────────────────────────────────────────────────
 # "redis" (default, uses always-on Redis) | "etcd" (dedicated container)
@@ -1321,6 +1371,7 @@ $(optional_env_line MONGO_IMAGE_TAG "$MONGO_IMAGE_TAG" "8.0.17")
 # larger or dedicated hosts; avoid dropping the cache below 1 GB.
 $(optional_env_line MONGO_CACHE_GB "$MONGO_CACHE_GB" "1")
 $(optional_env_line MONGO_MEMORY_LIMIT "$MONGO_MEMORY_LIMIT" "2G")
+$(optional_env_line MONGO_MEMORY_RESERVATION "$MONGO_MEMORY_RESERVATION" "512M")
 
 # App container memory ceiling and its combined memory+swap ceiling. Derived
 # from this machine on a fresh install; set them yourself to pin. The governor
@@ -1336,6 +1387,11 @@ $(optional_env_line PIPESHUB_BLOCK_PRIVATE_ADDRESSES "$PIPESHUB_BLOCK_PRIVATE_AD
 
 # ── Qdrant ───────────────────────────────────────────────────────────────────
 QDRANT_API_KEY=${QDRANT_API_KEY}
+# Qdrant's container memory limit, also given to the app for the Services page
+# warning. Search stays fast only while the index fits; size it from
+# docs/deployment/vector-db-sizing.md.
+$(optional_env_line QDRANT_MEMORY_LIMIT "$QDRANT_MEMORY_LIMIT" "6G")
+$(optional_env_line QDRANT_MEMORY_RESERVATION "$QDRANT_MEMORY_RESERVATION" "2G")
 
 # ── Indexing concurrency ─────────────────────────────────────────────────────
 # Do not write MAX_CONCURRENT_* / EMBEDDING_*_CONCURRENCY here. Empty values
@@ -1370,6 +1426,10 @@ PIPESHUB_ACCESSIBLE_RECORDS_CACHE=
 PIPESHUB_ACCESSIBLE_RECORDS_CACHE_TTL=300
 # 0 disables the signed-URL cache. Keep well under the 3600s signing lifetime.
 PIPESHUB_SIGNED_URL_CACHE_SECONDS=0
+# Most characters one agent turn may stream (text, reasoning and tool-call
+# arguments together) before it is stopped as a runaway. Blank keeps the
+# built-in 1000000; 0 removes the limit.
+PIPESHUB_AGENT_MAX_TURN_OUTPUT_CHARS=
 
 # ── ML performance ───────────────────────────────────────────────────────────
 # Caps PyTorch / OpenBLAS / MKL thread fan-out per operation.
@@ -1393,6 +1453,25 @@ ENVFILE
   # secret key in plain text. Guarantee this regardless of the caller's umask
   # (a permissive umask would otherwise leave it world-readable).
   chmod 600 "$ENV_FILE" 2>/dev/null || true
+
+  if [[ -n "${PIPESHUB_IMAGE:-}" ]]; then
+    printf 'PIPESHUB_IMAGE=%s\n' "$PIPESHUB_IMAGE" >> "$ENV_FILE"
+  fi
+  if [[ -n "${PIPESHUB_COMPOSE_OVERRIDES:-}" ]]; then
+    printf 'PIPESHUB_COMPOSE_OVERRIDES=%s\n' "$PIPESHUB_COMPOSE_OVERRIDES" >> "$ENV_FILE"
+  fi
+  if [[ -n "${PIPESHUB_ENV_EXTRA:-}" ]]; then
+    [[ -f "$PIPESHUB_ENV_EXTRA" ]] || die "PIPESHUB_ENV_EXTRA: $PIPESHUB_ENV_EXTRA not found"
+    # A key the installer already wrote would appear twice and be read back wrong.
+    while IFS= read -r _extra_line; do
+      _extra_key="${_extra_line%%=*}"
+      [[ "$_extra_line" == *=* && "$_extra_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      if grep -qE "^${_extra_key}=" "$ENV_FILE"; then
+        die "PIPESHUB_ENV_EXTRA sets ${_extra_key}, which the installer already writes; remove it from $PIPESHUB_ENV_EXTRA"
+      fi
+    done < "$PIPESHUB_ENV_EXTRA"
+    { printf '\n# From %s\n' "$PIPESHUB_ENV_EXTRA"; cat "$PIPESHUB_ENV_EXTRA"; } >> "$ENV_FILE"
+  fi
 
   success ".env written to $ENV_FILE (permissions: owner read/write only)"
 
@@ -1430,7 +1509,6 @@ _app_memswap_mb="$(_parse_mem_mb "${APP_MEMSWAP_LIMIT:-16G}")" || _app_memswap_m
 if [[ -n "$_app_mem_mb" && -n "$_app_memswap_mb" ]] && (( _app_memswap_mb < _app_mem_mb )); then
   die "APP_MEMSWAP_LIMIT (${APP_MEMSWAP_LIMIT:-16G}) must be >= APP_MEMORY_LIMIT (${APP_MEMORY_LIMIT:-10G}). Raise APP_MEMSWAP_LIMIT in .env (or raise both together) before launching."
 fi
-
 # Resolve APP_PORT from .env when wizard was skipped (upgrade / reuse)
 APP_PORT="${APP_PORT:-3000}"
 HEALTH_URL="http://localhost:${APP_PORT}/api/v1/health/services"
@@ -1499,6 +1577,37 @@ case "${DATA_STORE:-}" in
     success "Repaired graph DB configuration in .env (DATA_STORE=${DATA_STORE})."
     ;;
 esac
+
+# Byte size in Neo4j's setting syntax (plain bytes, or k/m/g/t with an optional
+# B or iB suffix, any case; all binary) -> bytes. Returns 1 if not recognised.
+_parse_neo4j_bytes() {
+  local v n unit
+  # tr, not ${1,,}: the installer supports bash 3.2 (macOS), which lacks it.
+  v="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  [[ "$v" =~ ^([0-9]+)([kmgt]?)(ib|b)?$ ]] || return 1
+  # 10#: a leading zero (010G) would otherwise be read as octal.
+  n=$(( 10#${BASH_REMATCH[1]} )); unit="${BASH_REMATCH[2]}"
+  case "$unit" in
+    k) n=$(( n * 1024 )) ;;
+    m) n=$(( n * 1024 ** 2 )) ;;
+    g) n=$(( n * 1024 ** 3 )) ;;
+    t) n=$(( n * 1024 ** 4 )) ;;
+  esac
+  echo "$n"
+}
+
+# The JVM refuses to start when the initial heap exceeds the maximum, and Neo4j
+# would then restart in a loop with only a JVM error in its log. Only Neo4j
+# reads these settings, so an ArangoDB deployment is not held to them.
+if [[ "$DATA_STORE" == "neo4j" ]]; then
+  _neo4j_heap_init="$(_parse_neo4j_bytes "${NEO4J_HEAP_INITIAL:-1G}")" || _neo4j_heap_init=""
+  _neo4j_heap_max="$(_parse_neo4j_bytes "${NEO4J_HEAP_MAX:-2G}")" || _neo4j_heap_max=""
+  if [[ -z "$_neo4j_heap_init" || -z "$_neo4j_heap_max" ]]; then
+    warn "Could not read NEO4J_HEAP_INITIAL (${NEO4J_HEAP_INITIAL:-1G}) or NEO4J_HEAP_MAX (${NEO4J_HEAP_MAX:-2G}) as a size; not checking that the initial heap fits the maximum."
+  elif (( _neo4j_heap_init > _neo4j_heap_max )); then
+    die "NEO4J_HEAP_INITIAL (${NEO4J_HEAP_INITIAL:-1G}) must be <= NEO4J_HEAP_MAX (${NEO4J_HEAP_MAX:-2G}). Lower NEO4J_HEAP_INITIAL in .env before launching."
+  fi
+fi
 
 # Repair COMPOSE_PROFILES if it disagrees with the configured services. Without
 # this, reusing an .env written by an older installer (or hand-edited) can start
@@ -1725,8 +1834,8 @@ _USE_BUILD=false
 _is_tty=false; [[ -t 1 ]] && _is_tty=true
 _PROGRESS=(--progress "$(resolve_compose_progress "$_is_tty")")
 
-compose_up()        { docker compose "${_PROGRESS[@]}" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file "$ENV_FILE" up -d "$@"; }
-compose_logs_tail() { docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" --env-file "$ENV_FILE" logs --tail 30 2>&1 || true; }
+compose_up()        { docker compose "${_PROGRESS[@]}" "${COMPOSE_FILES[@]}" -p "$PROJECT_NAME" --env-file "$ENV_FILE" up -d "$@"; }
+compose_logs_tail() { docker compose "${COMPOSE_FILES[@]}" -p "$PROJECT_NAME" --env-file "$ENV_FILE" logs --tail 30 2>&1 || true; }
 
 # Start the stack, healing a MongoDB rseq segfault once if that is what stopped
 # it. A segfault fails `up` within seconds rather than later: the app's
@@ -1776,6 +1885,16 @@ should_pull_image() { # args: use_build flag_no_pull env_no_pull -> "true"|"fals
   echo true
 }
 
+# Version and commit of the checkout, as build args for the image. The running
+# container has no git history, so they are read here, on the host. A value
+# already in the environment wins; a checkout without git leaves them empty.
+export_build_info() { # args: repo_root
+  local repo_root="$1" tag
+  tag="$(git -C "$repo_root" describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+  export APP_VERSION="${APP_VERSION:-${tag#v}}"
+  export GIT_COMMIT="${GIT_COMMIT:-$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || true)}"
+}
+
 _DO_PULL="$(should_pull_image "$_USE_BUILD" "$FLAG_NO_PULL" "${PIPESHUB_NO_PULL:-}")"
 # Rotation without --upgrade must not refresh images; the operator asked only
 # to replace signing secrets.
@@ -1785,7 +1904,7 @@ fi
 # Pinning a specific tag (--version / PIPESHUB_VERSION) still benefits from the
 # pull: it fetches exactly that immutable tag rather than a moving :latest, so
 # reproducibility is preserved while a stale local copy is corrected.
-_APP_IMAGE="pipeshubai/pipeshub-ai:${IMAGE_TAG:-latest}"
+_APP_IMAGE="${APP_IMAGE_REPO}:${IMAGE_TAG:-latest}"
 _SANDBOX_IMAGE="${SANDBOX_DOCKER_IMAGE:-pipeshubai/pipeshub-sandbox:${IMAGE_TAG:-latest}}"
 
 if project_has_pinned_container_names; then
@@ -1800,6 +1919,7 @@ if $_USE_BUILD; then
   $FLAG_UPGRADE && info "Rebuilding image from source for tag: ${IMAGE_TAG:-local}..."
   info "Building image from source and starting containers..."
   info "(This may take 10–30+ minutes on first run)"
+  export_build_info "$(cd "${SCRIPT_DIR}/../../" && pwd)"
   if ! compose_up_with_mongo_heal "up --build" --build; then
     die "Fix the error above and re-run install.sh."
   fi
@@ -1814,7 +1934,7 @@ else
     _PULL_SERVICES=(pipeshub-ai)
     [[ "${DEPLOY_TYPE:-}" != "eval" ]] && _PULL_SERVICES+=(sandbox-image)
     if ! docker compose "${_PROGRESS[@]}" \
-        -f "$COMPOSE_FILE" \
+        "${COMPOSE_FILES[@]}" \
         -p "$PROJECT_NAME" \
         --env-file "$ENV_FILE" \
         pull "${_PULL_SERVICES[@]}" 2>&1; then
@@ -1848,7 +1968,7 @@ fi
 if $FLAG_ROTATE_SIGNING_SECRETS; then
   info "Recreating the app container so it applies the new signing secrets..."
   if ! docker compose "${_PROGRESS[@]}" \
-      -f "$COMPOSE_FILE" \
+      "${COMPOSE_FILES[@]}" \
       -p "$PROJECT_NAME" \
       --env-file "$ENV_FILE" \
       up -d --force-recreate --no-deps pipeshub-ai; then

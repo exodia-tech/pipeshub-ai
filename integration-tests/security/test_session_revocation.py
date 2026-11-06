@@ -29,16 +29,16 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Iterator
-from urllib.parse import urlparse
 
+import jwt
 import pytest
 import requests
-from jose import jwt
 from pymongo import MongoClient
 
 from helper import local_auth
 from helper.clients.auth_client import UserAccountClient
 from helper.config import MONGO_DB_NAME, MONGO_URI, TEST_USER_PASSWORD
+from helper.connector_service import CONNECTOR_URL_ENV, connector_service_url
 from helper.pipeshub_client import PipeshubClient
 from helper.second_user import (
     SecondUser,
@@ -98,14 +98,6 @@ SESSIONS = pytest.mark.parametrize(
 )
 
 
-def _python_service_url(base_url: str) -> str:
-    explicit = os.getenv("PIPESHUB_CONNECTOR_URL", "").strip()
-    if explicit:
-        return explicit.rstrip("/")
-    parsed = urlparse(base_url)
-    return f"{parsed.scheme}://{parsed.hostname}:8088"
-
-
 def _node_status(user: SecondUser, token: str) -> int:
     return requests.get(
         f"{user.base_url}{NODE_ROUTE}",
@@ -117,7 +109,7 @@ def _node_status(user: SecondUser, token: str) -> int:
 def _python_status(user: SecondUser, token: str) -> int | None:
     try:
         return requests.get(
-            f"{_python_service_url(user.base_url)}{PYTHON_ROUTE}",
+            f"{connector_service_url(user.base_url)}{PYTHON_ROUTE}",
             headers={"Authorization": f"Bearer {token}"},
             timeout=user.timeout,
         ).status_code
@@ -249,7 +241,7 @@ def _assert_access_refused_at_python(sessions: TwoSessions, which: str, event: s
     if before is None:
         pytest.skip(
             f"The connector service is not reachable at "
-            f"{_python_service_url(sessions.user.base_url)}; set PIPESHUB_CONNECTOR_URL."
+            f"{connector_service_url(sessions.user.base_url)}; set {CONNECTOR_URL_ENV}."
         )
     if before != 200:
         pytest.fail(
@@ -449,17 +441,21 @@ class TestDeletedUserEndsEverySession:
         _assert_access_refused_at_python(after_deletion, which, "the user was deleted")
 
 
-def _scoped_jwt_secret() -> str:
-    secret = os.getenv("SCOPED_JWT_SECRET", "").strip()
+def _stack_secret(env_name: str, token_kind: str) -> str:
+    secret = os.getenv(env_name, "").strip()
     if secret:
         return secret
     reason = (
-        "SCOPED_JWT_SECRET is not set, so no refresh token can be signed the way "
-        "the stack signs them."
+        f"{env_name} is not set, so no {token_kind} can be signed the way the "
+        "stack signs them."
     )
     if secrets_required():
         pytest.fail(f"{reason} The integration workflow sets it for every job.")
     pytest.skip(reason)
+
+
+def _scoped_jwt_secret() -> str:
+    return _stack_secret("SCOPED_JWT_SECRET", "refresh token")
 
 
 def _refresh_token(secret: str, user_id: str, org_id: str, issued: datetime, expires: datetime) -> str:
@@ -512,4 +508,106 @@ class TestExpiredRefreshToken:
             f"A refresh token that expired an hour ago got HTTP "
             f"{response.status_code} (new access token returned: "
             f"{'accessToken' in response.text})."
+        )
+
+
+@dataclass(frozen=True)
+class SignedSessions:
+    """Two session tokens for one account that differ only in when they expire."""
+
+    user: SecondUser
+    live: str
+    expired: str
+
+
+def _session_token(claims: dict, secret: str, issued: datetime, expires: datetime) -> str:
+    """A session token signed exactly as Node's authJwtGenerator signs one."""
+    timed = {**claims, "iat": int(issued.timestamp()), "exp": int(expires.timestamp())}
+    return jwt.encode(timed, secret, algorithm="HS256")
+
+
+@pytest.fixture(scope="class")
+def signed_sessions(pipeshub_client: PipeshubClient) -> Iterator[SignedSessions]:
+    secret = _stack_secret("JWT_SECRET", "session token")
+    user = _new_user(pipeshub_client)
+    try:
+        # Copied from a session the stack issued, so the only thing these
+        # tokens do not share with a real one is the time they carry.
+        claims = {
+            name: value
+            for name, value in local_auth.jwt_claims(user.token).items()
+            if name not in ("iat", "exp")
+        }
+        if not claims.get("userId") or not claims.get("role"):
+            pytest.fail(
+                "The session the stack issued at sign-in carries no userId or role "
+                f"claim (claims present: {sorted(claims)}), so there is nothing to copy."
+            )
+        now = datetime.now(timezone.utc)
+        # Both were issued two hours ago. The fresh account has no event that
+        # ends sessions, so the age alone cannot be why one is refused.
+        issued = now - timedelta(hours=2)
+        yield SignedSessions(
+            user=user,
+            live=_session_token(claims, secret, issued, now + timedelta(minutes=5)),
+            expired=_session_token(claims, secret, issued, now - timedelta(hours=1)),
+        )
+    finally:
+        delete_second_user(pipeshub_client, user, strict=True)
+
+
+class TestExpiredAccessToken:
+    """Test list: an expired access token is refused.
+
+    Session tokens live 24 hours on every stack, so waiting one out is not an
+    option. Both tokens are signed here with the stack's test-only JWT_SECRET
+    and are identical but for their expiry. The unexpired one must work first;
+    otherwise the refusal could be a signing mismatch rather than the expiry.
+    """
+
+    def test_an_expired_access_token_is_refused_by_the_public_api(
+        self, signed_sessions: SignedSessions
+    ) -> None:
+        user = signed_sessions.user
+        status = _node_status(user, signed_sessions.live)
+        assert status == 200, (
+            f"A session token signed here, not yet expired, was refused (HTTP "
+            f"{status}), so JWT_SECRET does not match the stack's and the expired "
+            "case below would prove nothing."
+        )
+
+        response = requests.get(
+            f"{user.base_url}{NODE_ROUTE}",
+            headers={"Authorization": f"Bearer {signed_sessions.expired}"},
+            timeout=user.timeout,
+        )
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        error_body = isinstance(body, dict) and "error" in body
+        assert response.status_code == 401 and error_body, (
+            f"A session token that expired an hour ago got HTTP "
+            f"{response.status_code} from the public API (error body: {error_body}). "
+            "A token that outlives its expiry keeps whoever holds it signed in."
+        )
+
+    def test_the_python_services_refuse_an_expired_access_token(
+        self, signed_sessions: SignedSessions
+    ) -> None:
+        user = signed_sessions.user
+        before = _python_status(user, signed_sessions.live)
+        if before is None:
+            pytest.skip(
+                f"The connector service is not reachable at "
+                f"{connector_service_url(user.base_url)}; set {CONNECTOR_URL_ENV}."
+            )
+        assert before == 200, (
+            f"A session token signed here, not yet expired, got HTTP {before} from "
+            "the Python service, so the expired case below would prove nothing."
+        )
+        status = _python_status(user, signed_sessions.expired)
+        assert status == 401, (
+            f"A session token that expired an hour ago got HTTP {status} from the "
+            "Python service instead of being refused (401)."
         )

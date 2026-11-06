@@ -4,9 +4,10 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { apiClient } from '@/lib/api/axios-instance';
+import { onSessionEnd } from '@/lib/api/session-cache';
 
 interface FeatureFlagsState {
-  /** null = not yet loaded (treat the same as "disabled" to avoid a flash of gated UI) */
+  /** null = not yet loaded. Opt-in selectors treat that as off; default-on selectors treat it as on. */
   flags: Record<string, boolean> | null;
   loading: boolean;
 }
@@ -60,10 +61,10 @@ export const useFeatureFlagsStore = create<FeatureFlagsStore>()(
               state.loading = false;
             });
           } catch {
-            // Fail closed to "loaded, nothing enabled" rather than leaving
-            // `flags` null forever — an indefinite `null` would permanently
-            // block flag-gated pages (e.g. MCP redirects) on a transient
-            // network hiccup, which is worse than the safe (disabled) default.
+            // Mark the load as finished rather than leaving `flags` null forever.
+            // An indefinite `null` would permanently block pages that wait for
+            // flags (MCP, Skills, Actions). An empty map keeps opt-in flags off
+            // and leaves default-on flags on.
             set((state) => {
               state.flags = state.flags ?? {};
               state.loading = false;
@@ -82,10 +83,20 @@ export const useFeatureFlagsStore = create<FeatureFlagsStore>()(
   ),
 );
 
+// Flags belong to the org signed in to; the next sign-in (maybe another server on desktop) loads its
+// own through HealthGate. A switch to another org keeps the app on screen, so it loads them here.
+onSessionEnd(({ refetch }) => {
+  fetchPromise = null;
+  useFeatureFlagsStore.setState(useFeatureFlagsStore.getInitialState(), true);
+  if (refetch) void useFeatureFlagsStore.getState().fetchFlags();
+});
+
 export const selectFeatureFlagsLoaded = (s: FeatureFlagsStore) => s.flags !== null;
-/** Treats "not yet loaded" as disabled so gated UI never flashes on then off. */
-export const selectMcpEnabled = (s: FeatureFlagsStore) => s.flags?.ENABLE_MCP === true;
-/** Actions defaults to enabled, so an unloaded/absent flag must NOT read as disabled (unlike MCP). */
+/** MCP defaults to enabled, so an unloaded or absent flag must not read as disabled. */
+export const selectMcpEnabled = (s: FeatureFlagsStore) => s.flags?.ENABLE_MCP !== false;
+/** API Toolsets default to disabled (Labs); "not yet loaded" reads as disabled. */
+export const selectApiToolsetsEnabled = (s: FeatureFlagsStore) => s.flags?.ENABLE_API_TOOLSETS === true;
+/** Actions defaults to enabled, so an unloaded or absent flag must not read as disabled. */
 export const selectActionsEnabled = (s: FeatureFlagsStore) => s.flags?.ENABLE_ACTIONS !== false;
 /** Vector store rebuild defaults to disabled; admins opt in from Labs. */
 export const selectVectorStoreRebuildEnabled = (s: FeatureFlagsStore) =>
@@ -93,8 +104,14 @@ export const selectVectorStoreRebuildEnabled = (s: FeatureFlagsStore) =>
 /** Projects defaults to disabled; admins opt in from Labs. */
 export const selectProjectsEnabled = (s: FeatureFlagsStore) =>
   s.flags?.ENABLE_PROJECTS === true;
+/** Chat "Compare models" defaults to disabled; admins opt in from Labs. */
+export const selectChatCompareEnabled = (s: FeatureFlagsStore) =>
+  s.flags?.ENABLE_CHAT_COMPARE === true;
 /** Skills default to enabled (Beta); admins opt out from Labs. */
 export const selectSkillsEnabled = (s: FeatureFlagsStore) => s.flags?.ENABLE_SKILLS !== false;
+/** The trash ("Move Deleted Records to the Trash") defaults to disabled; admins opt in from Labs. */
+export const selectSoftDeleteEnabled = (s: FeatureFlagsStore) =>
+  s.flags?.ENABLE_SOFT_DELETE === true;
 /** User/org prompt context defaults to enabled; admins opt out from Labs. */
 export const selectUserContextEnabled = (s: FeatureFlagsStore) =>
   s.flags?.ENABLE_USER_CONTEXT !== false;

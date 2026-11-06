@@ -41,6 +41,13 @@ export class AuthorizationError extends OAuthError {
   }
 }
 
+/** RFC 8707 §2: the requested `resource` is not one this server issues tokens for. */
+export class InvalidTargetError extends OAuthError {
+  constructor(message: string, metadata?: ErrorMetadata) {
+    super('INVALID_TARGET', message, 400, metadata);
+  }
+}
+
 export class InvalidClientError extends OAuthError {
   constructor(message: string, metadata?: ErrorMetadata) {
     super('INVALID_CLIENT', message, 401, metadata);
@@ -87,5 +94,26 @@ export class DeviceGrantError extends OAuthError {
   constructor(oauthError: string, message: string, metadata?: ErrorMetadata) {
     super(oauthError.toUpperCase().replace(/-/g, '_'), message, 400, metadata)
     this.oauthError = oauthError
+  }
+}
+
+/**
+ * RFC 8693 token-exchange errors. Always HTTP 400; the JSON `error` member is
+ * `oauthError` (`invalid_target`, `invalid_request`, `invalid_grant`).
+ *
+ * `invalid_target` is deliberately returned for every refusal about the
+ * person being asked for — no such user, not on the allow-list, an
+ * administrator, a disabled account — and always with the same description.
+ * A service token that could tell those apart would be a working directory of
+ * the organisation and a map of its administrators, readable by anything that
+ * got hold of the credential. The real cause is written to the delegation
+ * audit log, which only an administrator can read.
+ */
+export class TokenExchangeError extends OAuthError {
+  readonly oauthError: string;
+
+  constructor(oauthError: string, message: string, metadata?: ErrorMetadata) {
+    super(oauthError.toUpperCase().replace(/-/g, '_'), message, 400, metadata);
+    this.oauthError = oauthError;
   }
 }

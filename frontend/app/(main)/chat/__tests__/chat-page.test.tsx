@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor, act } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
@@ -11,9 +11,11 @@ import type { ConversationMessage } from '../types';
 let searchParams = new URLSearchParams();
 const routerPush = vi.fn();
 const routerReplace = vi.fn();
+// One object, as Next's useRouter gives: effects that depend on the router must not re-run per render.
+const router = { push: (...args: unknown[]) => routerPush(...args), replace: (...args: unknown[]) => routerReplace(...args) };
 vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParams,
-  useRouter: () => ({ push: routerPush, replace: routerReplace }),
+  useRouter: () => router,
 }));
 
 const append = vi.fn();
@@ -21,16 +23,17 @@ vi.mock('@assistant-ui/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@assistant-ui/react')>()),
   AssistantRuntimeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useExternalStoreRuntime: () => ({}),
-  useThreadRuntime: () => ({ append }),
+  useAui: () => ({ thread: () => ({ append }) }),
 }));
 
 vi.mock('../components', async () => {
   const { useChatStore } = await import('../store');
   return {
     // Stands in for the real list: shows the text of each message in the open thread.
-    MessageList: () => {
+    MessageList: ({ composer }: { composer?: React.ReactNode }) => {
       const messages = useChatStore((s) => (s.activeSlotId ? s.slots[s.activeSlotId]?.messages : undefined));
       return (
+        <>
         <ul aria-label="Messages">
           {(messages ?? []).map((m, i) => (
             <li key={i}>
@@ -40,6 +43,8 @@ vi.mock('../components', async () => {
             </li>
           ))}
         </ul>
+        {composer}
+        </>
       );
     },
     ChatInputWrapper: () => <textarea aria-label="Message composer" />,
@@ -63,9 +68,16 @@ vi.mock('@/app/(main)/workspace/connectors/demo-data/components', () => ({
   DemoDataRemovalNotice: () => <div>Demo removal notice</div>,
 }));
 
-vi.mock('@/config', () => ({
-  AgentChatHeader: ({ displayName }: { displayName: string | null }) => (
-    <header aria-label="Agent header">{displayName ?? 'Agent'}</header>
+vi.mock('@/config', async () => ({
+  chatModelOptions: (await import('@/app/(main)/chat/utils/chat-model-options')).chatModelOptions,
+  AgentChatHeader: ({ displayName, readOnly }: { displayName: string | null; readOnly?: boolean }) => (
+    <header aria-label="Agent header" data-read-only={String(Boolean(readOnly))}>{displayName ?? 'Agent'}</header>
+  ),
+  ConversationHeaderOverlay: (props: { agentChip: React.ReactNode; shareGroup: React.ReactNode }) => (
+    <>
+      {props.agentChip}
+      {props.shareGroup}
+    </>
   ),
 }));
 
@@ -88,6 +100,11 @@ vi.mock('@/app/(main)/agents/api', async (importOriginal) => ({
   },
 }));
 
+const listInstances = vi.fn();
+vi.mock('@/app/(main)/workspace/api-toolsets/api', () => ({
+  ApiToolsetsApi: { listInstances: (...args: unknown[]) => listInstances(...args) },
+}));
+
 const fetchModelsForContext = vi.fn();
 vi.mock('@/chat/utils/fetch-models-for-context', () => ({
   fetchModelsForContext: (...args: unknown[]) => fetchModelsForContext(...args),
@@ -106,6 +123,7 @@ vi.mock('@/app/components/file-preview', () => ({
 const getSharedMembers = vi.fn();
 vi.mock('../share-adapter', () => ({
   createChatShareAdapter: () => ({ getSharedMembers: () => getSharedMembers() }),
+  toChatSharedMembers: (sharedWith: unknown) => getSharedMembers(sharedWith),
 }));
 vi.mock('@/app/components/share', () => ({
   ShareSidebar: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Share conversation" /> : null),
@@ -130,7 +148,7 @@ vi.mock('@/app/components/ui/service-gate', () => ({
   ServiceGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock('@/app/components/ui/MaterialIcon', () => ({ MaterialIcon: () => null }));
-vi.mock('@/lib/hooks/use-is-mobile', () => ({ useIsMobile: () => false }));
+vi.mock('@/lib/hooks/use-is-mobile', () => ({ useIsMobile: () => false, useIsBelowDesktop: () => false }));
 
 const getUsersByIds = vi.fn();
 vi.mock('@/app/(main)/workspace/users/api', () => ({
@@ -138,8 +156,12 @@ vi.mock('@/app/(main)/workspace/users/api', () => ({
 }));
 
 const getProject = vi.fn();
-vi.mock('@/chat/project-api', () => ({ ProjectApi: { get: (...args: unknown[]) => getProject(...args) } }));
+vi.mock('@/chat/project-api', () => ({
+  ProjectApi: { get: (...args: unknown[]) => getProject(...args) },
+  projectDetailKey: (id: string) => ['projects/detail', id] as const,
+}));
 vi.mock('@/chat/hooks/use-project-scope-hydration', () => ({ useProjectScopeHydration: () => {} }));
+vi.mock('@/chat/hooks/use-hydrate-unread-conversations', () => ({ useHydrateUnreadConversations: () => {} }));
 
 const toastError = vi.fn();
 vi.mock('@/lib/store/toast-store', () => ({
@@ -163,6 +185,10 @@ import { usePendingChatStore } from '@/lib/store/pending-chat-store';
 import { useFeatureFlagsStore } from '@/lib/store/feature-flags-store';
 import { useServicesHealthStore } from '@/lib/store/services-health-store';
 import { useCommandStore } from '@/lib/store/command-store';
+import { clearSessionCache } from '@/lib/api/session-cache';
+import { refreshSwrKey, writeSwrKey } from '@/lib/api/swr-cache';
+import { agentDetailKey } from '@/app/(main)/agents/api';
+import { projectDetailKey } from '@/chat/project-api';
 
 // ── Fixtures ───────────────────────────────────────────────────────
 
@@ -185,7 +211,11 @@ function apiMessage(overrides: Partial<ConversationMessage>): ConversationMessag
   } as ConversationMessage;
 }
 
-function conversationDetail({ isOwner = true, messages }: { isOwner?: boolean; messages?: ConversationMessage[] } = {}) {
+function conversationDetail({
+  isOwner = true,
+  messages,
+  sharedWith = [],
+}: { isOwner?: boolean; messages?: ConversationMessage[]; sharedWith?: { userId: string; accessLevel: string; _id: string }[] } = {}) {
   const msgs = messages ?? [
     apiMessage({ _id: 'u1', messageType: 'user_query', content: 'How many vacation days do I get?' }),
     apiMessage({ _id: 'b1', messageType: 'bot_response', content: 'You get 25 days a year.' }),
@@ -198,13 +228,26 @@ function conversationDetail({ isOwner = true, messages }: { isOwner?: boolean; m
       messages: msgs,
       status: 'complete',
       modelInfo: undefined,
-      isShared: false,
-      sharedWith: [],
+      isShared: sharedWith.length > 0,
+      sharedWith,
       access: { isOwner, accessLevel: isOwner ? 'owner' : 'read' },
     },
     messages: msgs,
     pagination: PAGINATION,
   };
+}
+
+const AGENT_WITH_TOOLS = {
+  _key: 'agent-a',
+  name: 'Agent A',
+  toolsets: [{ name: 'jira', tools: [{ name: 'search', fullName: 'jira.search' }] }],
+};
+
+/** What the shared API client rejects with on an HTTP error. */
+function httpFailure(status: number) {
+  const failure = new AxiosError(`Request failed with status code ${status}`);
+  failure.response = { status, statusText: '', data: {}, headers: new AxiosHeaders(), config: { headers: new AxiosHeaders() } } as never;
+  return processError(failure as AxiosError<never>);
 }
 
 function renderPage(params = '') {
@@ -224,6 +267,8 @@ afterEach(() => cleanup());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Agent and project details are cached for 60 s; each case starts from an empty cache.
+  clearSessionCache();
   useChatStore.getState().reset();
   useUserStore.setState({ profile: null });
   usePendingChatStore.setState({ pending: null });
@@ -236,11 +281,20 @@ beforeEach(() => {
   fetchModelsForContext.mockResolvedValue(undefined);
   getSharedMembers.mockResolvedValue([]);
   getUsersByIds.mockResolvedValue([]);
+  listInstances.mockResolvedValue([]);
 });
 
 // ── Tests ──────────────────────────────────────────────────────────
 
 describe('Chat page — new chat', () => {
+  it('links the footer to the GitHub repository and the docs introduction', () => {
+    const { container } = renderPage();
+
+    const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('https://github.com/exodia-tech/pipeshub-ai');
+    expect(hrefs).toContain('https://github.com/exodia-tech/pipeshub-ai/blob/exodia/coolify-setup/docs/exodia-brain.md');
+  });
+
   it('greets the user by name and offers the composer', () => {
     useUserStore.setState({
       profile: {
@@ -320,6 +374,36 @@ describe('Chat page — new chat', () => {
     expect(state.collectionNamesCache['kb-1']).toBe('Plans');
     expect(usePendingChatStore.getState().pending).toBeNull();
   });
+
+  it('opens scoped to the rows handed over from All Records, replacing the selection and sending nothing', async () => {
+    useChatStore.getState().setFilters({ apps: ['jira-1'], kb: [] });
+    usePendingChatStore.getState().setPending({
+      message: '',
+      pageContext: {
+        selectedNodes: [
+          { id: 'folder-a', name: 'A', nodeType: 'folder', connector: 'KB' },
+          { id: 'rec-b1', name: 'b1.md', nodeType: 'record', connector: 'KB' },
+          { id: 'group-pt', name: 'PT', nodeType: 'recordGroup', connector: 'Jira' },
+          { id: 'kb-alpha', name: 'GS-Alpha', nodeType: 'app', connector: 'KB' },
+        ],
+      },
+      referrerPage: '/knowledge-base',
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(usePendingChatStore.getState().pending).toBeNull());
+    const state = useChatStore.getState();
+    expect(state.settings.filters).toEqual({
+      apps: ['kb-alpha'],
+      kb: [],
+      recordGroups: ['group-pt'],
+      records: ['folder-a', 'rec-b1'],
+    });
+    expect(state.collectionNamesCache).toMatchObject({ 'folder-a': 'A', 'rec-b1': 'b1.md', 'group-pt': 'PT' });
+    expect(state.collectionMetaCache['rec-b1']).toMatchObject({ nodeType: 'record' });
+    expect(append).not.toHaveBeenCalled();
+  });
 });
 
 describe('Chat page — opening a conversation', () => {
@@ -340,7 +424,105 @@ describe('Chat page — opening a conversation', () => {
     expect(screen.getByRole('textbox', { name: 'Message composer' })).toBeTruthy();
   });
 
-  it('restores the collections the last question was scoped to', async () => {
+  it('loads the open conversation again when it is invalidated, as a notification about it does', async () => {
+    fetchConversation.mockResolvedValueOnce(conversationDetail());
+    renderPage('conversationId=conv-1');
+    expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
+
+    fetchConversation.mockResolvedValueOnce(
+      conversationDetail({
+        messages: [
+          apiMessage({ _id: 'u1', messageType: 'user_query', content: 'How many vacation days do I get?' }),
+          apiMessage({ _id: 'b1', messageType: 'bot_response', content: 'You get 25 days a year.' }),
+          apiMessage({ _id: 'u2', messageType: 'user_query', content: 'And sick days?' }),
+          apiMessage({ _id: 'b2', messageType: 'bot_response', content: 'Ten paid sick days.' }),
+        ],
+      }),
+    );
+    await act(async () => useChatStore.getState().invalidateConversation('conv-1'));
+
+    expect(await screen.findByText('Ten paid sick days.')).toBeTruthy();
+    expect(fetchConversation).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops a history response fetched before an invalidation that arrived while it was loading', async () => {
+    let resolveFirst: (v: ReturnType<typeof conversationDetail>) => void = () => {};
+    fetchConversation.mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }));
+    fetchConversation.mockResolvedValueOnce(
+      conversationDetail({
+        messages: [
+          apiMessage({ _id: 'u1', messageType: 'user_query', content: 'How many vacation days do I get?' }),
+          apiMessage({ _id: 'b1', messageType: 'bot_response', content: 'You get 25 days a year.' }),
+          apiMessage({ _id: 'u2', messageType: 'user_query', content: 'And sick days?' }),
+          apiMessage({ _id: 'b2', messageType: 'bot_response', content: 'Ten paid sick days.' }),
+        ],
+      }),
+    );
+    renderPage('conversationId=conv-1');
+    await waitFor(() => expect(fetchConversation).toHaveBeenCalledTimes(1));
+
+    await act(async () => useChatStore.getState().invalidateConversation('conv-1'));
+    await act(async () => resolveFirst(conversationDetail()));
+
+    expect(await screen.findByText('Ten paid sick days.')).toBeTruthy();
+    expect(fetchConversation).toHaveBeenCalledTimes(2);
+  });
+
+  it('never initializes from a stale response after the refetch limit, and loads again shortly after', async () => {
+    const pending: Array<(v: ReturnType<typeof conversationDetail>) => void> = [];
+    for (let i = 0; i < 4; i++) {
+      fetchConversation.mockImplementationOnce(() => new Promise((r) => { pending.push(r); }));
+    }
+    fetchConversation.mockResolvedValueOnce(
+      conversationDetail({
+        messages: [
+          apiMessage({ _id: 'u1', messageType: 'user_query', content: 'How many vacation days do I get?' }),
+          apiMessage({ _id: 'b1', messageType: 'bot_response', content: 'You get 25 days a year.' }),
+          apiMessage({ _id: 'u2', messageType: 'user_query', content: 'And sick days?' }),
+          apiMessage({ _id: 'b2', messageType: 'bot_response', content: 'Ten paid sick days.' }),
+        ],
+      }),
+    );
+    renderPage('conversationId=conv-1');
+
+    // Every allowed request is overtaken by an invalidation before it answers.
+    for (let i = 0; i < 4; i++) {
+      await waitFor(() => expect(pending).toHaveLength(i + 1));
+      await act(async () => useChatStore.getState().invalidateConversation('conv-1'));
+      await act(async () => pending[i](conversationDetail()));
+    }
+
+    // The fourth (stale) answer is not applied: nothing is shown yet and the slot is still loading.
+    expect(screen.queryByText('You get 25 days a year.')).toBeNull();
+    const slot = Object.values(useChatStore.getState().slots).find((x) => x.convId === 'conv-1');
+    expect(slot?.isInitialized).toBe(false);
+
+    // The fresh load scheduled after the limit brings the current conversation.
+    expect(await screen.findByText('Ten paid sick days.', {}, { timeout: 3000 })).toBeTruthy();
+    expect(fetchConversation).toHaveBeenCalledTimes(5);
+  });
+
+  it('does not mark the slot loaded when an overtaken request fails after the refetch limit', async () => {
+    const pending: Array<(e: Error) => void> = [];
+    for (let i = 0; i < 4; i++) {
+      fetchConversation.mockImplementationOnce(() => new Promise((_r, reject) => { pending.push(reject); }));
+    }
+    fetchConversation.mockResolvedValueOnce(conversationDetail());
+    renderPage('conversationId=conv-1');
+
+    for (let i = 0; i < 4; i++) {
+      await waitFor(() => expect(pending).toHaveLength(i + 1));
+      await act(async () => useChatStore.getState().invalidateConversation('conv-1'));
+      await act(async () => pending[i](new Error('network')));
+    }
+
+    const slot = Object.values(useChatStore.getState().slots).find((x) => x.convId === 'conv-1');
+    expect(slot?.isInitialized).toBe(false);
+    expect(await screen.findByText('You get 25 days a year.', {}, { timeout: 3000 })).toBeTruthy();
+    expect(fetchConversation).toHaveBeenCalledTimes(5);
+  });
+
+  it('restores what the last question was scoped to, at every level of the hierarchy', async () => {
     fetchConversation.mockResolvedValue(
       conversationDetail({
         messages: [
@@ -349,10 +531,13 @@ describe('Chat page — opening a conversation', () => {
             content: 'What changed?',
             appliedFilters: {
               apps: [
-                { id: 'legacy-kb-root', name: 'Collections', nodeType: 'app', connector: 'KB' },
+                { id: 'knowledgeBase_org-1', name: 'Collections', nodeType: 'app', connector: 'KB' },
                 { id: 'drive-1', name: 'Drive', nodeType: 'app', connector: 'DRIVE' },
+                { id: 'kb-3', name: 'Policies', nodeType: 'app', connector: 'KB' },
               ],
               kb: [{ id: 'kb-9', name: 'Handbook', nodeType: 'recordGroup', connector: 'KB' }],
+              recordGroups: [{ id: 'space-1', name: 'Engineering', nodeType: 'recordGroup', connector: 'CONFLUENCE' }],
+              records: [{ id: 'folder-1', name: 'Specs', nodeType: 'folder', connector: 'DRIVE' }],
             },
           }),
           apiMessage({ _id: 'b1', messageType: 'bot_response', content: 'Two policies.' }),
@@ -364,8 +549,20 @@ describe('Chat page — opening a conversation', () => {
 
     await screen.findByText('Two policies.');
     const { settings, collectionNamesCache } = useChatStore.getState();
-    expect(settings.filters).toEqual({ apps: ['drive-1'], kb: ['kb-9'] });
-    expect(collectionNamesCache).toMatchObject({ 'drive-1': 'Drive', 'kb-9': 'Handbook' });
+    expect(settings.filters).toEqual({
+      apps: ['drive-1', 'kb-3', 'kb-9'],
+      kb: [],
+      recordGroups: ['space-1'],
+      records: ['folder-1'],
+    });
+    expect(collectionNamesCache).toMatchObject({
+      'drive-1': 'Drive',
+      'kb-3': 'Policies',
+      'kb-9': 'Handbook',
+      'space-1': 'Engineering',
+      'folder-1': 'Specs',
+    });
+    expect(collectionNamesCache).not.toHaveProperty('knowledgeBase_org-1');
   });
 
   it("hides the composer on a conversation someone shared with the user", async () => {
@@ -377,8 +574,34 @@ describe('Chat page — opening a conversation', () => {
     expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
   });
 
+  it('shows no composer while an existing chat is still loading, so a recipient never sees it', async () => {
+    let finishLoading!: (detail: ReturnType<typeof conversationDetail>) => void;
+    fetchConversation.mockReturnValue(new Promise((resolve) => { finishLoading = resolve as typeof finishLoading; }));
+    renderPage('conversationId=conv-1');
+
+    await waitFor(() => expect(fetchConversation).toHaveBeenCalled());
+    expect(screen.queryByRole('textbox', { name: 'Message composer' })).toBeNull();
+
+    await act(async () => finishLoading(conversationDetail({ isOwner: false })));
+    await screen.findByText('You get 25 days a year.');
+    expect(screen.queryByRole('textbox', { name: 'Message composer' })).toBeNull();
+  });
+
+  it('shows the composer to the owner once their chat has loaded', async () => {
+    let finishLoading!: (detail: ReturnType<typeof conversationDetail>) => void;
+    fetchConversation.mockReturnValue(new Promise((resolve) => { finishLoading = resolve as typeof finishLoading; }));
+    renderPage('conversationId=conv-1');
+
+    await waitFor(() => expect(fetchConversation).toHaveBeenCalled());
+    expect(screen.queryByRole('textbox', { name: 'Message composer' })).toBeNull();
+
+    await act(async () => finishLoading(conversationDetail({ isOwner: true })));
+    expect(await screen.findByRole('textbox', { name: 'Message composer' })).toBeTruthy();
+  });
+
   it('lets the owner see who it is shared with and open sharing', async () => {
-    fetchConversation.mockResolvedValue(conversationDetail({ isOwner: true }));
+    const sharedWith = [{ userId: 'u2', accessLevel: 'read', _id: 's1' }];
+    fetchConversation.mockResolvedValue(conversationDetail({ isOwner: true, sharedWith }));
     getSharedMembers.mockResolvedValue([
       { id: 'me', name: 'Asha Rao', isOwner: true, type: 'user', avatarUrl: '' },
       { id: 'u2', name: 'Ben Cho', isOwner: false, type: 'user', avatarUrl: '' },
@@ -387,9 +610,78 @@ describe('Chat page — opening a conversation', () => {
 
     expect(await screen.findByText('Ben Cho')).toBeTruthy();
     expect(screen.queryByText('Asha Rao')).toBeNull();
+    // The members come from the conversation already loaded, not a second download of it.
+    expect(getSharedMembers).toHaveBeenCalledWith(sharedWith);
+    expect(fetchConversation).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Share' }));
     expect(screen.getByRole('dialog', { name: 'Share conversation' })).toBeTruthy();
+  });
+
+  it('keeps who the conversation is shared with on its slot', async () => {
+    const sharedWith = [{ userId: 'u2', accessLevel: 'read', _id: 's1' }];
+    fetchConversation.mockResolvedValue(conversationDetail({ isOwner: true, sharedWith }));
+
+    renderPage('conversationId=conv-1');
+
+    await waitFor(() => {
+      const state = useChatStore.getState();
+      expect(state.slots[state.activeSlotId ?? '']?.sharedWith).toEqual(sharedWith);
+    });
+  });
+
+  it('looks nobody up for the header of a chat shared with nobody', async () => {
+    fetchConversation.mockResolvedValue(conversationDetail({ isOwner: true }));
+
+    renderPage('conversationId=conv-1');
+
+    expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Share' })).toBeTruthy();
+    expect(getSharedMembers).not.toHaveBeenCalled();
+  });
+
+  it('updates the header avatars after a share without fetching the conversation again', async () => {
+    fetchConversation.mockResolvedValue(conversationDetail({ isOwner: true }));
+    getSharedMembers.mockResolvedValue([{ id: 'u2', name: 'Ben Cho', isOwner: false, type: 'user', avatarUrl: '' }]);
+    renderPage('conversationId=conv-1');
+    expect(await screen.findByRole('button', { name: 'Share' })).toBeTruthy();
+
+    // What the adapter does with the share answer.
+    act(() => {
+      const { activeSlotId, updateSlot } = useChatStore.getState();
+      updateSlot(activeSlotId ?? '', { sharedWith: [{ userId: 'u2', accessLevel: 'read', _id: 's1' }] });
+    });
+
+    expect(await screen.findByText('Ben Cho')).toBeTruthy();
+    expect(fetchConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no members and makes no lookups for a viewer of a shared chat', async () => {
+    const sharedWith = [{ userId: 'me', accessLevel: 'read', _id: 's1' }];
+    fetchConversation.mockResolvedValue(conversationDetail({ isOwner: false, sharedWith }));
+
+    renderPage('conversationId=conv-1');
+
+    expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
+    expect(getSharedMembers).not.toHaveBeenCalled();
+  });
+
+  it("switching from an owned chat builds the new chat's members once, never the old one's", async () => {
+    const sharedA = [{ userId: 'ua', accessLevel: 'read', _id: 'sa' }];
+    const sharedB = [{ userId: 'ub', accessLevel: 'read', _id: 'sb' }];
+    fetchConversation.mockImplementation(async (id: string) =>
+      conversationDetail({ isOwner: true, sharedWith: id === 'conv-1' ? sharedA : sharedB }),
+    );
+    const { rerender } = renderPage('conversationId=conv-1');
+    await waitFor(() => expect(getSharedMembers).toHaveBeenCalledWith(sharedA));
+    getSharedMembers.mockClear();
+
+    searchParams = new URLSearchParams('conversationId=conv-2');
+    rerender(<Theme><ChatPage /></Theme>);
+
+    await waitFor(() => expect(getSharedMembers).toHaveBeenCalledWith(sharedB));
+    expect(getSharedMembers).toHaveBeenCalledTimes(1);
   });
 
   it('shows a single message when the server refuses to open the conversation', async () => {
@@ -409,7 +701,7 @@ describe('Chat page — opening a conversation', () => {
     await waitFor(() => expect(fetchConversation).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
     expect(toastError).toHaveBeenCalledTimes(1);
-    expect(toastError.mock.calls[0][0]).toBe('Server Error');
+    expect(toastError.mock.calls[0][0]).toBe('Server error');
   });
 
   it('tells the user when the conversation cannot be read, instead of showing an empty chat', async () => {
@@ -517,23 +809,25 @@ describe('Chat page — keyboard shortcuts and the address bar', () => {
 });
 
 describe('Chat page — agent chats', () => {
+  const CREATOR_ID = '507f1f77bcf86cd799439011';
+
   it("shows the agent's name and who built it, and warns about tools that no longer exist", async () => {
     getAgent.mockResolvedValue({
       agent: {
         _key: 'agent-7',
         name: 'Support Bot',
-        createdBy: 'creator-1',
+        createdBy: CREATOR_ID,
         toolsets: [{ name: 'jira', tools: [{ name: 'jira.search', fullName: 'jira.search', deprecated: true }] }],
       },
       toolFullNames: ['jira.search'],
     });
-    getUsersByIds.mockResolvedValue([{ name: 'Priya Shah', email: 'priya@acme.test' }]);
+    getUsersByIds.mockResolvedValue([{ userId: CREATOR_ID, name: 'Priya Shah', email: 'priya@acme.test' }]);
 
     renderPage('agentId=agent-7');
 
     expect(await screen.findByText('Support Bot')).toBeTruthy();
     expect(await screen.findByText('Priya Shah')).toBeTruthy();
-    expect(getUsersByIds).toHaveBeenCalledWith(['creator-1']);
+    expect(getUsersByIds).toHaveBeenCalledWith([CREATOR_ID], { suppressErrorToast: true });
     expect(toastError).toHaveBeenCalledWith(
       'This agent has tools that are no longer available. Open the Agent Builder to remove them.',
       expect.objectContaining({ action: expect.objectContaining({ label: 'Open Agent Builder' }) }),
@@ -541,10 +835,219 @@ describe('Chat page — agent chats', () => {
     const { action } = toastError.mock.calls[0][1] as { action: { onClick: () => void } };
     action.onClick();
     expect(routerPush).toHaveBeenCalledWith('/agents/edit?agentKey=agent-7');
-    expect(fetchModelsForContext).toHaveBeenCalledWith(expect.any(String), { force: true });
+    expect(getAgent).toHaveBeenCalledTimes(1);
+    expect(getAgent).toHaveBeenCalledWith('agent-7', { quiet: true });
+    // The composer (`ChatInputWrapper`) loads the agent's models; the page no longer forces a second fetch.
+    expect(fetchModelsForContext).not.toHaveBeenCalled();
   });
 
-  it('opens an agent conversation through the agent API and never offers sharing', async () => {
+  it('reuses the loaded agent when the user comes back within 60 s', async () => {
+    getAgent.mockResolvedValue({ agent: { _key: 'agent-7', name: 'Support Bot', toolsets: [] }, toolFullNames: [] });
+    renderPage('agentId=agent-7');
+    expect(await screen.findByText('Support Bot')).toBeTruthy();
+
+    cleanup();
+    useChatStore.getState().reset();
+    renderPage('agentId=agent-7');
+
+    expect(await screen.findByText('Support Bot')).toBeTruthy();
+    expect(getAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the agent filled in when the agent sidebar mounts after the page', async () => {
+    getAgent.mockResolvedValue({
+      agent: { _key: 'agent-7', name: 'Support Bot', toolsets: [], knowledge: [] },
+      toolFullNames: ['jira.search'],
+    });
+    renderPage('agentId=agent-7');
+    expect(await screen.findByText('Support Bot')).toBeTruthy();
+
+    act(() => useChatStore.getState().setAgentSidebarAgentId('agent-7'));
+
+    expect(useChatStore.getState().agentContextDisplayName).toBe('Support Bot');
+    expect(useChatStore.getState().agentToolCatalogFullNames).toEqual(['jira.search']);
+    expect(useChatStore.getState().agentContextAccess).not.toBeNull();
+    expect(getAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('fills a cached agent in once per open, with one API actions lookup, when the sidebar mounts alongside', async () => {
+    useFeatureFlagsStore.setState({ flags: { ENABLE_API_TOOLSETS: true } } as Partial<ReturnType<typeof useFeatureFlagsStore.getState>>);
+    getAgent.mockResolvedValue({
+      agent: { _key: 'agent-7', name: 'Support Bot', toolsets: [], apiToolsetTools: [{ instanceId: 'i1', operationId: 'op' }] },
+      toolFullNames: [],
+    });
+    // Stands in for the agent sidebar, which claims the agent from its own effect in the same commit.
+    function AgentSidebarStandIn() {
+      useEffect(() => {
+        useChatStore.getState().setAgentSidebarAgentId('agent-7');
+        return () => useChatStore.getState().setAgentSidebarAgentId(null);
+      }, []);
+      return null;
+    }
+    const openWithSidebar = () => {
+      searchParams = new URLSearchParams('agentId=agent-7');
+      return render(<Theme><AgentSidebarStandIn /><ChatPage /></Theme>);
+    };
+
+    openWithSidebar();
+    expect(await screen.findByText('Support Bot')).toBeTruthy();
+    await waitFor(() => expect(listInstances).toHaveBeenCalledTimes(1));
+    cleanup();
+    expect(useChatStore.getState().agentContextDisplayName).toBeNull();
+
+    openWithSidebar();
+    expect(await screen.findByText('Support Bot')).toBeTruthy();
+    await act(async () => { await Promise.resolve(); });
+
+    expect(listInstances).toHaveBeenCalledTimes(2);
+    expect(getAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the agent's fields when the user leaves the chat page", async () => {
+    getAgent.mockResolvedValue({ agent: AGENT_WITH_TOOLS, toolFullNames: ['jira.search'] });
+    renderPage('agentId=agent-a');
+    await waitFor(() => expect(useChatStore.getState().agentChatToolGroups).toHaveLength(1));
+    act(() => useChatStore.getState().setAgentKnowledgeScope({ apps: ['app-1'], kb: [] }));
+
+    cleanup();
+
+    const state = useChatStore.getState();
+    expect(state.agentToolCatalogFullNames).toEqual([]);
+    expect(state.agentChatToolGroups).toEqual([]);
+    expect(state.agentKnowledgeScope).toBeNull();
+    expect(state.agentDeprecatedToolNames).toEqual([]);
+    expect(state.agentContextDisplayName).toBeNull();
+    expect(state.agentContextCreatedBy).toBeNull();
+    expect(state.agentContextAccess).toBeNull();
+  });
+
+  it('after the user fixes and saves the agent, coming back shows the saved agent and no stale warning', async () => {
+    const withRemovedTool = {
+      _key: 'agent-7',
+      name: 'Support Bot',
+      toolsets: [{ name: 'jira', tools: [{ name: 'jira.search', fullName: 'jira.search', deprecated: true }] }],
+    };
+    getAgent.mockResolvedValue({ agent: withRemovedTool, toolFullNames: ['jira.search'] });
+    renderPage('agentId=agent-7');
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    cleanup();
+
+    // The builder saves the agent without the removed tool.
+    const saved = { ...withRemovedTool, name: 'Support Bot v2', toolsets: [] };
+    act(() => refreshSwrKey(agentDetailKey('agent-7')));
+    toastError.mockClear();
+    getAgent.mockResolvedValue({ agent: saved, toolFullNames: [] });
+    renderPage('agentId=agent-7');
+
+    expect(await screen.findByText('Support Bot v2')).toBeTruthy();
+    expect(screen.queryByText('Support Bot')).toBeNull();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(useChatStore.getState().agentToolCatalogFullNames).toEqual([]);
+  });
+
+  it('a deleted agent whose chat is open is shown as gone, with no request and no error toast', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    getAgent.mockResolvedValue({ agent: { _key: 'agent-7', name: 'Support Bot', toolsets: [] }, toolFullNames: [] });
+    renderPage('agentId=agent-7');
+    expect(await screen.findByText('Support Bot')).toBeTruthy();
+
+    // What AgentsApi.deleteAgent writes.
+    act(() => writeSwrKey(agentDetailKey('agent-7'), { agent: null, toolFullNames: [] }));
+
+    await waitFor(() => expect(useChatStore.getState().agentContextDisplayName).toBeNull());
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(getAgent).toHaveBeenCalledTimes(1);
+    expect(toastError).not.toHaveBeenCalled();
+    expect(useChatStore.getState().agentContextAccess).toBeNull();
+  });
+
+  it("clears the previous agent's tools, knowledge and access while the next agent loads", async () => {
+    getAgent.mockResolvedValueOnce({ agent: AGENT_WITH_TOOLS, toolFullNames: ['jira.search'] });
+    const { rerender } = renderPage('agentId=agent-a');
+    await waitFor(() => expect(useChatStore.getState().agentChatToolGroups).toHaveLength(1));
+    expect(useChatStore.getState().agentContextAccess).not.toBeNull();
+
+    getAgent.mockReturnValue(new Promise(() => {}));
+    searchParams = new URLSearchParams('agentId=agent-b');
+    rerender(<Theme><ChatPage /></Theme>);
+
+    await waitFor(() => expect(useChatStore.getState().agentChatToolGroups).toEqual([]));
+    const state = useChatStore.getState();
+    expect(state.agentToolCatalogFullNames).toEqual([]);
+    expect(state.agentKnowledgeDefaults).toEqual({ apps: [], kb: [] });
+    expect(state.agentContextAccess).toBeNull();
+    expect(state.agentContextDisplayName).toBeNull();
+  });
+
+  it('resets every agent field when the user leaves the agent for the main chat', async () => {
+    getAgent.mockResolvedValue({ agent: AGENT_WITH_TOOLS, toolFullNames: ['jira.search'] });
+    const { rerender } = renderPage('agentId=agent-a');
+    await waitFor(() => expect(useChatStore.getState().agentChatToolGroups).toHaveLength(1));
+    // What the user may have picked meanwhile.
+    act(() => {
+      useChatStore.getState().setAgentKnowledgeScope({ apps: ['app-1'], kb: [] });
+      useChatStore.getState().setAgentStreamTools(['jira.search']);
+    });
+
+    searchParams = new URLSearchParams();
+    rerender(<Theme><ChatPage /></Theme>);
+
+    await waitFor(() => expect(useChatStore.getState().agentChatToolGroups).toEqual([]));
+    const state = useChatStore.getState();
+    expect(state.agentKnowledgeScope).toBeNull();
+    expect(state.agentStreamTools).toBeNull();
+    expect(state.agentToolCatalogFullNames).toEqual([]);
+    expect(state.agentContextAccess).toBeNull();
+    expect(state.agentContextDisplayName).toBeNull();
+  });
+
+  it('shows the new agent, never the previous one, when switching to an agent already loaded', async () => {
+    getAgent.mockImplementation(async (id: string) => ({
+      agent: { _key: id, name: id === 'agent-a' ? 'Agent A' : 'Agent B', toolsets: [] },
+      toolFullNames: [],
+    }));
+    const { rerender } = renderPage('agentId=agent-b');
+    expect(await screen.findByText('Agent B')).toBeTruthy();
+    searchParams = new URLSearchParams('agentId=agent-a');
+    rerender(<Theme><ChatPage /></Theme>);
+    expect(await screen.findByText('Agent A')).toBeTruthy();
+
+    searchParams = new URLSearchParams('agentId=agent-b');
+    rerender(<Theme><ChatPage /></Theme>);
+
+    expect(await screen.findByText('Agent B')).toBeTruthy();
+    expect(screen.queryByText('Agent A')).toBeNull();
+    expect(getAgent).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the loaded agent when a later refresh fails with a server error, and drops it on a 403', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      getAgent.mockResolvedValue({ agent: { _key: 'agent-7', name: 'Support Bot', toolsets: [] }, toolFullNames: [] });
+      renderPage('agentId=agent-7');
+      expect(await screen.findByText('Support Bot')).toBeTruthy();
+      cleanup();
+      await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+
+      getAgent.mockRejectedValueOnce(httpFailure(500));
+      renderPage('agentId=agent-7');
+      await waitFor(() => expect(getAgent).toHaveBeenCalledTimes(2));
+      await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+      expect(useChatStore.getState().agentContextDisplayName).toBe('Support Bot');
+      cleanup();
+      await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+
+      getAgent.mockRejectedValueOnce(httpFailure(403));
+      renderPage('agentId=agent-7');
+      await waitFor(() => expect(getAgent).toHaveBeenCalledTimes(3));
+      await waitFor(() => expect(useChatStore.getState().agentContextDisplayName).toBeNull());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('opens an agent conversation through the agent API and offers sharing to its owner', async () => {
     getAgent.mockResolvedValue({ agent: { name: 'Support Bot', toolsets: [] }, toolFullNames: [] });
     fetchAgentConversation.mockResolvedValue(conversationDetail({ isOwner: true }));
 
@@ -553,7 +1056,77 @@ describe('Chat page — agent chats', () => {
     expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
     expect(fetchAgentConversation).toHaveBeenCalledWith('agent-7', 'conv-1');
     expect(fetchConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Share' })).toBeTruthy();
+  });
+
+  it('opens a shared agent conversation read-only: no Share button and no composer', async () => {
+    getAgent.mockResolvedValue({ agent: { name: 'Support Bot', toolsets: [] }, toolFullNames: [] });
+    fetchAgentConversation.mockResolvedValue(conversationDetail({ isOwner: false }));
+
+    renderPage('agentId=agent-7&conversationId=conv-1');
+
+    expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
+    expect(fetchAgentConversation).toHaveBeenCalledWith('agent-7', 'conv-1');
+    expect(screen.queryByRole('textbox', { name: 'Message composer' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
+    expect(getSharedMembers).not.toHaveBeenCalled();
+  });
+
+  it('does not raise an error toast when the agent of an opened chat cannot be loaded', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    getAgent.mockRejectedValue(httpFailure(404));
+    fetchAgentConversation.mockResolvedValue(conversationDetail({ isOwner: false }));
+
+    renderPage('agentId=agent-7&conversationId=conv-1');
+
+    expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
+    await waitFor(() => expect(getAgent).toHaveBeenCalledWith('agent-7', { quiet: true }));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('still lets a new agent chat report an agent that cannot be loaded, once', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    getAgent.mockRejectedValue(httpFailure(404));
+
+    renderPage('agentId=agent-7');
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    // The sidebar resetting the agent fields re-runs the hydration, not the report.
+    act(() => useChatStore.getState().setAgentSidebarAgentId('agent-7'));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(toastError).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the agent header read-only on a chat someone shared with the user', async () => {
+    getAgent.mockRejectedValue(new Error('Request failed with status code 404'));
+    fetchAgentConversation.mockResolvedValue(conversationDetail({ isOwner: false }));
+
+    renderPage('agentId=agent-7&conversationId=conv-1');
+
+    expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
+    // Ownership is known only once the conversation has loaded; the header is up before that.
+    await waitFor(() => {
+      expect(screen.getByLabelText('Agent header').getAttribute('data-read-only')).toBe('true');
+    });
+  });
+
+  it('keeps the agent name and menu on a shared agent chat whose agent the user can open', async () => {
+    getAgent.mockResolvedValue({ agent: { name: 'Support Bot', toolsets: [] }, toolFullNames: [] });
+    fetchAgentConversation.mockResolvedValue(conversationDetail({ isOwner: false }));
+
+    renderPage('agentId=agent-7&conversationId=conv-1');
+
+    expect(await screen.findByText('Support Bot')).toBeTruthy();
+  });
+
+  it('leaves the agent header editable on the owner’s own agent chat', async () => {
+    getAgent.mockResolvedValue({ agent: { name: 'Support Bot', toolsets: [] }, toolFullNames: [] });
+    fetchAgentConversation.mockResolvedValue(conversationDetail({ isOwner: true }));
+
+    renderPage('agentId=agent-7&conversationId=conv-1');
+
+    expect(await screen.findByText('You get 25 days a year.')).toBeTruthy();
+    expect(screen.getByLabelText('Agent header').getAttribute('data-read-only')).toBe('false');
   });
 
   it('still opens the chat when the agent cannot be loaded', async () => {
@@ -562,7 +1135,7 @@ describe('Chat page — agent chats', () => {
 
     renderPage('agentId=agent-7');
 
-    await waitFor(() => expect(fetchModelsForContext).toHaveBeenCalled());
+    await waitFor(() => expect(getAgent).toHaveBeenCalled());
     expect(screen.getByRole('textbox', { name: 'Message composer' })).toBeTruthy();
     expect(useChatStore.getState().agentContextDisplayName).toBeNull();
   });
@@ -587,6 +1160,35 @@ describe('Chat page — projects and previews', () => {
     renderPage('projectId=p-1');
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('Failed to load this project'));
+  });
+
+  it('treats a project deleted or left in this tab as gone: one toast, back to a plain chat, no request', async () => {
+    useFeatureFlagsStore.setState({ flags: { ENABLE_PROJECTS: true } } as Partial<ReturnType<typeof useFeatureFlagsStore.getState>>);
+    getProject.mockResolvedValue({ id: 'p-1', name: 'Launch plan', color: '#f00' });
+    renderPage('projectId=p-1');
+    expect(await screen.findByText('Launch plan')).toBeTruthy();
+    cleanup();
+
+    // What ProjectApi.remove and ProjectApi.leave write, within the window of that load.
+    writeSwrKey(projectDetailKey('p-1'), null);
+    renderPage('projectId=p-1');
+
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/chat/'));
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledWith('Failed to load this project');
+    expect(getProject).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports each project that fails to load, not only the first', async () => {
+    useFeatureFlagsStore.setState({ flags: { ENABLE_PROJECTS: true } } as Partial<ReturnType<typeof useFeatureFlagsStore.getState>>);
+    getProject.mockRejectedValue(new Error('boom'));
+    const { rerender } = renderPage('projectId=p-1');
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+
+    searchParams = new URLSearchParams('projectId=p-2');
+    rerender(<Theme><ChatPage /></Theme>);
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(2));
   });
 
   it('ignores the project in the address bar when projects are turned off', () => {
@@ -620,5 +1222,21 @@ describe('Chat page — projects and previews', () => {
       } as Partial<ReturnType<typeof useChatStore.getState>>),
     );
     expect(screen.getByLabelText('Fullscreen preview').textContent).toBe('handbook.pdf');
+  });
+});
+
+describe('Chat page — search mode', () => {
+  it('keeps the results view for a search that failed or found nothing', async () => {
+    renderPage();
+    await screen.findByText('What do you want to explore today?');
+
+    act(() => {
+      const store = useChatStore.getState();
+      store.setMode('search');
+      store.setSearchResults([], null, 'zzqxw qqq');
+      store.setSearchError('Search is unavailable.');
+    });
+
+    expect(screen.getByText('Search results')).toBeTruthy();
   });
 });

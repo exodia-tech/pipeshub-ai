@@ -11,8 +11,10 @@ from pydantic import BaseModel, Field
 from app.config.constants.arangodb import CollectionNames
 from app.models.entities import EntityType
 from app.modules.entity_resolution.normalizer import normalize_name
+from app.modules.entity_resolution.organizations import organization_key
+from app.services.graph_db.taxonomy import MAX_TAXONOMY_ALIASES
 
-MAX_ALIASES_PER_NODE = 20
+MAX_ALIASES_PER_NODE = MAX_TAXONOMY_ALIASES
 
 
 class ResolutionMode(str, Enum):
@@ -20,8 +22,8 @@ class ResolutionMode(str, Enum):
 
     ``OFF`` skips resolution entirely. ``SHADOW`` computes and logs every
     decision but writes nothing and leaves the extracted names untouched.
-    ``APPLY`` rewrites the record's metadata to canonical names and hands the
-    graph transformer the nodes to use.
+    ``APPLY`` cleans the record's own names and hands the graph transformer
+    the canonical nodes they link to.
     """
 
     OFF = "off"
@@ -44,6 +46,11 @@ class TaxonomyKind:
     entity_type: EntityType
     level: str | None = None
 
+    @property
+    def partition_key(self) -> str:
+        """Finer bucket than the collection. Subcategory levels never merge."""
+        return self.level or self.slot
+
 
 CATEGORY = TaxonomyKind("category", CollectionNames.CATEGORIES.value, EntityType.CATEGORY)
 SUBCATEGORY_1 = TaxonomyKind(
@@ -58,11 +65,23 @@ SUBCATEGORY_3 = TaxonomyKind(
 TOPIC = TaxonomyKind("topic", CollectionNames.TOPICS.value, EntityType.TOPIC)
 LANGUAGE = TaxonomyKind("language", CollectionNames.LANGUAGES.value, EntityType.LANGUAGE)
 
+# Organisations a document names (KG-13 slice 3b). Resolved with taxonomy, but
+# they live in ``organizations`` beside CRM accounts, not in a taxonomy
+# collection, so they are in neither tuple below.
+ORGANIZATION = TaxonomyKind("organizations", CollectionNames.ORGS.value, EntityType.ORGANIZATION)
+
 SUBCATEGORY_CHAIN: tuple[TaxonomyKind, ...] = (SUBCATEGORY_1, SUBCATEGORY_2, SUBCATEGORY_3)
 RESOLVED_KINDS: tuple[TaxonomyKind, ...] = (CATEGORY, *SUBCATEGORY_CHAIN, TOPIC)
 KINDS_BY_COLLECTION: dict[str, TaxonomyKind] = {
     kind.collection: kind for kind in (*RESOLVED_KINDS, LANGUAGE)
 }
+
+
+def name_key(collection: str, name: str) -> str:
+    """The key two spellings of a name in ``collection`` are matched on."""
+    if collection == ORGANIZATION.collection:
+        return organization_key(name)
+    return normalize_name(name)
 
 
 @dataclass
@@ -111,11 +130,15 @@ class ResolutionStats:
     names_dropped: int = 0
     names_deduped: int = 0
     tier0_hits: int = 0
+    # Names given at least one live candidate (not candidates offered).
     winners_offered: int = 0
+    # Candidates dropped as stale (deleted, another org's, merged away).
     stale_winners: int = 0
     model_calls: int = 0
     model_failures: int = 0
+    # Failed attempts, so a record that resolved after a retry still shows one.
     vector_failures: int = 0
+    graph_failures: int = 0
     rejected_decisions: int = 0
     merges: int = 0
     in_record_merges: int = 0
@@ -132,8 +155,9 @@ class ResolutionStats:
 class EntityResolution:
     """The resolver's output for one record.
 
-    ``entries`` is keyed by ``(collection, normalized canonical name)``, which
-    is how the graph transformer looks a rewritten metadata name back up.
+    ``entries`` is keyed by ``(collection, normalized canonical name)`` and
+    ``by_extracted`` by ``(collection, normalized extracted name)``, which is
+    how the graph transformer looks a metadata name back up.
     """
 
     org_id: str
@@ -141,12 +165,14 @@ class EntityResolution:
     stats: ResolutionStats = field(default_factory=ResolutionStats)
     entries: dict[tuple[str, str], ResolvedEntity] = field(default_factory=dict)
     assignments: dict[int, ResolvedEntity] = field(default_factory=dict)
+    by_extracted: dict[tuple[str, str], ResolvedEntity] = field(default_factory=dict)
 
     def add(self, entity: ResolvedEntity) -> None:
         self.entries[(entity.kind.collection, entity.normalized)] = entity
 
     def get(self, collection: str, name: str) -> ResolvedEntity | None:
-        return self.entries.get((collection, normalize_name(name)))
+        key = (collection, name_key(collection, name))
+        return self.by_extracted.get(key) or self.entries.get(key)
 
     def decisions_for_log(self) -> list[dict[str, Any]]:
         """What was decided, by id and count: extracted names are document
@@ -190,6 +216,7 @@ class MergeDecisions(BaseModel):
 
 __all__ = [
     "CATEGORY",
+    "ORGANIZATION",
     "KINDS_BY_COLLECTION",
     "LANGUAGE",
     "MAX_ALIASES_PER_NODE",

@@ -19,6 +19,7 @@ from fastapi.responses import StreamingResponse
 
 from app.config.configuration_service import ConfigurationService
 from app.config.constants.arangodb import (
+    AccessRule,
     PermissionModel,
     Connectors,
     MimeTypes,
@@ -61,6 +62,7 @@ from app.connectors.core.registry.filters import (
     load_connector_filters,
 )
 from app.connectors.sources.atlassian.core.apps import ConfluenceDataCenterPersonalApp
+from app.connectors.sources.atlassian.core.confluence_access import listing_modified_after
 from app.connectors.sources.atlassian.core.confluence_dc_removal import (
     ConfluenceDataCenterRemovalMixin,
     ContentListing,
@@ -69,6 +71,11 @@ from app.connectors.sources.atlassian.core.confluence_dc_removal import (
     stored_map,
 )
 from app.connectors.sources.atlassian.core.confluence_html import prepare_streaming_html
+from app.connectors.sources.atlassian.core.confluence_sync import (
+    save_synced_records,
+    synced,
+)
+from app.connectors.sources.atlassian.core.people import confluence_people
 from app.sources.client.http.http_retry import call_with_retry
 from app.connectors.sources.microsoft.common.msgraph_client import RecordUpdate
 from app.models.entities import (
@@ -93,8 +100,8 @@ from app.connectors.core.base.error.stream_errors import (
     to_stream_error,
 )
 
-# Time offset (in hours) applied to date filters to handle timezone differences
-# between the application and Confluence server, ensuring no data is missed during sync
+# How far back each incremental sync re-reads before its checkpoint. CQL reads dates
+# in the site's time zone, not UTC; the admin's date filters are used as set.
 TIME_OFFSET_HOURS = 24
 
 # Expand parameters for fetching pages and blogposts with required metadata
@@ -466,12 +473,7 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                 )
 
             # Ensure ConnectorGroup permission
-            group_permission = await self.ensure_connector_group_permission()
-            self.logger.info(
-                "Confluence DC Personal connector %s: connector group permission ready (granted=%s)",
-                self.connector_id,
-                bool(group_permission),
-            )
+            await self.ensure_creator_user_app_relation()
 
             # Load sync and indexing filters
             self.sync_filters, self.indexing_filters = await load_connector_filters(
@@ -550,14 +552,10 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                     excluded_space_keys = space_keys_filter.get_value()
                     self.logger.info(f"Filtering to exclude space keys: {excluded_space_keys}")
 
-            # Get ConnectorGroup permission (Jira DC Personal pattern)
-            group_permission = self._connector_group_permission
-            if group_permission is None:
-                # Idempotent — returns the cached permission if already created upstream
-                group_permission = await self.ensure_connector_group_permission()
-            space_permissions: list[Permission] = (
-                [group_permission] if group_permission else []
-            )
+            # The creator's user-app link is the gate. Spaces inherit the app
+            # and carry no grant of their own.
+            if self._connector_group_permission is None:
+                await self.ensure_creator_user_app_relation()
 
             # Pagination: v1 REST uses start/limit
             batch_size = 25
@@ -635,15 +633,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                             skipped_a_space = True
                             continue
 
-                        # Grant ConnectorGroup permission (Jira DC Personal pattern)
-                        batch_groups_with_permissions.append((record_group, list(space_permissions)))
+                        batch_groups_with_permissions.append((record_group, []))
                         record_groups.append(record_group)
                         total_spaces_synced += 1
-
-                        if space_permissions:
-                            self.logger.debug(
-                                f"Space {space_name}: granted access via ConnectorGroup"
-                            )
 
                     except Exception as space_error:
                         skipped_a_space = True
@@ -766,8 +758,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
             if not content_indexing_enabled:
                 webpage_record.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
 
-            await self.data_entities_processor.on_new_records(
-                [(webpage_record, permissions)]
+            await save_synced_records(
+                self.data_entities_processor,
+                [synced(webpage_record, permissions, existing_record)],
             )
             self.logger.info(
                 "Backfilled space homepage %s (%s) for space %s — omitted from CQL search",
@@ -871,14 +864,13 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
             if created_filter:
                 created_after, created_before = created_filter.get_datetime_iso()
 
-            # Merge modified_after with checkpoint (use the latest)
-            if modified_after and last_sync_time:
-                modified_after = max(modified_after, last_sync_time)
-                self.logger.info(f"🔄 Using latest modified_after: {modified_after} (filter: {modified_after}, checkpoint: {last_sync_time})")
-            elif modified_after:
+            filter_modified_after = modified_after
+            modified_after = listing_modified_after(filter_modified_after, last_sync_time, TIME_OFFSET_HOURS)
+            if filter_modified_after and last_sync_time:
+                self.logger.info(f"🔄 Using latest modified_after: {modified_after} (filter: {filter_modified_after}, checkpoint: {last_sync_time} less {TIME_OFFSET_HOURS}h)")
+            elif filter_modified_after:
                 self.logger.info(f"🔍 Using filter: Fetching {content_type}s modified after {modified_after}")
             elif last_sync_time:
-                modified_after = last_sync_time
                 self.logger.info(f"🔄 Incremental sync: Fetching {content_type}s modified after {modified_after}")
             else:
                 self.logger.info(f"🆕 Full sync: Fetching all {content_type}s (first time)")
@@ -955,7 +947,6 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                         order_by="lastModified",
                         sort_order="asc",
                         expand=CONTENT_EXPAND_PARAMS,
-                        time_offset_hours=TIME_OFFSET_HOURS
                     )
                 else:  # CONFLUENCE_BLOGPOST
                     response = await datasource.get_blogposts_v1(
@@ -972,7 +963,6 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                         order_by="lastModified",
                         sort_order="asc",
                         expand=CONTENT_EXPAND_PARAMS,
-                        time_offset_hours=TIME_OFFSET_HOURS
                     )
 
                 # Check response
@@ -1053,8 +1043,8 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                         if not content_indexing_enabled:
                             webpage_record.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
 
-                        # Add item to batch
-                        records_with_permissions.append((webpage_record, permissions))
+                        # Add item to batch. A content change publishes updateRecord.
+                        records_with_permissions.append(synced(webpage_record, permissions, existing_record))
                         total_synced += 1
 
                         # Extract space_id for children
@@ -1114,8 +1104,11 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                                         # Set indexing status based on filter
                                         if not content_attachments_indexing_enabled:
                                             attachment_record.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
-                                        # Attachments inherit permissions from parent
-                                        records_with_permissions.append((attachment_record, permissions))
+                                        attachment_record.inherit_permissions = True
+                                        attachment_record.rewrite_permissions = True
+                                        records_with_permissions.append(
+                                            synced(attachment_record, [], existing_attachment)
+                                        )
                                         total_attachments_synced += 1
                                         self.logger.debug(f"Attachment: {attachment_record.record_name}")
 
@@ -1141,9 +1134,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                             )
                             # Comments already have indexing status set; just count them
                             # (Note: comments now includes attachment records too)
-                            comment_count = sum(1 for rec, _ in comments if rec.record_type in [RecordType.COMMENT, RecordType.INLINE_COMMENT])
+                            comment_count = sum(1 for rec, *_ in comments if rec.record_type in [RecordType.COMMENT, RecordType.INLINE_COMMENT])
                             if not content_comments_indexing_enabled:
-                                for rec, _ in comments:
+                                for rec, *_ in comments:
                                     if rec.record_type in (RecordType.COMMENT, RecordType.INLINE_COMMENT):
                                         rec.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
                             records_with_permissions.extend(comments)
@@ -1160,7 +1153,7 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
 
                 # Save batch to database
                 if records_with_permissions:
-                    await self.data_entities_processor.on_new_records(records_with_permissions)
+                    await save_synced_records(self.data_entities_processor, records_with_permissions)
                     self.logger.info(f"Synced batch of {len(records_with_permissions)} items ({content_type}s + attachments + comments)")
 
                 # Extract next page token from _links.next
@@ -1303,7 +1296,6 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
         comment_node_id: str,
         parent_space_id: Optional[str],
         attachments_indexing_enabled: bool,
-        permissions: list[Permission]
     ) -> list[tuple[FileRecord, list[Permission]]]:
         """
         Fetch and transform attachment file records for a comment.
@@ -1326,20 +1318,29 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
 
             records_with_permissions = []
             for attachment_data in attachments:
+                attachment_id = attachment_data.get("id")
+                existing_attachment = None
+                if attachment_id:
+                    existing_attachment = await self.data_entities_processor.get_record_by_external_id(
+                        connector_id=self.connector_id,
+                        external_record_id=attachment_id,
+                    )
                 file_record = self._transform_to_attachment_file_record(
                     attachment_data=attachment_data,
                     parent_external_record_id=comment_id,
                     parent_external_record_group_id=parent_space_id,
                     parent_node_id=comment_node_id,
                     parent_record_type=comment_record_type,
-                    api_base_url=attachment_api_base_url
+                    api_base_url=attachment_api_base_url,
+                    existing_record=existing_attachment,
                 )
                 if file_record:
                     # Apply indexing filter
                     if not attachments_indexing_enabled:
                         file_record.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
-                    # Inherit page permissions
-                    records_with_permissions.append((file_record, permissions))
+                    file_record.inherit_permissions = True
+                    file_record.rewrite_permissions = True
+                    records_with_permissions.append(synced(file_record, [], existing_attachment))
 
             return records_with_permissions
 
@@ -1443,7 +1444,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                         )
 
                         if comment_record:
-                            all_comments.append((comment_record, page_permissions))
+                            comment_record.inherit_permissions = True
+                            comment_record.rewrite_permissions = True
+                            all_comments.append(synced(comment_record, [], existing_comment))
 
                             # Sync comment attachments (explicit child attachments)
                             comment_record_type = RecordType.INLINE_COMMENT if comment_type == "inline" else RecordType.COMMENT
@@ -1453,7 +1456,6 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                                 comment_node_id=comment_record.id,
                                 parent_space_id=parent_space_id,
                                 attachments_indexing_enabled=attachments_indexing_enabled,
-                                permissions=page_permissions
                             )
                             all_comments.extend(comment_file_records)
 
@@ -1512,7 +1514,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                                                     if file_record:
                                                         if not attachments_indexing_enabled:
                                                             file_record.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
-                                                        all_comments.append((file_record, page_permissions))
+                                                        file_record.inherit_permissions = True
+                                                        file_record.rewrite_permissions = True
+                                                        all_comments.append((file_record, []))
                                                         synced_attachment_ids.add(attachment_id)
 
                         children = await self._fetch_comment_children_recursive(
@@ -1628,7 +1632,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                         )
 
                         if child_record:
-                            all_children.append((child_record, page_permissions))
+                            child_record.inherit_permissions = True
+                            child_record.rewrite_permissions = True
+                            all_children.append(synced(child_record, [], existing_child))
 
                             # Sync comment attachments (explicit child attachments)
                             child_record_type = RecordType.INLINE_COMMENT if comment_type == "inline" else RecordType.COMMENT
@@ -1638,7 +1644,6 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                                 comment_node_id=child_record.id,
                                 parent_space_id=parent_space_id,
                                 attachments_indexing_enabled=attachments_indexing_enabled,
-                                permissions=page_permissions
                             )
                             all_children.extend(child_file_records)
 
@@ -1697,7 +1702,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                                                     if file_record:
                                                         if not attachments_indexing_enabled:
                                                             file_record.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
-                                                        all_children.append((file_record, page_permissions))
+                                                        file_record.inherit_permissions = True
+                                                        file_record.rewrite_permissions = True
+                                                        all_children.append((file_record, []))
                                                         synced_attachment_ids.add(attachment_id)
 
                         grandchildren = await self._fetch_comment_children_recursive(
@@ -2265,6 +2272,10 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                 web_url=web_url,
                 source_created_at=source_created_at,
                 source_updated_at=source_created_at,  # Confluence doesn't provide updated timestamp for spaces
+                # The space inherits the app. The creator's user-app link is the gate;
+                # an empty list clears a ConnectorGroup grant an older sync stored.
+                access_rule=AccessRule.OPEN,
+                inherit_permissions=True,
             )
 
         except Exception as e:
@@ -2424,6 +2435,7 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                 source_updated_at=source_updated_at,
                 is_dependent_node=False,  # Pages are root nodes
                 parent_node_id=None,  # Pages have no parent node
+                **confluence_people(data),
             )
 
         except Exception as e:
@@ -2579,6 +2591,7 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                 source_updated_at=source_updated_at,
                 is_dependent_node=True,  # Attachments are dependent nodes
                 parent_node_id=parent_node_id,  # Internal record ID of parent page/comment
+                **confluence_people(attachment_data),
             )
 
         except Exception as e:
@@ -2609,6 +2622,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
         webpage_record = self._transform_to_webpage_record(
             data, record_type, existing_record, api_base_url
         )
+        if webpage_record:
+            webpage_record.inherit_permissions = True
+            webpage_record.rewrite_permissions = True
 
         if not webpage_record:
             return RecordUpdate(
@@ -3025,8 +3041,10 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
                     await self.data_entities_processor.on_record_content_update(updated_record)
 
                     # Update permissions if they exist
-                    if permissions:
-                        await self.data_entities_processor.on_updated_record_permissions(updated_record, permissions)
+                    if permissions or updated_record.rewrite_permissions:
+                        await self.data_entities_processor.on_updated_record_permissions(
+                            updated_record, list(permissions or [])
+                        )
 
                 self.logger.info(f"Published update events for {len(updated_records)} records that changed at source")
 
@@ -3112,6 +3130,8 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
             # Personal connector: all records inherit permissions from space ConnectorGroup
             permissions = []
 
+            webpage_record.inherit_permissions = True
+            webpage_record.rewrite_permissions = True
             return (webpage_record, permissions)
 
         except Exception as e:
@@ -3162,6 +3182,8 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
             # Personal connector: all records inherit permissions from space ConnectorGroup
             permissions = []
 
+            webpage_record.inherit_permissions = True
+            webpage_record.rewrite_permissions = True
             return (webpage_record, permissions)
 
         except Exception as e:
@@ -3252,10 +3274,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
             if not comment_record:
                 return None
 
-            # Comments inherit permissions from parent page - fetch page permissions
-            permissions = []  # Personal connector: inherit from space
-
-            return (comment_record, permissions)
+            comment_record.inherit_permissions = True
+            comment_record.rewrite_permissions = True
+            return (comment_record, [])
 
         except Exception as e:
             self.logger.error(f"Error fetching comment {record.external_record_id}: {e}")
@@ -3322,10 +3343,9 @@ class ConfluenceDataCenterPersonalConnector(ConfluenceDataCenterRemovalMixin, Ba
             if not attachment_record:
                 return None
 
-            # Attachments inherit permissions from parent page - fetch page permissions
-            permissions = []  # Personal connector: inherit from space
-
-            return (attachment_record, permissions)
+            attachment_record.inherit_permissions = True
+            attachment_record.rewrite_permissions = True
+            return (attachment_record, [])
 
         except Exception as e:
             self.logger.error(f"Error fetching attachment {record.external_record_id}: {e}")

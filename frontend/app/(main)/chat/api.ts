@@ -1,6 +1,9 @@
 import { apiClient, streamSSERequest } from '@/lib/api';
+import { onSessionEnd } from '@/lib/api/session-cache';
+import { OrgApi, type OrgResponse } from '@/app/(main)/workspace/general/api';
 import { CHAT_STREAM_ERROR_MESSAGES } from '@/lib/api/stream-errors';
 import { CONVERSATION_MESSAGES_PAGE_SIZE } from './constants';
+import { PROJECT_ID_UNASSIGNED } from './project-types';
 import {
   Conversation,
   ConversationMessage,
@@ -25,7 +28,10 @@ import {
   SearchResponse,
   streamChatModeToAgentApiChatMode,
   AttachmentRef,
+  type ChatKnowledgeFilters,
+  CHAT_ATTACHMENT_UPLOAD_TIMEOUT_MS,
 } from './types';
+import { hasAnyFilter } from './utils/tree-selection';
 import { getClientTimezone, getClientCurrentTime } from './utils/client-time';
 import { createAGUIEventHandler, type AGUIStreamTracking } from './agui-event-handler';
 
@@ -36,6 +42,17 @@ export interface FeedbackPayload {
     positive?: string;
     negative?: string;
   };
+}
+
+export interface ForkConversationResult {
+  id: string;
+  title: string;
+  projectId?: string;
+  forkedFrom: {
+    conversationId: string;
+    messageId: string;
+  };
+  messageCount: number;
 }
 
 export interface StreamMessageCallbacks {
@@ -67,6 +84,8 @@ export interface StreamMessageCallbacks {
    * straight into slot state. No legacy equivalent; safe to no-op.
    */
   onParts?: (parts: MessagePart[]) => void;
+  /** Compare mode: the question is saved and its id known, so the branch for the second model can start. */
+  onTurnStarted?: (data: { conversationId?: string; userMessageId?: string }) => void;
   onError?: (error: Error) => void;
   signal?: AbortSignal;
 }
@@ -112,7 +131,13 @@ export function mapApiConversationToConversation(conv: ConversationApiResponse):
     status: conv.status,
     modelInfo: conv.modelInfo,
     isOwner: conv.isOwner,
+    ...(conv.isPinned === true ? { isPinned: true } : {}),
+    // Dropping these made every row look project-less: Move to project
+    // pre-selected "No project" and "Remove from project" never showed.
+    ...(conv.projectId ? { projectId: conv.projectId } : {}),
+    ...(conv.projectVisibility ? { projectVisibility: conv.projectVisibility } : {}),
     sharedBy: conv.sharedBy,
+    agentKey: conv.agentKey,
   };
 }
 
@@ -123,7 +148,11 @@ export interface FetchConversationsOptions {
   source: ConversationSource;
   /** Passed to GET /api/v1/conversations?search= — server matches title and message content */
   search?: string;
+  /** Leave out chats that belong to a project; they are listed under their project instead. */
+  excludeProjectChats?: boolean;
   signal?: AbortSignal;
+  /** For callers that show the failure themselves. */
+  suppressErrorToast?: boolean;
 }
 
 /**
@@ -136,22 +165,35 @@ function sanitizeFilterIds(ids: unknown[] | null | undefined): string[] {
 }
 
 /**
- * Normalise an app/KB filter list and return a `{ filters }` spread fragment
- * for **non-agent** (assistant) streams.
+ * The `filters` object as sent: `apps` and `kb` always, and the keys that
+ * select below app level (record groups, folders, records) when not empty.
+ */
+function sanitizeFilters(filters: Partial<ChatKnowledgeFilters> | null | undefined): ChatKnowledgeFilters {
+  const recordGroups = sanitizeFilterIds(filters?.recordGroups);
+  const records = sanitizeFilterIds(filters?.records);
+  const recordsExact = sanitizeFilterIds(filters?.recordsExact);
+  return {
+    apps: sanitizeFilterIds(filters?.apps),
+    kb: sanitizeFilterIds(filters?.kb),
+    ...(recordGroups.length > 0 ? { recordGroups } : {}),
+    ...(records.length > 0 ? { records } : {}),
+    ...(recordsExact.length > 0 ? { recordsExact } : {}),
+  };
+}
+
+/**
+ * Normalise the filters and return a `{ filters }` spread fragment for
+ * **non-agent** (assistant) streams.
  *
  * Only emits the key when at least one valid ID remains — so the backend
  * treats the absence of `filters` as "search everything" (correct for the
  * assistant endpoint where no scope is intentional).
  */
 function buildFiltersPayload(
-  apps: unknown[] | null | undefined,
-  kb: unknown[] | null | undefined,
+  filters: Partial<ChatKnowledgeFilters> | null | undefined,
 ): Record<string, unknown> {
-  const validApps = sanitizeFilterIds(apps);
-  const validKb = sanitizeFilterIds(kb);
-  return validApps.length > 0 || validKb.length > 0
-    ? { filters: { apps: validApps, kb: validKb } }
-    : {};
+  const valid = sanitizeFilters(filters);
+  return hasAnyFilter(valid) ? { filters: valid } : {};
 }
 
 /**
@@ -162,13 +204,32 @@ function buildFiltersPayload(
  * `{ apps: [], kb: [] }` means "this agent has no knowledge scope."
  */
 function buildAgentFiltersPayload(
-  apps: unknown[] | null | undefined,
-  kb: unknown[] | null | undefined,
-): { filters: { apps: string[]; kb: string[] } } {
-  return { filters: { apps: sanitizeFilterIds(apps), kb: sanitizeFilterIds(kb) } };
+  filters: Partial<ChatKnowledgeFilters> | null | undefined,
+): { filters: ChatKnowledgeFilters } {
+  return { filters: sanitizeFilters(filters) };
 }
 
 // Chat API endpoints
+/**
+ * With no model resolved the store hands back empty strings. The API rejects
+ * an empty model field but picks the workspace default when it is missing, so
+ * only non-empty values are sent.
+ */
+function buildModelPayload(model: {
+  modelKey?: string;
+  modelName?: string;
+  modelFriendlyName?: string;
+}): Record<string, string> {
+  const modelKey = model.modelKey?.trim();
+  const modelName = model.modelName?.trim();
+  const modelFriendlyName = model.modelFriendlyName?.trim() || modelName;
+  return {
+    ...(modelKey ? { modelKey } : {}),
+    ...(modelName ? { modelName } : {}),
+    ...(modelFriendlyName ? { modelFriendlyName } : {}),
+  };
+}
+
 export const ChatApi = {
   // Fetch one page of conversations for a single source (owned or shared).
   // Call once per tab if you need both lists.
@@ -190,10 +251,13 @@ export const ChatApi = {
     if (search) {
       params.search = search;
     }
+    if (options.excludeProjectChats) {
+      params.projectId = PROJECT_ID_UNASSIGNED;
+    }
 
     const { data } = await apiClient.get<ConversationsListResponse>(
       `/api/v1/conversations`,
-      { params, signal: options.signal }
+      { params, signal: options.signal, suppressErrorToast: options.suppressErrorToast }
     );
 
     return {
@@ -220,6 +284,7 @@ export const ChatApi = {
       id: string;
       title: string;
       initiator: string;
+      createdAt?: string;
       messages: ConversationMessage[];
       status: string;
       modelInfo: ModelInfo;
@@ -292,9 +357,7 @@ export const ChatApi = {
       const f = request.filters;
       payload = {
         query: request.query,
-        modelKey: request.modelKey,
-        modelName: request.modelName,
-        modelFriendlyName: request.modelFriendlyName || request.modelName,
+        ...buildModelPayload(request),
         chatMode: agentChatMode,
         timezone: getClientTimezone(),
         currentTime: getClientCurrentTime(),
@@ -306,11 +369,12 @@ export const ChatApi = {
         // "use every configured toolset", `[]` as an explicit empty
         // filter), the opposite of what an unfiltered selection means.
         ...(request.agentStreamTools !== undefined ? { tools: request.agentStreamTools } : {}),
-        ...buildAgentFiltersPayload(f.apps, f.kb),
+        ...buildAgentFiltersPayload(f),
         ...(request.appliedFilters ? { appliedFilters: request.appliedFilters } : {}),
         ...(request.agentCapabilities ? { agentCapabilities: request.agentCapabilities } : {}),
         ...(request.attachments?.length ? { attachments: request.attachments } : {}),
         ...(request.projectId ? { projectId: request.projectId } : {}),
+        ...(request.toolApproval ? { toolApproval: request.toolApproval } : {}),
       };
     } else {
       endpoint = request.conversationId
@@ -319,14 +383,22 @@ export const ChatApi = {
       // Rename `agentStreamTools` → `tools` (Node.js controller reads `req.body.tools`
       // uniformly for both agent and non-agent paths) and validate filters.
       // `rest` already carries `runId` — spread through as-is.
-      const { agentStreamTools, filters: reqFilters, attachments: reqAttachments, ...rest } = request;
+      const {
+        agentStreamTools,
+        filters: reqFilters,
+        attachments: reqAttachments,
+        modelKey: _modelKey,
+        modelName: _modelName,
+        modelFriendlyName: _modelFriendlyName,
+        ...rest
+      } = request;
       payload = {
         ...rest,
-        modelFriendlyName: request.modelFriendlyName || request.modelName,
+        ...buildModelPayload(request),
         timezone: getClientTimezone(),
         currentTime: getClientCurrentTime(),
         ...(agentStreamTools !== undefined ? { tools: agentStreamTools } : {}),
-        ...buildFiltersPayload(reqFilters?.apps, reqFilters?.kb),
+        ...buildFiltersPayload(reqFilters),
         ...(reqAttachments?.length ? { attachments: reqAttachments } : {}),
       };
     }
@@ -359,16 +431,20 @@ export const ChatApi = {
       agentCapabilities?: StreamChatRequest['agentCapabilities'];
       reasoningEffort?: StreamChatRequest['reasoningEffort'];
       runId?: string;
+      /** The edited question; omitted to regenerate the stored one unchanged. */
+      query?: string;
+      /** The edited question's files, replacing the stored ones; omitted keeps them. */
+      attachments?: AttachmentRef[];
+      /** Changed answers to the question card the reply followed (`User selections: ...`). */
+      answers?: string;
     }
   ): Promise<void> {
     const endpoint = `/api/v1/conversations/${conversationId}/message/${messageId}/regenerate`;
 
     const body: Record<string, unknown> = {
-      modelKey: request.modelKey,
-      modelName: request.modelName,
-      modelFriendlyName: request.modelFriendlyName || request.modelName,
+      ...buildModelPayload(request),
       chatMode: request.chatMode,
-      ...buildFiltersPayload(request.filters?.apps, request.filters?.kb),
+      ...buildFiltersPayload(request.filters),
       timezone: getClientTimezone(),
       currentTime: getClientCurrentTime(),
     };
@@ -383,6 +459,15 @@ export const ChatApi = {
     }
     if (request.runId) {
       body.runId = request.runId;
+    }
+    if (request.query) {
+      body.query = request.query;
+    }
+    if (request.attachments !== undefined) {
+      body.attachments = request.attachments;
+    }
+    if (request.answers) {
+      body.answers = request.answers;
     }
 
     await runChatStream(endpoint, body, callbacks);
@@ -404,22 +489,26 @@ export const ChatApi = {
       chatMode: AgentStrategyApiSegment;
       /** Explicit tool subset for this agent context (all tools when omitted). */
       tools?: string[];
-      filters: { apps: string[]; kb: string[] };
+      filters: ChatKnowledgeFilters;
       agentCapabilities?: AgentCapabilities;
       reasoningEffort?: StreamChatRequest['reasoningEffort'];
       runId?: string;
+      /** The edited question; omitted to regenerate the stored one unchanged. */
+      query?: string;
+      /** The edited question's files, replacing the stored ones; omitted keeps them. */
+      attachments?: AttachmentRef[];
+      /** Changed answers to the question card the reply followed (`User selections: ...`). */
+      answers?: string;
     }
   ): Promise<void> {
     const endpoint = `/api/v1/agents/${agentId}/conversations/${conversationId}/message/${messageId}/regenerate`;
 
     const agentRegenBody: Record<string, unknown> = {
-      modelKey: model.modelKey,
-      modelName: model.modelName,
-      modelFriendlyName: model.modelFriendlyName || model.modelName,
+      ...buildModelPayload(model),
       chatMode: model.chatMode,
       timezone: getClientTimezone(),
       currentTime: getClientCurrentTime(),
-      ...buildAgentFiltersPayload(model.filters.apps, model.filters.kb),
+      ...buildAgentFiltersPayload(model.filters),
     };
     if (model.tools !== undefined) {
       agentRegenBody.tools = model.tools;
@@ -432,6 +521,15 @@ export const ChatApi = {
     }
     if (model.runId) {
       agentRegenBody.runId = model.runId;
+    }
+    if (model.query) {
+      agentRegenBody.query = model.query;
+    }
+    if (model.attachments !== undefined) {
+      agentRegenBody.attachments = model.attachments;
+    }
+    if (model.answers) {
+      agentRegenBody.answers = model.answers;
     }
 
     await runChatStream(endpoint, agentRegenBody, callbacks);
@@ -523,6 +621,20 @@ export const ChatApi = {
     await apiClient.patch(`/api/v1/conversations/${conversationId}/title`, { title });
   },
 
+  /**
+   * Copy a conversation into a new chat, including every message up to `messageId`.
+   * Endpoint: POST /api/v1/conversations/:conversationId/message/:messageId/fork
+   */
+  async forkConversation(
+    conversationId: string,
+    messageId: string,
+  ): Promise<ForkConversationResult> {
+    const { data } = await apiClient.post<ForkConversationResult>(
+      `/api/v1/conversations/${conversationId}/message/${messageId}/fork`,
+    );
+    return data;
+  },
+
   // Delete a conversation
   async deleteConversation(conversationId: string): Promise<void> {
     await apiClient.delete(`/api/v1/conversations/${conversationId}`);
@@ -536,6 +648,13 @@ export const ChatApi = {
   // Restore (unarchive) a conversation
   async restoreConversation(conversationId: string): Promise<void> {
     await apiClient.patch(`/api/v1/conversations/${conversationId}/unarchive`);
+  },
+
+  // Pin or unpin one of the caller's own conversations (idempotent; owner only)
+  async setConversationPinned(conversationId: string, pinned: boolean): Promise<void> {
+    await apiClient.patch(
+      `/api/v1/conversations/${encodeURIComponent(conversationId)}/${pinned ? 'pin' : 'unpin'}`,
+    );
   },
 
   /**
@@ -641,6 +760,7 @@ export const ChatApi = {
       : `/api/v1/conversations/attachments/upload`;
     const { data } = await apiClient.post<{ attachments: AttachmentRef[] }>(url, fd, {
       signal: opts.signal,
+      timeout: CHAT_ATTACHMENT_UPLOAD_TIMEOUT_MS,
       // Remove the default application/json Content-Type so axios can auto-set
       // multipart/form-data with the correct boundary for this FormData upload.
       headers: { 'Content-Type': undefined },
@@ -676,14 +796,21 @@ export const ChatApi = {
    * The chat UI paginates with `page` / `limit` and merges `serverPagination` when present.
    * Chevron rules live in `collections-tab` (`showExpandChevron`).
    */
-  async listCollectionsForChat(params?: { page?: number; limit?: number }): Promise<ListCollectionsForChatResult> {
-    const page = params?.page ?? 1;
+  async listCollectionsForChat(params?: {
+    cursor?: string | null;
+    limit?: number;
+    origins?: 'COLLECTION' | 'CONNECTOR';
+  }): Promise<ListCollectionsForChatResult> {
     const limit = params?.limit ?? 100;
     const { data } = await apiClient.get<KnowledgeHubNodesResponse>(
       '/api/v1/knowledgeBase/knowledge-hub/nodes',
       {
         params: {
-          page,
+          // Only a cursor the server issued is ever sent back; one it did not
+          // issue is a 400.
+          ...(params?.cursor ? { cursor: params.cursor } : {}),
+          // Root apps of one origin only; flattened=false keeps it a root listing, not a tree search.
+          ...(params?.origins ? { nodeTypes: 'app', origins: params.origins, flattened: false } : {}),
           limit,
           sortBy: 'updatedAt',
           sortOrder: 'desc',
@@ -707,24 +834,38 @@ export const ChatApi = {
     }));
     return {
       knowledgeBases,
-      requestedPage: page,
       requestedLimit: limit,
+      nextCursor: data.pagination?.nextCursor ?? null,
       serverPagination: data.pagination ?? null,
     };
   },
 
   /**
-   * Fetch available LLM models for the org.
+   * Fetch available LLM models for the org, with the whole response for any
+   * other org settings it carries.
    * Endpoint: GET /api/v1/configurationManager/ai-models/available/llm
    */
-  async fetchAvailableLlms(): Promise<AvailableLlmModel[]> {
+  async fetchOrgLlmCatalog(): Promise<{ models: AvailableLlmModel[]; response: unknown }> {
     const { data } = await apiClient.get<{ status: string; models: AvailableLlmModel[]; message: string }>(
       '/api/v1/configurationManager/ai-models/available/llm'
     );
     // `data` itself can be null/undefined (e.g. an empty response body), and
     // `?? []` alone wouldn't guard a malformed non-array `models` value — both
     // would otherwise reach callers that call `.find`/`.map` on the result.
-    return Array.isArray(data?.models) ? data.models : [];
+    return { models: Array.isArray(data?.models) ? data.models : [], response: data };
+  },
+
+  /**
+   * The org's LLM models from the session cache that chat uses.
+   * @deprecated Kept for edition code; call `fetchModelsForContext(ASSISTANT_CTX)`.
+   */
+  async fetchAvailableLlms(): Promise<AvailableLlmModel[]> {
+    // Imported on use: that module imports this one.
+    const [{ fetchModelsForContext }, { ASSISTANT_CTX }] = await Promise.all([
+      import('./utils/fetch-models-for-context'),
+      import('./store'),
+    ]);
+    return fetchModelsForContext(ASSISTANT_CTX);
   },
 
   // ── Deprecated: knowledge-hub/nodes approach (commented out) ──
@@ -777,16 +918,21 @@ interface KnowledgeHubNodesResponse {
     limit?: number;
     totalItems?: number;
     totalPages?: number;
+    startIndex?: number;
+    endIndex?: number;
     hasNext?: boolean;
     hasPrev?: boolean;
+    nextCursor?: string | null;
+    prevCursor?: string | null;
   } | null;
 }
 
 /** One page from {@link ChatApi.listCollectionsForChat}. */
 export interface ListCollectionsForChatResult {
   knowledgeBases: KnowledgeBaseForChat[];
-  requestedPage: number;
   requestedLimit: number;
+  /** The cursor for the next page, or null at the end of the result. */
+  nextCursor: string | null;
   serverPagination: KnowledgeHubNodesResponse['pagination'];
 }
 
@@ -808,87 +954,35 @@ export interface KnowledgeBaseForChat {
   folders: string[];
 }
 
-// ── AI Models Config ──
-
-/** Shape of a single AI model entry from the config endpoint */
-export interface AiModelConfig {
-  modelKey: string;
-  modelName: string;
-  provider: string;
-  isEnabled: boolean;
-  isDefault?: boolean;
-}
-
-/** Response envelope for GET /api/v1/configurationManager/aiModelsConfig */
-export interface AiModelsConfigResponse {
-  models: AiModelConfig[];
-}
-
-/**
- * Fetch the org's AI model configuration.
- *
- * Returns the list of models available for chat (with their keys and names).
- * Used by the runtime to dynamically pick the model instead of hardcoding.
- */
-export async function fetchAiModelsConfig(): Promise<AiModelConfig[]> {
-  const { data } = await apiClient.get<AiModelsConfigResponse>(
-    '/api/v1/configurationManager/aiModelsConfig',
-  );
-  return data.models ?? [];
-}
-
 // ============================================
 // Organisation
 // ============================================
 
-export interface OrgResponse {
-  _id: string;
-  registeredName: string;
-  shortName: string;
-  domain: string;
-  contactEmail: string;
-  accountType: string;
-  onBoardingStatus: string;
-}
+type OrgWithLogo = { org: OrgResponse | null; logoUrl: string | null };
 
-/**
- * Fetch the current organisation details.
- */
-export async function fetchOrg(): Promise<OrgResponse> {
-  const { data } = await apiClient.get<OrgResponse>('/api/v1/org');
-  return data;
-}
+let _orgWithLogoPromise: Promise<OrgWithLogo> | null = null;
 
-/**
- * Fetch the organisation logo and return a local blob URL.
- * Returns null if no logo is set or the request fails.
- */
-export async function fetchOrgLogo(): Promise<string | null> {
-  try {
-    const response = await apiClient.get<Blob>('/api/v1/org/logo', {
-      responseType: 'blob',
-    });
-    return URL.createObjectURL(response.data);
-  } catch {
-    return null;
-  }
-}
-
-
-let _orgWithLogoPromise: Promise<{ org: OrgResponse | null; logoUrl: string | null }> | null = null;
-
+/** @deprecated Kept for edition code; React code reads `useOrg` / `useOrgLogo`, which logo and org writes update. */
 export function clearOrgWithLogoCache(): void {
   _orgWithLogoPromise = null;
 }
 
-export function fetchOrgWithLogo(): Promise<{ org: OrgResponse | null; logoUrl: string | null }> {
+onSessionEnd(clearOrgWithLogoCache);
+
+/** @deprecated Kept for edition code; React code reads `useOrg` / `useOrgLogo`. */
+export function fetchOrgWithLogo(): Promise<OrgWithLogo> {
   if (!_orgWithLogoPromise) {
-    _orgWithLogoPromise = Promise.allSettled([fetchOrg(), fetchOrgLogo()]).then(
-      ([orgRes, logoRes]) => ({
-        org: orgRes.status === 'fulfilled' ? orgRes.value : null,
-        logoUrl: logoRes.status === 'fulfilled' ? logoRes.value : null,
-      })
+    const promise: Promise<OrgWithLogo> = Promise.allSettled([OrgApi.getOrg(), OrgApi.getLogoUrl()]).then(
+      ([orgRes, logoRes]) => {
+        // A failed org read is asked again next time instead of staying blank for the session.
+        if (orgRes.status === 'rejected' && _orgWithLogoPromise === promise) _orgWithLogoPromise = null;
+        return {
+          org: orgRes.status === 'fulfilled' ? orgRes.value : null,
+          logoUrl: logoRes.status === 'fulfilled' ? logoRes.value : null,
+        };
+      }
     );
+    _orgWithLogoPromise = promise;
   }
   return _orgWithLogoPromise;
 }

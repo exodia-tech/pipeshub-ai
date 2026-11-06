@@ -112,7 +112,7 @@ describe('SpeechController', () => {
       expect(next.calledOnce).to.be.true
       const err = next.firstCall.args[0]
       expect(err.message).to.equal(
-        'Something went wrong while PipesHub tried to check the speech settings. ' +
+        'Something went wrong while EXODIA Brain tried to check the speech settings. ' +
           'Please try again in a moment; if it keeps happening, ask your admin to check the services page.',
       )
       expect(err.message).to.not.include('broken')

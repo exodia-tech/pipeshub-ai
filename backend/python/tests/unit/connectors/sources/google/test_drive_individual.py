@@ -9,7 +9,7 @@ import pytest
 from app.config.constants.arangodb import Connectors, MimeTypes, OriginTypes, ProgressStatus
 from app.connectors.core.registry.filters import FilterCollection
 from app.models.entities import FileRecord, RecordGroupType, RecordType
-from app.models.permission import EntityType, Permission, PermissionType
+from app.models.permission import EntityType, Permission
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ class TestProcessDriveItem:
         )
         assert result.record.is_shared is True
 
-    async def test_permissions_include_owner(self, connector):
+    async def test_record_inherits_instead_of_granting_the_owner(self, connector) -> None:
         metadata = _make_file_metadata()
         result = await connector._process_drive_item(
             metadata=metadata,
@@ -280,9 +280,9 @@ class TestProcessDriveItem:
             user_email="user@example.com",
             drive_id="drive-1",
         )
-        assert len(result.new_permissions) == 1
-        assert result.new_permissions[0].type == PermissionType.OWNER
-        assert result.new_permissions[0].email == "user@example.com"
+        assert result.new_permissions == []
+        assert result.record.inherit_permissions is True
+        assert result.record.rewrite_permissions is True, "a grant stored before the migration is cleared"
 
     async def test_google_doc_mime_type_detected(self, connector):
         metadata = _make_file_metadata(
@@ -695,6 +695,10 @@ class TestRunSync:
             # Mock sync point to return None (no existing sync, triggers full sync)
             connector.drive_delta_sync_point.read_sync_point = AsyncMock(return_value=None)
 
+            # A listing that is not a drive list makes the run incomplete, so the mock lists none.
+
+            connector.drive_data_source.drives_list = AsyncMock(return_value={"drives": []})
+
             await connector.run_sync()
 
             # Should create user
@@ -710,10 +714,30 @@ class TestRunSync:
 class TestConnectionTest:
     """Tests for test_connection_and_access."""
 
-    async def test_returns_true_when_initialized(self, connector):
+    async def test_returns_true_when_drive_names_the_account(self, connector) -> None:
         connector.google_client.get_client.return_value = MagicMock()
+        connector._get_fresh_datasource = AsyncMock()
+        connector.drive_data_source.about_get = AsyncMock(
+            return_value={"user": {"emailAddress": "me@example.com"}}
+        )
         result = await connector.test_connection_and_access()
         assert result is True
+        connector.drive_data_source.about_get.assert_awaited_once()
+
+    async def test_returns_false_when_google_rejects_the_token(self, connector) -> None:
+        connector.google_client.get_client.return_value = MagicMock()
+        connector._get_fresh_datasource = AsyncMock(
+            side_effect=Exception("invalid_grant: Token has been expired or revoked.")
+        )
+        result = await connector.test_connection_and_access()
+        assert result is False
+
+    async def test_returns_false_when_drive_returns_no_account(self, connector) -> None:
+        connector.google_client.get_client.return_value = MagicMock()
+        connector._get_fresh_datasource = AsyncMock()
+        connector.drive_data_source.about_get = AsyncMock(return_value={})
+        result = await connector.test_connection_and_access()
+        assert result is False
 
     async def test_returns_false_when_data_source_not_initialized(self, connector):
         connector.drive_data_source = None
@@ -759,3 +783,22 @@ class TestBatchProcessing:
 
         # With batch_size=2 and 5 files: 2 full batches + 1 remainder
         assert connector.data_entities_processor.on_new_records.call_count == 3
+
+
+class TestDriveItemPeople:
+    async def test_my_drive_file_carries_owner_author_and_last_modifier(self, connector) -> None:
+        metadata = _make_file_metadata()
+        metadata["owners"] = [{"displayName": "Alice", "emailAddress": "alice@example.com", "permissionId": "p-alice", "me": True}]
+        metadata["lastModifyingUser"] = {"displayName": "Bob", "emailAddress": "bob@example.com", "permissionId": "p-bob"}
+
+        result = await connector._process_drive_item(
+            metadata=metadata, user_id="u1", user_email="alice@example.com", drive_id="drive-1"
+        )
+
+        record = result.record
+        assert [o.source_id for o in record.owners] == ["p-alice"]
+        assert record.authored_by is not None
+        assert record.authored_by.email == "alice@example.com"
+        assert record.last_modified_by is not None
+        assert record.last_modified_by.source_id == "p-bob"
+        assert record.created_by is None

@@ -14,6 +14,9 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
+import fakeredis.aioredis
+
+from app.services.vector_db.filters import ScopeFilterUnsupported
 from app.services.vector_db.models import (
     CollectionConfig,
     HybridSearchRequest,
@@ -50,6 +53,19 @@ def embedding_models(models: dict[str, FakeEmbeddingModel]) -> Iterator[None]:
         yield
 
 
+@contextmanager
+def recreate_lock_redis(server: fakeredis.FakeServer | None = None) -> Iterator[fakeredis.FakeServer]:
+    """The Redis that ``EntityVectorStore`` takes its recreate lock in: one
+    in-process server, a new client per call, as each call opens its own."""
+    server = server or fakeredis.FakeServer()
+
+    async def _client(config_service: object) -> fakeredis.aioredis.FakeRedis:
+        return fakeredis.aioredis.FakeRedis(server=server, decode_responses=True)
+
+    with patch("app.modules.transformers.entity_vectorstore.redis_from_config_service", side_effect=_client):
+        yield server
+
+
 def _field(payload: dict[str, Any], path: str) -> object:
     value: object = payload
     for part in path.split("."):
@@ -74,6 +90,23 @@ class FakeEntityVectorDB:
 
     def get_capabilities(self) -> VectorDBCapabilities:
         return VectorDBCapabilities()
+
+    @property
+    def entity_points(self) -> dict[str, VectorPoint]:
+        """The points that are entities: all but the collection's stamp."""
+        return {
+            point_id: point for point_id, point in self.points.items()
+            if (point.payload.get("metadata") or {}).get("entityId")
+        }
+
+    @property
+    def stamp(self) -> str | None:
+        """What ``EntityVectorStore.collection_stamp`` wrote, if it is still here."""
+        stamps = [
+            stamp for point in self.points.values()
+            if (stamp := (point.payload.get("metadata") or {}).get("indexStamp"))
+        ]
+        return stamps[0] if stamps else None
 
     def _require(self, collection_name: str) -> None:
         if self.dimension is None:
@@ -160,7 +193,7 @@ class FakeEntityVectorDB:
                 id=point.id, dense_vector=list(point.dense_vector or []), payload=copy.deepcopy(point.payload),
             )
 
-    async def update_payload_by_ids(self, collection_name: str, ids: list[str], payload: dict) -> None:
+    async def update_payload_by_ids(self, collection_name: str, ids: list[str], payload: dict, *, org_id) -> None:
         self._require(collection_name)
         for point_id in ids:
             if point_id in self.points:
@@ -169,6 +202,9 @@ class FakeEntityVectorDB:
     async def query_nearest_points(
         self, collection_name: str, requests: list[HybridSearchRequest],
     ) -> list[list[SearchResult]]:
+        for request in requests:
+            if request.scope_filter is not None:          # a double that ignored the filter would answer more than the real stores do
+                raise ScopeFilterUnsupported(f"{type(self).__name__} does not evaluate a scope filter")
         self._require(collection_name)
         batch = []
         for request in requests:

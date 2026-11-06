@@ -25,12 +25,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services.graph_db.common.record_visibility import RecordVisibility
 from app.services.messaging.kafka.handlers.entity import EntityEventService
+from app.utils.user_errors import CONNECTOR_OFF
+from tests.unit.connectors.services.local_run_stub import end_local_run, local_run
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+_DISABLE_PAYLOAD = {"orgId": "org-1", "apps": ["Drive"], "connectorId": "conn-1"}
+
 
 def _make_service():
     """Create an EntityEventService with mocked deps."""
@@ -416,6 +422,7 @@ class TestHandleAppDisabled:
 
             mock_stm = _gc_mock_stm.return_value
             mock_stm.request_stop = AsyncMock()
+            mock_stm.is_running = AsyncMock(return_value=False)
             result = await svc.process_event("appDisabled", {
                 "orgId": "org-1",
                 "apps": ["Drive"],
@@ -457,10 +464,12 @@ class TestHandleAppDisabled:
         live_connector.cleanup = AsyncMock()
         container.connectors_map = {"conn-1": live_connector}
 
-        with patch("app.services.messaging.kafka.handlers.entity.get_coordinator") as _gc_mock_stm:
+        with patch("app.services.messaging.kafka.handlers.entity.get_coordinator") as _gc_mock_stm, \
+             local_run(running=False):
 
             mock_stm = _gc_mock_stm.return_value
             mock_stm.request_stop = AsyncMock()
+            mock_stm.is_running = AsyncMock(return_value=False)
             result = await svc.process_event("appDisabled", {
                 "orgId": "org-1",
                 "apps": ["Drive"],
@@ -482,10 +491,12 @@ class TestHandleAppDisabled:
         live_connector.cleanup = AsyncMock(side_effect=Exception("cleanup failed"))
         container.connectors_map = {"conn-1": live_connector}
 
-        with patch("app.services.messaging.kafka.handlers.entity.get_coordinator") as _gc_mock_stm:
+        with patch("app.services.messaging.kafka.handlers.entity.get_coordinator") as _gc_mock_stm, \
+             local_run(running=False):
 
             mock_stm = _gc_mock_stm.return_value
             mock_stm.request_stop = AsyncMock()
+            mock_stm.is_running = AsyncMock(return_value=False)
             result = await svc.process_event("appDisabled", {
                 "orgId": "org-1",
                 "apps": ["Drive"],
@@ -494,6 +505,72 @@ class TestHandleAppDisabled:
         assert result is True
         # Popped before cleanup, so the map entry is gone even on cleanup failure
         assert "conn-1" not in container.connectors_map
+
+    @staticmethod
+    def _disabled_service_with_live_connector() -> tuple:
+        svc, logger, gp, container = _make_service()
+        gp.get_document = AsyncMock(return_value={
+            "name": "Drive", "type": "FILE", "appGroup": "Google",
+            "createdAtTimestamp": 1000000,
+        })
+        gp.batch_upsert_nodes = AsyncMock()
+        live_connector = MagicMock()
+        live_connector.cleanup = AsyncMock()
+        container.connectors_map = {"conn-1": live_connector}
+        return svc, logger, container, live_connector
+
+    @pytest.mark.asyncio
+    async def test_app_disabled_stops_the_sync_before_cleanup(self) -> None:
+        svc, _, _, live_connector = self._disabled_service_with_live_connector()
+        calls = []
+        live_connector.cleanup = AsyncMock(side_effect=lambda: calls.append("cleanup"))
+
+        with patch("app.services.messaging.kafka.handlers.entity.get_coordinator") as _gc_mock_stm, \
+             local_run(running=False):
+            mock_stm = _gc_mock_stm.return_value
+            mock_stm.request_stop = AsyncMock(side_effect=lambda _cid: calls.append("request_stop"))
+            mock_stm.is_running = AsyncMock(return_value=False)
+            await svc.process_event("appDisabled", _DISABLE_PAYLOAD)
+
+        assert calls == ["request_stop", "cleanup"]
+
+    @pytest.mark.asyncio
+    async def test_app_disabled_closes_the_connector_only_after_a_sync_that_outlives_the_wait(
+        self,
+    ) -> None:
+        """Closing the client under a sync that is still running crashes its tasks."""
+        svc, _, container, live_connector = self._disabled_service_with_live_connector()
+        svc._wait_for_sync_to_stop = AsyncMock(return_value=False)
+
+        with local_run() as run, \
+             patch("app.services.messaging.kafka.handlers.entity.get_coordinator") as _gc_mock_stm:
+            _gc_mock_stm.return_value.request_stop = AsyncMock()
+            result = await svc.process_event("appDisabled", _DISABLE_PAYLOAD)
+
+            assert result is True
+            assert "conn-1" not in container.connectors_map
+            live_connector.cleanup.assert_not_awaited()
+            await end_local_run(run)
+
+        live_connector.cleanup.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_app_disabled_closes_the_connector_only_after_the_run_when_the_stop_request_fails(
+        self,
+    ) -> None:
+        svc, _, container, live_connector = self._disabled_service_with_live_connector()
+
+        with local_run() as run, \
+             patch("app.services.messaging.kafka.handlers.entity.get_coordinator") as _gc_mock_stm:
+            _gc_mock_stm.return_value.request_stop = AsyncMock(side_effect=Exception("down"))
+            result = await svc.process_event("appDisabled", _DISABLE_PAYLOAD)
+
+            assert result is True
+            assert "conn-1" not in container.connectors_map
+            live_connector.cleanup.assert_not_awaited()
+            await end_local_run(run)
+
+        live_connector.cleanup.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_cancel_sync_error_handled(self):
@@ -706,12 +783,15 @@ class TestAppDisabledDrainsQueuedRecords:
         args, kwargs = gp.reset_indexing_status_for_connector.await_args
         assert args[0] == "conn-1"
         assert args[1] == ProgressStatus.AUTO_INDEX_OFF.value
-        # IN_PROGRESS is mid-pipeline and COMPLETED is already done; taking
-        # either out from under a running index is its own race.
-        assert set(kwargs["exclude_statuses"]) == {
-            ProgressStatus.IN_PROGRESS.value,
-            ProgressStatus.COMPLETED.value,
-        }
+        # Only the backlog, marked as parked by the turn-off: a record the
+        # connector's filters keep out of auto-indexing is AUTO_INDEX_OFF too,
+        # and stamping it CONNECTOR_OFF would have it queued on the next enable.
+        assert kwargs["only_statuses"] == [ProgressStatus.QUEUED.value]
+        assert kwargs["reason"] == CONNECTOR_OFF
+        assert "exclude_statuses" not in kwargs
+        # A trashed record is skipped by the resume, so parking it would leave
+        # it parked if it were restored later.
+        assert kwargs["visibility"] is RecordVisibility.LIVE
 
     @pytest.mark.asyncio
     async def test_sweep_failure_does_not_abort_the_disable(self):
@@ -721,7 +801,7 @@ class TestAppDisabledDrainsQueuedRecords:
             "name": "Drive", "type": "FILE", "appGroup": "Google",
             "createdAtTimestamp": 1000000,
         })
-        gp.batch_upsert_nodes = AsyncMock()
+        gp.update_node = AsyncMock()
         gp.reset_indexing_status_for_connector = AsyncMock(
             side_effect=RuntimeError("graph unavailable")
         )
@@ -737,7 +817,7 @@ class TestAppDisabledDrainsQueuedRecords:
             })
 
         assert result is True
-        gp.batch_upsert_nodes.assert_awaited()
+        gp.update_node.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_sweep_runs_after_sync_cancellation(self):

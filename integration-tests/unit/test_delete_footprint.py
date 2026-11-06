@@ -12,7 +12,7 @@ honest are pinned here:
   re-count after a delete looks in that same folder.
 * Content a survivor shares with a deleted record is counted where it was filed,
   must hold something before the delete, and moving it is reported as a change.
-* Shared content a connector or collection delete rebuilds under its surviving
+* Shared content a connector or collection delete hands over to its surviving
   holder must turn up inside that holder's folder with every count it had before.
 """
 
@@ -78,6 +78,17 @@ async def test_capture_keys_the_envelope_and_the_original_upload() -> None:
     assert before.documents == {f"prefix:{PREFIX}": 1, "id:doc-1": 1}
     assert before.upload_paths == {"doc-1": f"{ORG}/PipesHub/uploads/doc-1"}
     assert before.envelope_paths == {VRID: PREFIX}
+
+
+@pytest.mark.asyncio
+async def test_capture_counts_a_connectors_records_points_only() -> None:
+    """Entity points carry connectorIds and are written after indexing finishes."""
+    _, vector, _, _ = stores = _stores()
+
+    before = await _capture(stores, connector_id="conn-1")
+
+    vector.count_for_connector.assert_awaited_once_with("conn-1", collection="records")
+    assert before.connector_points == 3
 
 
 @pytest.mark.asyncio
@@ -348,70 +359,98 @@ def test_store_changes_read_a_moved_folder_at_its_new_place() -> None:
     assert fp.store_changes(before, short, moved={PREFIX: new}) == [f"blob files {PREFIX} (now {new}): 2 -> 1"]
 
 
-REBUILT = f"{SURVIVOR_FOLDER}/copy.md"
+HANDED_OVER = f"{SURVIVOR_FOLDER}/copy.md"
 HOLDER = fp.Tracked(name="copy.md", record_id="r2", virtual_record_id=VRID)
 
 
-async def _rebuild_stores(counts_by_path: dict[str, int], *, rebuilt_at: str = REBUILT):
-    """Shared content counted under the deleted copy's folder, then the stores as they stand after the rebuild."""
+async def _handed_over_stores(counts_by_path: dict[str, int], *, filed_at: str = HANDED_OVER):
+    """Shared content counted under the deleted copy's folder, then the stores as they stand after the handover."""
     graph, vector, blob, mongo = stores = _survivor_stores({PREFIX: 2})
     before = await fp.capture(
         GRAPH, vector, blob, mongo, org_id=ORG, records=[HOLDER], envelope_paths={VRID: PREFIX}
     )
     blob.count_under.side_effect = lambda path, vendor: counts_by_path.get(path, 0)
     mongo.count_documents_under_path.side_effect = lambda path: 1 if counts_by_path.get(path) else 0
-    mongo.envelope_path.return_value = rebuilt_at
-    graph.get_record_by_name.return_value = {"id": "r2", "recordName": "copy.md", "indexingStatus": "COMPLETED"}
+    mongo.envelope_path.return_value = filed_at
+    graph.get_record_by_name.return_value = {
+        "id": "r2", "recordName": "copy.md", "indexingStatus": "COMPLETED", "extractionStatus": "COMPLETED",
+    }
     return before, stores
 
 
-async def _assert_rebuilt(before, stores) -> None:
+async def _assert_handed_over(before, stores) -> None:
     graph, vector, blob, mongo = stores
-    await fp.assert_rebuilt(
+    await fp.assert_handed_over(
         before, graph, vector, blob, mongo, org_id=ORG, connector_id="kb-2", holder=HOLDER, what="x"
     )
 
 
 @pytest.mark.asyncio
-async def test_shared_content_rebuilt_whole_under_the_survivor_passes() -> None:
-    before, stores = await _rebuild_stores({REBUILT: 2})
+async def test_shared_content_handed_over_whole_to_the_survivor_passes() -> None:
+    before, stores = await _handed_over_stores({HANDED_OVER: 2})
     graph, *_, mongo = stores
     graph.count_edges_touching.return_value = 9
 
-    await _assert_rebuilt(before, stores)
+    await _assert_handed_over(before, stores)
 
     mongo.envelope_path.assert_awaited_with(ORG, VRID, within=SURVIVOR_FOLDER, timeout=480)
     graph.get_record_by_name.assert_awaited_with("kb-2", "copy.md")
 
 
 @pytest.mark.asyncio
-async def test_shared_content_not_rebuilt_whole_is_reported() -> None:
-    before, stores = await _rebuild_stores({REBUILT: 1})
+async def test_shared_content_is_counted_only_once_the_holder_has_enriched_it() -> None:
+    """A holder still being enriched has no summary vector yet; counted before that, one point is missing."""
+    before, stores = await _handed_over_stores({HANDED_OVER: 2})
+    graph = stores[0]
+    indexed = {"id": "r2", "recordName": "copy.md", "indexingStatus": "COMPLETED"}
+    readings = [{**indexed, "extractionStatus": "IN_PROGRESS"}, {**indexed, "extractionStatus": "COMPLETED"}]
+    graph.get_record_by_name.side_effect = lambda *_: readings.pop(0) if len(readings) > 1 else readings[0]
+
+    await _assert_handed_over(before, stores)
+
+    assert graph.get_record_by_name.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_shared_content_not_handed_over_whole_is_reported() -> None:
+    before, stores = await _handed_over_stores({HANDED_OVER: 1})
     stores[1].count_for_virtual_record.return_value = 0
 
     with pytest.raises(AssertionError) as caught:
-        await _assert_rebuilt(before, stores)
+        await _assert_handed_over(before, stores)
     message = str(caught.value)
-    assert f"blob files {PREFIX} (now {REBUILT}): 2 -> 1" in message
+    assert f"blob files {PREFIX} (now {HANDED_OVER}): 2 -> 1" in message
     assert f"embeddings {VRID}: 3 -> 0" in message
 
 
-@pytest.mark.parametrize("rebuilt_at", [FLAT, f"{ORG}/PipesHub/records/kb-2-old/copy.md"])
 @pytest.mark.asyncio
-async def test_shared_content_rebuilt_outside_the_survivors_folder_is_reported(rebuilt_at: str) -> None:
-    before, stores = await _rebuild_stores({rebuilt_at: 2}, rebuilt_at=rebuilt_at)
+async def test_shared_content_also_left_where_it_was_is_reported() -> None:
+    """A copy to the survivor would pass on the survivor's counts alone."""
+    before, stores = await _handed_over_stores({HANDED_OVER: 2, PREFIX: 2})
+
+    with pytest.raises(AssertionError) as caught:
+        await _assert_handed_over(before, stores)
+    message = str(caught.value)
+    assert f"blob files {PREFIX}: 2" in message
+    assert f"storage documents prefix:{PREFIX}: 1" in message
+
+
+@pytest.mark.parametrize("filed_at", [FLAT, f"{ORG}/PipesHub/records/kb-2-old/copy.md"])
+@pytest.mark.asyncio
+async def test_shared_content_filed_outside_the_survivors_folder_is_reported(filed_at: str) -> None:
+    before, stores = await _handed_over_stores({filed_at: 2}, filed_at=filed_at)
 
     with pytest.raises(AssertionError, match="not under"):
-        await _assert_rebuilt(before, stores)
+        await _assert_handed_over(before, stores)
 
 
 @pytest.mark.asyncio
-async def test_a_rebuilt_holder_missing_from_the_graph_is_reported() -> None:
-    before, stores = await _rebuild_stores({REBUILT: 2})
+async def test_a_holder_missing_from_the_graph_is_reported() -> None:
+    before, stores = await _handed_over_stores({HANDED_OVER: 2})
     stores[0].count_existing_nodes.return_value = 1
 
     with pytest.raises(AssertionError, match="graph nodes 2 -> 1"):
-        await _assert_rebuilt(before, stores)
+        await _assert_handed_over(before, stores)
 
 
 def _graph_reading(*snapshots: dict | None) -> AsyncMock:
@@ -466,3 +505,126 @@ async def test_without_enriched_an_indexed_record_is_settled_while_enrichment_ru
     await fp.wait_for_connector_records(graph, "c1", ["a"])
 
     assert graph.get_record_by_name.await_count == 1
+
+
+# A record delete hands shared content filed under the deleted record to a survivor.
+MOVED_TO = f"{FOLDER}/copy.md"
+SHARED_BEFORE = fp.StoresFootprint(
+    GRAPH, None, {VRID: 3}, {PREFIX: 2}, {f"prefix:{PREFIX}": 1}, envelope_paths={VRID: PREFIX}
+)
+
+
+def test_relocated_keys_the_counts_by_where_the_content_is_filed_now() -> None:
+    moved = fp.relocated(SHARED_BEFORE, {PREFIX: MOVED_TO})
+
+    assert moved.blobs == {MOVED_TO: 2}
+    assert moved.documents == {f"prefix:{MOVED_TO}": 1}
+    assert moved.envelope_paths == {VRID: MOVED_TO}
+    assert moved.points == SHARED_BEFORE.points
+
+
+@pytest.mark.asyncio
+async def test_content_moved_whole_to_the_survivor_passes() -> None:
+    _, vector, blob, mongo = _survivor_stores({MOVED_TO: 2})
+
+    await fp.assert_content_whole_at(
+        SHARED_BEFORE, vector, blob, mongo, virtual_record_id=VRID, new=MOVED_TO, what="x"
+    )
+
+
+@pytest.mark.asyncio
+async def test_content_left_in_place_passes() -> None:
+    _, vector, blob, mongo = _survivor_stores({PREFIX: 2})
+
+    await fp.assert_content_whole_at(
+        SHARED_BEFORE, vector, blob, mongo, virtual_record_id=VRID, new=PREFIX, what="x"
+    )
+
+
+@pytest.mark.asyncio
+async def test_content_copied_rather_than_moved_is_reported() -> None:
+    _, vector, blob, mongo = _survivor_stores({MOVED_TO: 2, PREFIX: 2})
+
+    with pytest.raises(AssertionError, match="left where it was"):
+        await fp.assert_content_whole_at(
+            SHARED_BEFORE, vector, blob, mongo, virtual_record_id=VRID, new=MOVED_TO, what="x"
+        )
+
+
+@pytest.mark.asyncio
+async def test_content_short_after_the_move_is_reported() -> None:
+    _, vector, blob, mongo = _survivor_stores({MOVED_TO: 1})
+
+    with pytest.raises(AssertionError, match="blob files: 2 -> 1"):
+        await fp.assert_content_whole_at(
+            SHARED_BEFORE, vector, blob, mongo, virtual_record_id=VRID, new=MOVED_TO, what="x"
+        )
+
+
+@pytest.mark.asyncio
+async def test_the_settled_envelope_path_waits_for_the_move_to_finish() -> None:
+    _, _, blob, mongo = _survivor_stores({MOVED_TO: 2})
+    reads = iter([PREFIX, MOVED_TO, MOVED_TO])
+    mongo.envelope_path.side_effect = lambda *a, **kw: next(reads)
+
+    path = await fp.settled_envelope_path(blob, mongo, org_id=ORG, virtual_record_id=VRID, within=FOLDER)
+
+    assert path == MOVED_TO
+
+
+@pytest.mark.asyncio
+async def test_unchanged_reads_handed_over_content_where_it_is_filed_now() -> None:
+    graph, vector, blob, mongo = _survivor_stores({MOVED_TO: 2})
+    mongo.envelope_path.return_value = MOVED_TO
+
+    await fp.assert_unchanged(
+        SHARED_BEFORE, graph, vector, blob, mongo, org_id=ORG,
+        records=[fp.Tracked(name="copy.md", record_id="r2", virtual_record_id=VRID)],
+        what="x", handed_over={VRID: fp.Handover(FOLDER, leaving=PREFIX)},
+    )
+
+    with pytest.raises(AssertionError, match=r"blob files .*: 2 -> 0"):
+        await fp.assert_unchanged(
+            SHARED_BEFORE, graph, vector, blob, mongo, org_id=ORG,
+            records=[fp.Tracked(name="copy.md", record_id="r2", virtual_record_id=VRID)], what="x",
+        )
+
+
+@pytest.mark.asyncio
+async def test_the_settled_envelope_path_does_not_stop_on_the_folder_it_must_leave() -> None:
+    """Before the delete's event runs, two reads agree on the deleted record's folder with
+    every piece still in it; settling there would check the content in the wrong place."""
+    _, _, blob, mongo = _survivor_stores({PREFIX: 2, MOVED_TO: 2})
+    reads = iter([PREFIX, PREFIX, PREFIX, MOVED_TO, MOVED_TO])
+    mongo.envelope_path.side_effect = lambda *a, **kw: next(reads)
+
+    path = await fp.settled_envelope_path(
+        blob, mongo, org_id=ORG, virtual_record_id=VRID, within=FOLDER, leaving=PREFIX
+    )
+
+    assert path == MOVED_TO
+
+
+@pytest.mark.asyncio
+async def test_content_that_never_leaves_the_deleted_records_folder_is_reported() -> None:
+    _, _, blob, mongo = _survivor_stores({PREFIX: 2})
+    mongo.envelope_path.return_value = PREFIX
+
+    with pytest.raises(AssertionError, match="still filed under the deleted record's folder"):
+        await fp.settled_envelope_path(
+            blob, mongo, org_id=ORG, virtual_record_id=VRID, within=FOLDER, leaving=PREFIX, attempts=3
+        )
+
+
+@pytest.mark.asyncio
+async def test_content_filed_under_a_remaining_holder_may_stay() -> None:
+    _, _, blob, mongo = _survivor_stores({PREFIX: 2})
+    mongo.envelope_path.return_value = PREFIX
+
+    assert await fp.settled_envelope_path(blob, mongo, org_id=ORG, virtual_record_id=VRID, within=FOLDER) == PREFIX
+
+
+def test_an_envelope_folder_is_the_records_it_is_named_after() -> None:
+    assert fp.filed_under(f"{FOLDER}/a", fp.Tracked(name="a", record_id="r1", virtual_record_id=VRID))
+    assert not fp.filed_under(f"{FOLDER}/copy", fp.Tracked(name="a", record_id="r1", virtual_record_id=VRID))
+

@@ -24,6 +24,9 @@ interface ShareableRowProps {
   showRoleDropdown?: boolean;
   /** When provided, suppresses role options in the dropdown (e.g. for chat) */
   noRolesInfo?: { title: string; description: string };
+  roleOptions?: { roles: ShareRole[]; labels?: Record<ShareRole, { label: string; description: string }> };
+  /** A team row offers roles like a user row instead of "Teams do not have roles". */
+  teamHasRoles?: boolean;
   /** Whether to show a radio button for selection */
   showRadio?: boolean;
   /** Whether to show "Invite to EXODIA Brain" link */
@@ -54,6 +57,8 @@ export function ShareableRow({
   showRadio = false,
   showInvite = false,
   noRolesInfo,
+  roleOptions,
+  teamHasRoles = false,
   isCurrentUser = false,
   onToggle,
   onRoleChange,
@@ -161,8 +166,10 @@ export function ShareableRow({
           role={role}
           onRoleChange={onRoleChange}
           onRemove={onRemove}
-          isTeam={type === 'team'}
+          isTeam={type === 'team' && !teamHasRoles}
           noRolesInfo={noRolesInfo}
+          roles={roleOptions?.roles}
+          labels={roleOptions?.labels}
           onOpenChange={onRoleDropdownOpenChange}
         />
       )}

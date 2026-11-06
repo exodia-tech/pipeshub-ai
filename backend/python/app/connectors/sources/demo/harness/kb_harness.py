@@ -7,7 +7,8 @@ fixture's must_cite / must_not_cite lists. This is the cheap way to tune the
 content before the demo connector exists: the words are identical either way.
 
 What an answer says is scored two ways. ``answer_must_mention`` is an exact,
-case-insensitive token ("2.2%", a name). ``answer_must_state`` (and optionally
+case-insensitive token ("2.2%", a name); a hyphen and a space between two words
+count as the same, so "platform-fee" mentions "platform fee". ``answer_must_state`` (and optionally
 ``answer_must_not_state``) lists facts as plain sentences, each one fact, the
 way a reviewer would check it: "A purchase of up to and including $250 needs
 no approval." An AI judge reads the answer against them (``answer_judge.py``
@@ -331,6 +332,19 @@ def cited_fixture_ids(cited_names: list[str], name_to_id: dict[str, str], thread
     return ids
 
 
+_PHRASE_GAP = re.compile(r"[\s\-\u2010\u2011\u2012\u2013\u2014]+")
+
+
+def _phrase_text(text: str) -> str:
+    return _PHRASE_GAP.sub(" ", text.lower())
+
+
+def mentions(answer: str, phrase: str) -> bool:
+    """Exact, case-insensitive, and blind to how words are joined: "platform-fee"
+    is "platform fee". A leak check that missed the hyphenated form would pass a leak."""
+    return _phrase_text(phrase) in _phrase_text(answer)
+
+
 def score(
     q: dict, expect: str, cited_ids: set[str], answer: str, judge: AnswerJudge | None = None
 ) -> tuple[bool, str]:
@@ -351,13 +365,13 @@ def score(
     any_ok = ((not any_of) or any(x in cited_ids for x in any_of)) and ((not any_of2) or any(x in cited_ids for x in any_of2))
     forbidden = [x for x in q.get("must_not_cite", []) if x in cited_ids]
     mention = q.get("answer_must_mention", [])
-    unmentioned = [m for m in mention if m.lower() not in answer.lower()]
+    unmentioned = [m for m in mention if not mentions(answer, m)]
     if expect == "none":
         # A failed run proves nothing about access, so it is not a pass.
         if answer.startswith("ERROR:"):
             return False, f"FAIL ({answer})"
         leaked = [x for x in q.get("restricted", must) if x in cited_ids]
-        leaked += [f for f in q.get("restricted_facts", []) if f.lower() in answer.lower()]
+        leaked += [f for f in q.get("restricted_facts", []) if mentions(answer, f)]
         return (not leaked), ("PASS" if not leaked else f"FAIL (leaked restricted: {leaked})")
     ok = enough and any_ok and not forbidden and not unmentioned
     full = "full" if not missing else f"{len(must)-len(missing)}/{len(must)}"
@@ -385,12 +399,23 @@ def ask_body(question: str, chat_mode: str, kb_ids: list[str] | None = None) -> 
 
 
 def ask(
-    origin: str, jwt: str, question: str, chat_mode: str = "internal_search", kb_ids: list[str] | None = None
+    origin: str,
+    jwt: str,
+    question: str,
+    chat_mode: str = "internal_search",
+    kb_ids: list[str] | None = None,
+    transport: httpx.BaseTransport | None = None,
 ) -> tuple[str, list[str]]:
-    """Ask via the raw SSE endpoint; the generated SDK's stream parser mis-types `data` (spec bug)."""
-    answer, cited = [], []
+    """Ask via the raw SSE endpoint; the generated SDK's stream parser mis-types `data` (spec bug).
+
+    The answer scored is the one the conversation saved. The raw text stream also
+    carries each tool-calling turn's narration ("I'll search…"), which the chat
+    shows as a step, not as the answer; without a saved answer, the last turn's
+    text stands in."""
+    turn: list[str] = []
+    saved, cited = "", []
     # Agent mode can take a few minutes on a question it has to search around.
-    with httpx.Client(base_url=origin, timeout=300) as c, c.stream(
+    with httpx.Client(base_url=origin, timeout=300, transport=transport) as c, c.stream(
         "POST", "/api/v1/conversations/stream",
         json=ask_body(question, chat_mode, kb_ids),
         headers={"Authorization": f"Bearer {jwt}", "Accept": "text/event-stream"},
@@ -399,16 +424,20 @@ def ask(
         for event, raw in iter_sse(resp):
             try: payload = json.loads(raw) if raw else {}
             except json.JSONDecodeError: payload = {}
-            if event == "TEXT_MESSAGE_CONTENT":
-                answer.append(payload.get("delta", ""))
+            if event == "TEXT_MESSAGE_START":
+                turn = []
+            elif event == "TEXT_MESSAGE_CONTENT":
+                turn.append(payload.get("delta", ""))
             elif event == "RUN_FINISHED":
                 msgs = ((payload.get("result") or {}).get("conversation") or {}).get("messages") or []
+                if msgs and msgs[-1].get("messageType") == "bot_response":
+                    saved = msgs[-1].get("content") or ""
                 for c_ in (msgs[-1].get("citations") if msgs else None) or []:
                     meta = (c_.get("citationData") or {}).get("metadata") or c_.get("metadata") or {}
                     cited.append(meta.get("recordName") or "")
             elif event == "RUN_ERROR":
                 return f"ERROR: {payload.get('message')}", []
-    return "".join(answer), cited
+    return (saved if saved.strip() else "".join(turn)), cited
 
 
 def main() -> None:

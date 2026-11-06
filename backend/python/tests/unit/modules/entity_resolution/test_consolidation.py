@@ -23,6 +23,7 @@ from app.modules.entity_resolution.consolidation import (
 from app.modules.entity_resolution.keys import taxonomy_node_key
 from app.modules.entity_resolution.normalizer import normalize_name
 from app.modules.transformers.entity_vectorstore import EntityWriteOutcome
+from app.services.graph_db.taxonomy import MAX_TAXONOMY_ALIASES
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -97,7 +98,7 @@ class FakeGraph:
         ]
 
     async def add_taxonomy_aliases(self, collection: str, key: str, aliases: list[str],
-                                   normalized: list[str], *, org_id: str, max_aliases: int = 20,
+                                   normalized: list[str], *, org_id: str, max_aliases: int = MAX_TAXONOMY_ALIASES,
                                    transaction: str | None = None) -> None:
         node = self.nodes.get((collection, key))
         if node is None or node.get("orgId") != org_id:
@@ -175,6 +176,20 @@ class FakeGraph:
                 counts[k] = counts.get(k, 0) + 1
         return [{"_key": k, "name": self.nodes[(collection, k)]["name"], "records": n}
                 for k, n in sorted(counts.items()) if after_key is None or k > after_key][:limit]
+
+    async def find_merged_taxonomy_nodes_with_edges(self, collection: str, org_id: str, limit: int,
+                                                    after_key: str | None = None,
+                                                    transaction: str | None = None) -> list[dict]:
+        counts: dict[str, set[str]] = {}
+        for edge in self.edges:
+            c, k = edge.target
+            node = self.nodes.get(edge.target)
+            if c == collection and node and node.get("orgId") == org_id and node.get("mergedInto") \
+                    and self.record_orgs.get(edge.record) == org_id:
+                counts.setdefault(k, set()).add(edge.record)
+        return [{"_key": k, "name": self.nodes[(collection, k)]["name"],
+                 "mergedInto": self.nodes[(collection, k)]["mergedInto"], "records": len(r)}
+                for k, r in sorted(counts.items()) if after_key is None or k > after_key][:limit]
 
     async def get_taxonomy_entity_membership(self, refs: list[dict], org_id: str,
                                              transaction: str | None = None) -> dict:
@@ -655,3 +670,101 @@ class TestUndoReportsTheIndex:
         # The target lost its only records, so its point goes.
         assert (ORG, EntityType.TOPIC.value, [target]) in store.deletes
 
+
+
+class TestStrayEdges:
+    """Indexing that resolved to a node just before it was merged links to it
+    afterwards; the sweep moves those edges on to where the node redirects."""
+
+    async def test_a_record_linked_after_the_merge_is_found_and_swept(self) -> None:
+        graph, store = _merge_fixture(), FakeStore()
+        consolidator = _consolidator(graph, store)
+        await consolidator.merge(TOPICS, ORG, "win", "lose", dry_run=False)
+        assert await consolidator.stray_nodes(TOPICS, ORG) == []
+        graph.link("late", ORG, TOPICS, "lose", extracted="pricing")
+        graph.link("theirs", OTHER, TOPICS, "lose")
+        (stray,) = await consolidator.stray_nodes(TOPICS, ORG)
+        assert (stray.key, stray.merged_into, stray.records) == ("lose", "win", 1)
+
+        planned = await consolidator.sweep(TOPICS, ORG, "lose", dry_run=True)
+        assert (planned.edges_moved, planned.dry_run) == (1, True)
+        assert graph.targets("late") == [(TOPICS, "lose")]
+
+        result = await consolidator.sweep(TOPICS, ORG, "lose", dry_run=False)
+        assert (result.edges_moved, result.index_refreshed) == (1, True)
+        assert graph.targets("late") == [(TOPICS, "win")]
+        assert next(e for e in graph.edges if e.record == "late").merged_from == "lose"
+        assert graph.targets("theirs") == [(TOPICS, "lose")]
+        assert await consolidator.stray_nodes(TOPICS, ORG) == []
+        # Still undoable: the swept edge goes back with the rest.
+        await consolidator.unmerge(TOPICS, ORG, "lose", dry_run=False)
+        assert graph.targets("late") == [(TOPICS, "lose")]
+
+    async def test_a_stray_on_a_chain_goes_to_the_end_of_it(self) -> None:
+        graph = _chain_fixture()
+        consolidator = _consolidator(graph)
+        await consolidator.merge(TOPICS, ORG, "b", "a", dry_run=False)
+        await consolidator.merge(TOPICS, ORG, "c", "b", dry_run=False)
+        graph.nodes[(TOPICS, "a")]["mergedInto"] = "b"  # an older redirect not yet flattened
+        graph.link("late", ORG, TOPICS, "a")
+        await consolidator.sweep(TOPICS, ORG, "a", dry_run=False)
+        assert graph.targets("late") == [(TOPICS, "c")]
+        assert graph.nodes[(TOPICS, "a")]["mergedInto"] == "b"  # the loser's own redirect is the merge's to keep
+
+    @pytest.mark.parametrize("swept", [True, False], ids=["swept", "not-swept"])
+    async def test_an_unflattened_chain_undoes_from_the_middle_first(self, swept: bool) -> None:
+        """a -> b -> c where a still redirects to b: unmerging b brings a's
+        edges back with b's, so unmerging a afterwards finds them at b."""
+        graph = _chain_fixture()
+        consolidator = _consolidator(graph)
+        await consolidator.merge(TOPICS, ORG, "b", "a", dry_run=False)
+        await consolidator.merge(TOPICS, ORG, "c", "b", dry_run=False)
+        graph.nodes[(TOPICS, "a")]["mergedInto"] = "b"  # the b -> c merge stopped before flattening a
+        if swept:
+            graph.link("late", ORG, TOPICS, "a")
+            await consolidator.sweep(TOPICS, ORG, "a", dry_run=False)
+        assert (await consolidator.unmerge(TOPICS, ORG, "b", dry_run=False)).edges_moved == (3 if swept else 2)
+        assert graph.targets("rb") == [(TOPICS, "b")] and graph.targets("ra") == [(TOPICS, "b")]
+        await consolidator.unmerge(TOPICS, ORG, "a", dry_run=False)
+        assert graph.targets("ra") == [(TOPICS, "a")]
+        assert graph.targets("rb") == [(TOPICS, "b")]
+        assert graph.targets("rc") == [(TOPICS, "c")]
+        if swept:
+            assert graph.targets("late") == [(TOPICS, "a")]
+
+    async def test_a_wide_level_does_not_hide_a_deeper_follower(self) -> None:
+        """More direct followers than the hop limit must not stop the walk
+        before a follower of a follower."""
+        from app.modules.entity_resolution.consolidation import MAX_MERGE_REDIRECT_HOPS
+
+        graph = FakeGraph()
+        graph.node(TOPICS, "b", "B", ORG)
+        graph.node(TOPICS, "c", "C", ORG)
+        for i in range(MAX_MERGE_REDIRECT_HOPS + 2):
+            graph.node(TOPICS, f"f{i}", f"F{i}", ORG, mergedInto="b")
+        graph.node(TOPICS, "deep", "Deep", ORG, mergedInto="f0")
+        assert "deep" in await _consolidator(graph)._redirecting_to(TOPICS, ORG, "b")
+
+    async def test_strays_are_paged(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.modules.entity_resolution import consolidation
+
+        monkeypatch.setattr(consolidation, "_LEGACY_PAGE", 2)
+        graph = FakeGraph()
+        graph.node(TOPICS, "w", "W", ORG)
+        for i in range(5):
+            graph.node(TOPICS, f"l{i}", f"L{i}", ORG, mergedInto="w")
+            graph.link(f"r{i}", ORG, TOPICS, f"l{i}")
+        assert [n.key for n in await _consolidator(graph).stray_nodes(TOPICS, ORG)] == [f"l{i}" for i in range(5)]
+
+    async def test_sweeping_a_node_that_was_never_merged_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="not a merged node"):
+            await _consolidator(_merge_fixture()).sweep(TOPICS, ORG, "lose", dry_run=False)
+
+
+async def test_the_graph_double_caps_aliases_at_the_providers_limit_when_none_is_given() -> None:
+    # Consolidation omits max_aliases, so the double must default as the providers do.
+    graph = FakeGraph()
+    graph.nodes[(CollectionNames.TOPICS.value, "t1")] = {"name": "Pricing", "orgId": "acme"}
+    names = [f"pricing {i}" for i in range(25)]
+    await graph.add_taxonomy_aliases(CollectionNames.TOPICS.value, "t1", names, names, org_id="acme")
+    assert len(graph.nodes[(CollectionNames.TOPICS.value, "t1")]["aliases"]) == 25 <= MAX_TAXONOMY_ALIASES

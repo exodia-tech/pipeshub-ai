@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAuthStore } from '@/lib/store/auth-store';
+import { clearSessionCache } from '@/lib/api/session-cache';
 import { useKnowledgeBaseStore } from '../store';
 import { resetKnowledgeBaseSession } from '../utils/sidebar-session';
 import { openFolderChildren } from '../utils/folder-children';
@@ -10,10 +11,16 @@ import { collection, hubNode, hubResponse } from './kb-page-harness';
 
 const getNavigationNodes = vi.hoisted(() => vi.fn());
 const getNodeChildren = vi.hoisted(() => vi.fn());
-vi.mock('../api', () => ({
-  KnowledgeHubApi: { getNavigationNodes, getNodeChildren },
-  forgetPendingNodeChildrenRequests: () => {},
-}));
+vi.mock('../api', async () => {
+  const { pagedByCursor } = await import('./kb-page-harness');
+  return {
+    KnowledgeHubApi: {
+      getNavigationNodes: pagedByCursor(getNavigationNodes, 0),
+      getNodeChildren: pagedByCursor(getNodeChildren, 2),
+    },
+    forgetPendingNodeChildrenRequests: () => {},
+  };
+});
 
 const ENGINEERING = collection('kb-eng', 'Engineering');
 const DESIGNS = hubNode({ id: 'folder-designs', name: 'Designs', nodeType: 'folder', parentId: 'kb-eng' });
@@ -45,7 +52,7 @@ describe('knowledge base state across sign-out', () => {
   it('forgets the previous sidebar when the user signs out', () => {
     const kb = useKnowledgeBaseStore.getState();
     kb.cacheNodeChildren('kb-eng', [DESIGNS]);
-    kb.setNodeChildrenPagination('kb-eng', { hasNext: true, nextPage: 2, nodeType: 'app' });
+    kb.setNodeChildrenPagination('kb-eng', { hasNext: true, nextCursor: 'p2', nodeType: 'app', pagesLoaded: 1 });
 
     useAuthStore.getState().logout();
 
@@ -64,6 +71,19 @@ describe('knowledge base state across sign-out', () => {
 
     expect(useKnowledgeBaseStore.getState().appNodes).toEqual([]);
     expect(useKnowledgeBaseStore.getState().nodeChildrenCache.size).toBe(0);
+  });
+
+  it('forgets the sidebar, and the loads still out, when the session ends on an org switch (app stays open)', async () => {
+    const lastOrg = held<ReturnType<typeof hubResponse>>();
+    getNodeChildren.mockReturnValueOnce(lastOrg.promise).mockResolvedValue(hubResponse([]));
+    void openFolderChildren('kb-eng', 'kb');
+
+    clearSessionCache({ refetch: true });
+
+    expect(useKnowledgeBaseStore.getState().appNodes).toEqual([]);
+    // The next open does not join the last org's load, which never settles.
+    await openFolderChildren('kb-eng', 'kb');
+    expect(getNodeChildren).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the sidebar when the same user refreshes their session', () => {
@@ -114,7 +134,7 @@ describe('knowledge base state across sign-out', () => {
     const old = held<ReturnType<typeof hubResponse>>();
     const kb = useKnowledgeBaseStore.getState();
     kb.cacheAppChildren('kb-eng', [DESIGNS]);
-    kb.setAppChildPagination('kb-eng', { hasNext: true, nextPage: 2 });
+    kb.setAppChildPagination('kb-eng', { hasNext: true, nextCursor: 'p2' });
     getNodeChildren.mockReturnValueOnce(old.promise);
 
     const loadingMore = loadMoreAppChildPage('kb-eng');

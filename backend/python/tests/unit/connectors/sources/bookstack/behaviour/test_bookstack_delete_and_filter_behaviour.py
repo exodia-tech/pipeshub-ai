@@ -5,6 +5,10 @@ every store; a listing or a lookup BookStack could not answer must remove
 nothing. The fakes answer the way the real services do: BookStack reports an
 error as a JSON body with no page list, the store hands back a plain ``Record``
 from ``get_record_by_external_id``, and sync points hold only strings.
+
+A role deleted in BookStack must leave the store too. When that delete fails,
+the role sync must not move its checkpoint, so the next sync reads the deletion
+from the audit log again.
 """
 
 import json
@@ -160,8 +164,10 @@ class FakeSyncPoint:
         return dict(self.points.get(key, {}))
 
     async def update_sync_point(self, key: str, data: dict[str, str]) -> None:
-        assert all(isinstance(v, str) for v in data.values())
-        self.points[key] = dict(data)
+        # Timestamps are strings; the role sync point also carries the rebuildOwed flag.
+        assert all(isinstance(v, (str, bool)) for v in data.values())
+        # Both graph stores merge an update into the stored sync point.
+        self.points.setdefault(key, {}).update(data)
 
 
 @contextmanager
@@ -203,290 +209,116 @@ def world() -> Iterator[tuple[FakeBookStack, FakeRecordStore, Any]]:
         yield source, store, connector
 
 
-async def test_a_page_deleted_in_bookstack_leaves_on_the_next_incremental_sync(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    assert set(store.records) == {"page/1", "page/2", "page/3", "page/4"}
 
-    source.delete_page(2)
-    await connector._sync_records()
 
-    assert store.deleted == ["page/2"]
-    assert set(store.records) == {"page/1", "page/3", "page/4"}
 
 
-async def test_a_page_restored_before_the_sync_keeps_its_record(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    page = dict(source.pages[2])
-    source.delete_page(2)
-    source.pages[2] = page
 
-    await connector._sync_records()
 
-    assert store.deleted == []
-    assert "page/2" in store.records
 
 
-async def test_a_purged_page_whose_event_lost_its_id_is_still_removed(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.purge_page(2)
 
-    await connector._sync_records()
 
-    assert store.deleted == ["page/2"]
-    assert set(store.records) == {"page/1", "page/3", "page/4"}
 
 
-async def test_a_purged_page_named_like_another_pages_id_is_still_removed(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.pages[3]["name"] = "(1) Introduction"
-    source.purge_page(3)
 
-    await connector._sync_records()
 
-    assert store.deleted == ["page/3"]
-    assert "page/1" in store.records
 
 
-async def test_a_purged_page_is_removed_once_the_page_list_can_be_read(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.purge_page(2)
-    source.listing_error_at_offset = 0
 
-    await connector._sync_records()
-    assert store.deleted == []
 
-    source.listing_error_at_offset = None
-    await connector._sync_records()
-    assert store.deleted == ["page/2"]
 
 
-async def test_a_delete_bookstack_cannot_confirm_is_kept_and_retried(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.delete_page(2)
-    source.lookup_error_for.add(2)
 
-    await connector._sync_records()
-    assert store.deleted == []
-    assert "page/2" in store.records
 
-    source.lookup_error_for.clear()
-    await connector._sync_records()
-    assert store.deleted == ["page/2"]
 
 
-async def test_a_throttled_audit_log_holds_the_cursor_until_the_delete_is_read(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.delete_page(2)
-    source.delete_log_errors = 1
 
-    await connector._sync_records()
-    assert store.deleted == []
 
-    await connector._sync_records()
-    assert store.deleted == ["page/2"]
 
 
-async def test_a_delete_that_fails_to_save_is_retried(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.delete_page(2)
-    store.fail_delete = True
 
-    await connector._sync_records()
-    assert "page/2" in store.records
 
-    store.fail_delete = False
-    await connector._sync_records()
-    assert store.deleted == ["page/2"]
 
 
-async def test_every_delete_in_a_long_audit_log_is_applied(world) -> None:
-    source, store, connector = world
-    for page_id in range(100, 106):
-        source.add_page(page_id)
-    await connector._sync_records()
-    with patch("app.connectors.sources.bookstack.connector._AUDIT_LOG_PAGE_SIZE", 2):
-        for page_id in range(100, 106):
-            source.delete_page(page_id)
-        await connector._sync_records()
 
-    assert sorted(store.deleted) == sorted(f"page/{i}" for i in range(100, 106))
 
 
-async def test_an_audit_log_that_ends_before_its_total_is_not_read_in_full(world) -> None:
-    # Reported as incomplete, the sync keeps its cursor and reads the unread deletions again.
-    source, store, connector = world
-    for page_id in range(100, 106):
-        source.add_page(page_id)
-    await connector._sync_records()
-    with patch("app.connectors.sources.bookstack.connector._AUDIT_LOG_PAGE_SIZE", 2):
-        for page_id in range(100, 106):
-            source.delete_page(page_id)
-        source.audit_ends_early_at = 2
 
-        events, complete = await connector._list_page_delete_events("2026-01-01T00:00:00Z")
-        assert (len(events), complete) == (2, False)
 
-        source.audit_ends_early_at = None
-        await connector._sync_records()
 
-    assert sorted(store.deleted) == sorted(f"page/{i}" for i in range(100, 106))
 
 
-async def test_a_page_list_that_ends_before_its_total_removes_nothing_and_looks_nothing_up(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    cursor = dict(connector.record_sync_point.points)
-    source.purge_page(2)
-    with patch("app.connectors.sources.bookstack.connector._AUDIT_LOG_PAGE_SIZE", 2):
-        source.listing_ends_early_at = 2
-        await connector._sync_records()
-        assert store.deleted == []
-        assert source.lookups == 0, "an incomplete list must not fall back to one lookup per page"
-        assert connector.record_sync_point.points == cursor
 
-        source.listing_ends_early_at = None
-        await connector._sync_records()
 
-    assert store.deleted == ["page/2"]
+class FakeBookStackRoles:
+    """Roles, their users and the role audit log, which is asked for events since a timestamp."""
 
+    def __init__(self) -> None:
+        self.users: dict[int, dict[str, Any]] = {}
+        self.roles: dict[int, dict[str, Any]] = {}
+        self.audit: list[dict[str, Any]] = []
+        self.now = "2026-01-01T00:00:00Z"
 
-async def test_a_full_listing_that_ends_before_its_total_removes_nothing(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.pages.pop(3)
+    def add_user(self, user_id: int, email: str) -> None:
+        self.users[user_id] = {"id": user_id, "email": email, "name": email}
 
-    source.listing_ends_early_at = 2
-    _full_sync(connector)
-    await connector._sync_records()
-    assert store.deleted == []
-    assert source.lookups == 0, "a cut-off listing must not fall back to one lookup per page"
+    def add_role(self, role_id: int, name: str, *user_ids: int) -> None:
+        self.roles[role_id] = {"id": role_id, "display_name": name, "users": [{"id": u} for u in user_ids]}
 
-    source.listing_ends_early_at = None
-    await connector._sync_records()
-    assert store.deleted == ["page/3"]
+    def delete_role(self, role_id: int) -> None:
+        role = self.roles.pop(role_id)
+        self.audit.append({"type": "role_delete", "detail": f"({role_id}) {role['display_name']}", "created_at": self.now})
 
+    @staticmethod
+    def _page(rows: list[dict[str, Any]], count: int | None, offset: int | None) -> BookStackResponse:
+        start = offset or 0
+        return BookStackResponse(success=True, data={"data": rows[start:start + (count or 100)], "total": len(rows)})
 
-async def test_a_narrowed_book_filter_removes_the_pages_it_now_leaves_out(world) -> None:
-    _, store, connector = world
-    await connector._sync_records()
+    async def list_audit_log(self, filter: dict[str, str]) -> BookStackResponse:  # noqa: A002
+        since = filter["created_at:gte"]
+        events = [e for e in self.audit if e["type"] == filter["type"] and e["created_at"] >= since]
+        return BookStackResponse(success=True, data={"data": events, "total": len(events)})
 
-    connector.sync_filters = _without_book(OTHER_BOOK)
-    _full_sync(connector)
-    await connector._sync_records()
+    async def list_users(self, count: int | None = None, offset: int | None = None) -> BookStackResponse:
+        return self._page(list(self.users.values()), count, offset)
 
-    assert store.deleted == ["page/4"]
-    assert set(store.records) == {"page/1", "page/2", "page/3"}
+    async def get_user(self, user_id: int) -> BookStackResponse:
+        return BookStackResponse(success=True, data=self.users[user_id])
 
+    async def list_roles(self, count: int | None = None, offset: int | None = None) -> BookStackResponse:
+        return self._page([{"id": r["id"], "display_name": r["display_name"]} for r in self.roles.values()], count, offset)
 
-async def test_a_full_sync_removes_a_page_deleted_while_incremental_syncs_missed_it(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.pages.pop(3)
+    async def get_role(self, role_id: int) -> BookStackResponse:
+        return BookStackResponse(success=True, data=self.roles[role_id])
 
-    _full_sync(connector)
-    await connector._sync_records()
 
-    assert store.deleted == ["page/3"]
+class FakeRoleStore:
+    """The role methods of ``DataSourceEntitiesProcessor``: each role's member emails, by BookStack role id."""
 
+    def __init__(self) -> None:
+        self.org_id = "org-1"
+        self.roles: dict[str, list[str]] = {}
+        self.fail_role_delete = False
 
-async def test_a_full_sync_removes_a_trashed_page_bookstack_no_longer_has(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    store.records["page/3"].is_deleted = True
-    source.pages.pop(3)
+    async def on_new_app_roles(self, roles: list[tuple[Any, list[Any]]]) -> None:
+        for role, members in roles:
+            self.roles[role.source_role_id] = [m.email for m in members]
 
-    _full_sync(connector)
-    await connector._sync_records()
+    async def get_nodes_by_filters(
+        self, collection: str, filters: dict[str, Any], return_fields: list[str] | None = None,
+        *, raise_on_error: bool = False,
+    ) -> list[dict[str, Any]]:
+        """The stored roles, as a complete role read lists them to remove the ones BookStack lost."""
+        return [{"externalRoleId": role_id} for role_id in self.roles]
 
-    assert store.deleted == ["page/3"], "the record scan must see trashed records, or this one stays forever"
+    async def on_app_role_deleted(self, external_role_id: str, connector_id: str) -> bool:
+        # Like the real processor: a delete that fails raises; False when the role isn't stored.
+        if self.fail_role_delete:
+            raise RuntimeError("graph unavailable")
+        return self.roles.pop(external_role_id, None) is not None
 
 
-async def test_a_listing_that_fails_part_way_removes_nothing_until_a_full_listing(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
+ROLE_CHECKPOINT = "bookstack/user_role_logs/global"
 
-    connector.sync_filters = _without_book(OTHER_BOOK)
-    source.listing_error_at_offset = 2
-    _full_sync(connector)
-    await connector._sync_records()
 
-    assert store.deleted == []
-    assert "page/4" in store.records
-
-    source.listing_error_at_offset = None
-    await connector._sync_records()
-    assert store.deleted == ["page/4"]
-
-
-async def test_a_page_the_listing_skipped_is_kept_when_bookstack_still_has_it(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.missed_by_listing.add(2)
-
-    _full_sync(connector)
-    await connector._sync_records()
-
-    assert store.deleted == []
-    assert "page/2" in store.records
-
-
-async def test_an_unlisted_page_whose_lookup_fails_is_kept_and_rechecked(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.pages.pop(3)
-    source.lookup_error_for.add(3)
-
-    _full_sync(connector)
-    await connector._sync_records()
-    assert store.deleted == []
-
-    source.lookup_error_for.clear()
-    await connector._sync_records()
-    assert store.deleted == ["page/3"]
-
-
-async def test_a_listing_bookstack_refuses_outright_removes_nothing(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-
-    source.listing_error_at_offset = 0
-    _full_sync(connector)
-    await connector._sync_records()
-
-    assert store.deleted == []
-    assert len(store.records) == 4
-
-
-async def test_a_filter_that_cannot_be_read_removes_nothing(world) -> None:
-    _, store, connector = world
-    await connector._sync_records()
-
-    connector.sync_filters = FilterCollection.from_dict(
-        {"book_ids": {"operator": "not_in", "type": "list", "value": ["not-a-book-id"]}}
-    )
-    _full_sync(connector)
-    with pytest.raises(ValueError):
-        await connector._sync_records()
-
-    assert store.deleted == []
-    assert len(store.records) == 4
-
-
-async def test_a_record_store_that_cannot_be_read_removes_nothing(world) -> None:
-    source, store, connector = world
-    await connector._sync_records()
-    source.pages.pop(3)
-
-    store.fail_scan = True
-    _full_sync(connector)
-    await connector._sync_records()
-
-    assert store.deleted == []

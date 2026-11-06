@@ -5,8 +5,8 @@ from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import jwt
 import pytest
-from jose import jwt
 
 from app.api.middlewares import caller_role
 from app.api.middlewares.caller_role import (
@@ -158,6 +158,21 @@ class TestFetchCallerRole:
         assert "x-organization-id" not in sent
         assert "x-is-admin" not in sent
         assert sent["host"] == "nodejs:3000"
+        assert "x-pipeshub-mcp-relay" not in sent
+
+    async def test_forwards_the_mcp_relay_header(self) -> None:
+        # Node accepts a token issued for /mcp on the lookup only with the relay header.
+        seen = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return httpx.Response(200, json={"role": "member"})
+
+        headers = {"Authorization": "Bearer caller-token", "X-Pipeshub-Mcp-Relay": "relay-1"}
+        with _node(handler):
+            await fetch_caller_role(_request(headers), _config_service())
+
+        assert seen[0].headers["x-pipeshub-mcp-relay"] == "relay-1"
 
     async def test_carries_a_caller_role_service_token_for_nodes_rate_limiter(self):
         seen: list = []
@@ -205,6 +220,16 @@ class TestFetchCallerRole:
 
         default = DefaultEndpoints.NODEJS_ENDPOINT.value.rstrip("/")
         assert str(seen[0].url) == f"{default}{CALLER_ROLE_PATH}"
+
+    async def test_uses_nodes_iam_endpoint_when_nodejs_is_not_configured(self) -> None:
+        """Helm runs Node on 3001; only the endpoints Node itself writes know that."""
+        seen: list = []
+        with _node(_seen_by_node(seen)):
+            await fetch_caller_role(
+                _request(_BEARER),
+                _config_service({"iam": {"endpoint": "http://localhost:3001"}}),
+            )
+        assert str(seen[0].url) == f"http://localhost:3001{CALLER_ROLE_PATH}"
 
     async def test_trailing_slash_in_configured_endpoint(self):
         seen = []

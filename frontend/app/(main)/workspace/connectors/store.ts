@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import { resetStoreOnSessionEnd } from '@/lib/api/session-cache';
 import { immer } from 'zustand/middleware/immer';
 import { devtools } from 'zustand/middleware';
+import { revalidateSwrNamespace, SWR_NS } from '@/lib/api/swr-cache';
 import type {
   Connector,
   ConnectorScope,
@@ -13,6 +15,7 @@ import type {
   PanelView,
   SyncStrategy,
   AuthCardState,
+  ConnectionCheckState,
   ConnectorInstance,
   InstancePanelTab,
   ConnectorStatsResponse,
@@ -20,6 +23,7 @@ import type {
 } from './types';
 import { mergeConfigWithSchema, initializeFormData } from './utils/config-merge';
 import { evaluateConditionalDisplay } from './utils/conditional-display';
+import { authSchemaForInstance } from './utils/auth-schema-for-instance';
 import {
   isNoneAuthType,
   isOAuthType,
@@ -96,6 +100,7 @@ interface ConnectorsState {
   isSavingAuth: boolean;
   isSavingConfig: boolean;
   saveError: string | null;
+  connectionCheck: ConnectionCheckState;
 
   // ── Instance page state ───────────────────────────────────────
   /** Connector type instances list */
@@ -141,6 +146,8 @@ interface ConnectorsState {
    * re-runs OAuth credential hydration and captures a fresh baseline.
    */
   oauthCredentialBaselineTick: number;
+  /** OAuth registration whose stored secrets the admin asked to see; '' when none. */
+  revealedOAuthAppId: string;
 
   // ── Actions ───────────────────────────────────────────────────
   setRegistryConnectors: (connectors: Connector[]) => void;
@@ -188,6 +195,7 @@ interface ConnectorsState {
   setIsSavingAuth: (saving: boolean) => void;
   setIsSavingConfig: (saving: boolean) => void;
   setSaveError: (error: string | null) => void;
+  setConnectionCheck: (check: ConnectionCheckState) => void;
   /** Set or clear individual form error keys. Pass `null` to remove a key. */
   mergeFormErrors: (patch: Record<string, string | null | undefined>) => void;
   clearOAuthAppsListState: () => void;
@@ -201,6 +209,7 @@ interface ConnectorsState {
   setOAuthCredentialBaseline: (
     baseline: { key: string; values: Record<string, unknown> } | null
   ) => void;
+  setRevealedOAuthAppId: (id: string) => void;
   setIsLoadingRecords: (loading: boolean) => void;
   setSyncStrategy: (strategy: SyncStrategy) => void;
   setSyncInterval: (minutes: number) => void;
@@ -235,6 +244,8 @@ interface ConnectorsState {
 // ========================================
 // Default form data
 // ========================================
+
+const idleConnectionCheck: ConnectionCheckState = { status: 'idle', message: null };
 
 const defaultFormData: PanelFormData = {
   auth: {},
@@ -305,6 +316,7 @@ const initialState = {
   isSavingAuth: false,
   isSavingConfig: false,
   saveError: null as string | null,
+  connectionCheck: { ...idleConnectionCheck },
 
   // Instance page
   instances: [] as ConnectorInstance[],
@@ -327,6 +339,7 @@ const initialState = {
   oauthAppsListConnectorType: '',
   oauthCredentialBaseline: null as { key: string; values: Record<string, unknown> } | null,
   oauthCredentialBaselineTick: 0,
+  revealedOAuthAppId: '',
 };
 
 // Panel-specific fields to reset when closing
@@ -357,12 +370,14 @@ const panelResetState = {
   isSavingAuth: false,
   isSavingConfig: false,
   saveError: null as string | null,
+  connectionCheck: { ...idleConnectionCheck },
 
   oauthAppsList: [] as ConnectorOAuthAppListRow[],
   oauthAppsListPhase: 'idle' as OAuthAppsListPhase,
   oauthAppsListFetchError: null as string | null,
   oauthAppsListConnectorType: '',
   oauthCredentialBaseline: null as { key: string; values: Record<string, unknown> } | null,
+  revealedOAuthAppId: '',
 };
 
 // ========================================
@@ -456,6 +471,7 @@ export const useConnectorsStore = create<ConnectorsState>()(
           }
           s.panelView = 'tabs';
           s.isAuthTypeImmutable = !!connectorId;
+          s.connectionCheck = { ...idleConnectionCheck };
 
           // Existing instance: drop cached schema/config immediately so we never use another
           // instance's `isAuthenticated` before GET /config returns (fixes wrong Authorize tab).
@@ -494,10 +510,13 @@ export const useConnectorsStore = create<ConnectorsState>()(
           }
         }),
 
-      bumpCatalogRefresh: () =>
+      bumpCatalogRefresh: () => {
         set((s) => {
           s.catalogRefreshToken += 1;
-        }),
+        });
+        revalidateSwrNamespace(SWR_NS.teamConnectorLists);
+        revalidateSwrNamespace(SWR_NS.connectorConfigs);
+      },
 
       bumpOAuthAuthorizeUiEpoch: () =>
         set((s) => {
@@ -542,6 +561,7 @@ export const useConnectorsStore = create<ConnectorsState>()(
       setSchemaAndConfig: (schema, config) =>
         set((s) => {
           s.oauthCredentialBaseline = null;
+          s.revealedOAuthAppId = '';
           s.oauthCredentialBaselineTick += 1;
           s.connectorSchema = schema;
           s.connectorConfig = config ?? null;
@@ -561,6 +581,14 @@ export const useConnectorsStore = create<ConnectorsState>()(
           s.selectedAuthType = authType;
           const formData = initializeFormData(merged, authType);
           s.formData = formData;
+          // Which fields this instance shows and requires depends on what it has saved; decided
+          // once here, so the form's rendering and validation read a plain schema.
+          if (schema.auth) {
+            s.connectorSchema = {
+              ...schema,
+              auth: authSchemaForInstance(schema.auth, config ? formData.auth : null) ?? schema.auth,
+            };
+          }
 
           // Evaluate conditional display for auth
           const conditionalDisplay = evaluateConditionalDisplay(
@@ -624,6 +652,7 @@ export const useConnectorsStore = create<ConnectorsState>()(
         set((s) => {
           if (s.isAuthTypeImmutable) return;
           s.selectedAuthType = authType;
+          s.connectionCheck = { ...idleConnectionCheck };
 
           // Re-initialize auth form data for this auth type
           const schema = s.connectorSchema;
@@ -708,6 +737,11 @@ export const useConnectorsStore = create<ConnectorsState>()(
           s.saveError = error;
         }),
 
+      setConnectionCheck: (check) =>
+        set((s) => {
+          s.connectionCheck = check;
+        }),
+
       mergeFormErrors: (patch) =>
         set((s) => {
           for (const [k, v] of Object.entries(patch)) {
@@ -764,6 +798,11 @@ export const useConnectorsStore = create<ConnectorsState>()(
       setOAuthCredentialBaseline: (baseline) =>
         set((s) => {
           s.oauthCredentialBaseline = baseline;
+        }),
+
+      setRevealedOAuthAppId: (id) =>
+        set((s) => {
+          s.revealedOAuthAppId = id;
         }),
 
       setIsLoadingRecords: (loading) =>
@@ -863,10 +902,10 @@ export const useConnectorsStore = create<ConnectorsState>()(
           delete s.localSyncStatuses[connectorId];
         }),
 
+      // Configs stay, keyed by instance: reopening a type page within the SWR window shows them with no request.
       clearInstanceData: () =>
         set((s) => {
           s.instances = [];
-          s.instanceConfigs = {};
           s.instanceStats = {};
           s.localSyncStatuses = {};
         }),
@@ -939,3 +978,5 @@ export const useConnectorsStore = create<ConnectorsState>()(
     { name: 'connectors-store' }
   )
 );
+
+resetStoreOnSessionEnd(useConnectorsStore);

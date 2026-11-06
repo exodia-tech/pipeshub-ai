@@ -18,6 +18,7 @@ import asyncio
 import hashlib
 import json
 import mimetypes
+import re
 import time
 import unicodedata
 import uuid
@@ -85,7 +86,7 @@ from app.models.entities import (
     RecordType,
     User,
 )
-from app.models.permission import EntityType, Permission, PermissionType
+from app.models.permission import Permission
 from app.services.graph_db.common.record_visibility import RecordVisibility
 from app.services.notification.types import (
     NotificationSeverity,
@@ -151,6 +152,7 @@ LOCAL_FS_MAX_BATCHES_PER_RUN = 100_000
 # The desktop streams file bytes over the socket relay, so stream_record can
 # serve content and records are safe to hand to the indexing pipeline.
 LOCAL_FS_DESKTOP_CONTENT_AVAILABLE = True
+_WINDOWS_DRIVE = re.compile(r"[A-Za-z]:")
 
 # Shown to whoever owns the connector when a run could not retire every record
 # it meant to. Plain words and a next step: no ids, no exception text.
@@ -164,6 +166,34 @@ ALL_CLEANUP_FAILED = (
     "Everything else synced. If the next sync does not clear them, ask your admin "
     "to check this connector's access."
 )
+
+
+# What a desktop failure means to the person who owns the folder, by the code
+# the desktop or the relay reported. Anything unlisted gets the general answer.
+_SYNC_STOP_REASONS: dict[str, str] = {
+    "DESKTOP_TIMEOUT": (
+        "the desktop app did not answer in time. Check that it is open, signed "
+        "in and not busy, then sync again."
+    ),
+    "NODE_UNREACHABLE": "PipesHub could not reach its desktop connection. Try again in a few minutes.",
+    "GATEWAY_NOT_READY": "PipesHub was still starting up. Try again in a few minutes.",
+    "CONFIG_MISMATCH": (
+        "the desktop app does not have this folder set up. Open this connector "
+        "in the desktop app on the computer that has the folder."
+    ),
+    "STALLED": "the desktop app kept the sync open without sending anything. Restart the desktop app.",
+    "RUN_TOO_LONG": "the sync ran for too long. Restart the desktop app, then sync again.",
+    "TOO_MANY_BATCHES": "the sync ran for too long. Restart the desktop app, then sync again.",
+    "STALE_RUN": "a newer sync of this folder started. No action is needed.",
+}
+_SYNC_STOP_DEFAULT_REASON = (
+    "the desktop app sent an answer PipesHub could not use. Check that the "
+    "desktop app is up to date."
+)
+
+
+def _sync_stop_reason(code: str) -> str:
+    return _SYNC_STOP_REASONS.get(code, _SYNC_STOP_DEFAULT_REASON)
 
 
 class LocalFsRecordCleanupError(Exception):
@@ -723,17 +753,7 @@ class LocalFsConnector(BaseConnector):
             preview_renderable=False,
         )
 
-        effective_owner = owner or self._owner_user_for_permissions
-        perms: List[Permission] = []
-        if effective_owner:
-            perms.append(
-                Permission(
-                    email=effective_owner.email,
-                    type=PermissionType.OWNER,
-                    entity_type=EntityType.USER,
-                )
-            )
-        return folder_record, perms
+        return folder_record, []
 
     def _build_parent_folder_records(
         self,
@@ -1336,17 +1356,7 @@ class LocalFsConnector(BaseConnector):
         ):
             file_record.indexing_status = ProgressStatus.AUTO_INDEX_OFF.value
 
-        effective_owner = owner or self._owner_user_for_permissions
-        perms: List[Permission] = []
-        if effective_owner:
-            perms.append(
-                Permission(
-                    email=effective_owner.email,
-                    type=PermissionType.OWNER,
-                    entity_type=EntityType.USER,
-                )
-            )
-        return file_record, perms
+        return file_record, []
 
     async def _ensure_owner_and_record_group(
         self,
@@ -1373,21 +1383,9 @@ class LocalFsConnector(BaseConnector):
             connector_id=self.connector_id,
             group_type=RecordGroupType.DRIVE,
             web_url=f"file://{root}",
+            inherit_permissions=True,
         )
-        await self.data_entities_processor.on_new_record_groups(
-            [
-                (
-                    record_group,
-                    [
-                        Permission(
-                            email=owner.email,
-                            type=PermissionType.OWNER,
-                            entity_type=EntityType.USER,
-                        )
-                    ],
-                )
-            ]
-        )
+        await self.data_entities_processor.on_new_record_groups([(record_group, [])])
 
         return owner, rg_external
 
@@ -1460,6 +1458,9 @@ class LocalFsConnector(BaseConnector):
             not rel_path
             or rel_path.startswith("/")
             or any(part in {"", ".", ".."} for part in parts)
+            # "C:/x" is absolute on the Windows machine the path came from.
+            or _WINDOWS_DRIVE.fullmatch(parts[0])
+            or "\x00" in rel_path
         ):
             return None
         return rel_path
@@ -1557,7 +1558,8 @@ class LocalFsConnector(BaseConnector):
                     # longer one of this run's live records.
                     seen_external_ids.discard(old_ext_id)
                     seen_external_ids.add(record.external_record_id)
-            await self.data_entities_processor.on_records_moved(list(move_buffer))
+            # Each move carries the record's full permission list, as for a new record.
+            await self.data_entities_processor.on_records_moved(list(move_buffer), permissions_fetched=True)
             processed += self._count_processed_file_records(
                 [(record, perms) for _old_ext_id, record, perms in move_buffer]
             )
@@ -1683,11 +1685,31 @@ class LocalFsConnector(BaseConnector):
                 skipped += 1
                 continue
 
+            new_ext_id = self._external_record_id_for_rel_path(rel_path)
+            # A rename/move only needs the in-place-update path when the old
+            # path actually resolves to a different external id (a missing/
+            # unusable oldPath, or the NFC-normalization same-id edge case,
+            # falls back to a plain upsert — the stale old row, if any, gets
+            # pruned by the next full run).
+            moved_from_ext_id = (
+                self._external_record_id_for_rel_path(old_rel_path)
+                if event_type in {"RENAMED", "MOVED"} and old_rel_path
+                else None
+            )
+            if moved_from_ext_id == new_ext_id:
+                moved_from_ext_id = None
+
+            # Records this event says are no longer in scope. Only what the
+            # event states for certain: a move means the old path is gone, and
+            # a file that now fails a filter has left the sync's scope.
+            retire: list[str] = []
+            skip = True
             if not event.sha256:
                 # The watcher always hashes full content now; a missing hash
                 # means a pre-upgrade desktop client or a failed local read,
                 # neither of which we can safely substitute a fake revision
-                # for without masking the real problem.
+                # for without masking the real problem. The desktop reports the
+                # file again once it can read it.
                 self.logger.warning(
                     "Local FS: skipping event %s for %s — desktop sent no "
                     "content hash",
@@ -1695,9 +1717,18 @@ class LocalFsConnector(BaseConnector):
                     rel_path,
                 )
                 skipped += 1
-                continue
-
-            if not self._pass_extension_filters(
+                in_scope = self._pass_extension_filters(
+                    Path(rel_path), sync_filters, is_directory=event.isDirectory
+                ) and self._pass_date_filters(event, sync_filters)
+                if not in_scope:
+                    retire.append(new_ext_id)
+                elif seen_external_ids is not None and not event.isDirectory:
+                    # The file is still there and in scope: a full run must not
+                    # prune its record while it cannot be read.
+                    seen_external_ids.add(new_ext_id)
+                if moved_from_ext_id:
+                    retire.append(moved_from_ext_id)
+            elif not self._pass_extension_filters(
                 Path(rel_path), sync_filters, is_directory=event.isDirectory
             ):
                 self.logger.debug(
@@ -1705,28 +1736,27 @@ class LocalFsConnector(BaseConnector):
                     rel_path,
                 )
                 skipped += 1
-                continue
-            if not self._pass_date_filters(event, sync_filters):
+                retire.extend(e for e in (new_ext_id, moved_from_ext_id) if e)
+            elif not self._pass_date_filters(event, sync_filters):
                 self.logger.debug(
                     "Local FS: skipping %s — date filter",
                     rel_path,
                 )
                 skipped += 1
+                retire.extend(e for e in (new_ext_id, moved_from_ext_id) if e)
+            else:
+                skip = False
+            if skip:
+                if retire:
+                    if prev_kind is not None and prev_kind != "delete":
+                        await drain_all()
+                    delete_only_buffer.extend(retire)
+                    prev_kind = "delete"
+                    if len(delete_only_buffer) >= batch_size:
+                        await flush_delete_only()
                 continue
 
-            new_ext_id = self._external_record_id_for_rel_path(rel_path)
-
-            # A rename/move only needs the in-place-update path when the old
-            # path actually resolves to a different external id (a missing/
-            # unusable oldPath, or the NFC-normalization same-id edge case,
-            # falls back to a plain upsert — the stale old row, if any, gets
-            # pruned by the next full run).
-            old_ext_id: Optional[str] = None
-            if event_type in {"RENAMED", "MOVED"} and old_rel_path:
-                candidate_old_ext_id = self._external_record_id_for_rel_path(old_rel_path)
-                if candidate_old_ext_id != new_ext_id:
-                    old_ext_id = candidate_old_ext_id
-
+            old_ext_id = moved_from_ext_id
             upsert_buffer.extend(
                 self._build_parent_folder_records(
                     rel_path,
@@ -1773,9 +1803,9 @@ class LocalFsConnector(BaseConnector):
         payload: JsonValue | bytes | bytearray,
     ) -> bytes:
         """
-        The storage service's GET /buffer route returns
-        ``res.json(buffer)``. Across local / S3 / Azure providers, that
-        always serializes a Node Buffer as ``{"type":"Buffer","data":[...]}``.
+        The storage service's GET /buffer route returns the raw bytes. Older
+        versions returned ``res.json(buffer)``, a Node Buffer serialised as
+        ``{"type":"Buffer","data":[...]}``, which is still accepted.
 
         Some legacy callers wrap it once more as ``{"data": <buffer>}``.
         """
@@ -1823,7 +1853,8 @@ class LocalFsConnector(BaseConnector):
                             response.status, record.record_name, (await response.text())[:500],
                         )
                         raise internal_service_status(response.status)
-                    raw_text = await response.text()
+                    is_raw = "application/octet-stream" in response.headers.get("Content-Type", "").lower()
+                    raw = await response.read()
         except asyncio.TimeoutError as exc:
             raise HTTPException(
                 status_code=HttpStatusCode.GATEWAY_TIMEOUT.value,
@@ -1846,11 +1877,12 @@ class LocalFsConnector(BaseConnector):
                 ),
             ) from exc
 
-        payload: JsonValue | bytes
-        try:
-            payload = json.loads(raw_text) if raw_text else {}
-        except json.JSONDecodeError:
-            payload = raw_text.encode("utf-8")
+        payload: JsonValue | bytes = raw
+        if not is_raw:
+            try:
+                payload = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                payload = raw
 
         body = self._decode_storage_buffer_payload(payload)
         media = record.mime_type or "application/octet-stream"
@@ -2231,11 +2263,12 @@ class LocalFsConnector(BaseConnector):
     ) -> None:
         """Tell the user a run stopped on a desktop-side failure.
 
-        Unlike the two helpers above, the detail is carried in the message so a
-        support request has something to work with. ``_suppress_notification``
-        keys on title + message, so the few errors whose text embeds a run id
-        (RESPONSE_MISMATCH) re-notify per run instead of collapsing — accepted,
-        since those mean two machines are racing for one folder.
+        Plain words only, and the same words for the same failure on every
+        run: ``_suppress_notification`` keys on title + message, and exception
+        text carries run ids, page numbers and the relay's internal URL, which
+        both read as noise to the user and change every run, so a desktop that
+        kept timing out notified on every scheduled sync. The code goes in the
+        payload and the detail in the log, for support.
 
         ``restarts_from_scratch`` is set for a FULL run, which keeps no resume
         point: promising that the next run continues where this one stopped
@@ -2257,17 +2290,14 @@ class LocalFsConnector(BaseConnector):
             severity=NotificationSeverity.ERROR,
             title="Local FS sync stopped — the desktop app could not finish this run",
             message=(
-                f"The sync of '{self.sync_root_path}' stopped due to an error "
-                f"({code}): {str(exc)[:200]}. Indexed files are kept. {resume} "
-                "If it keeps happening, check that the desktop app is running "
-                "and up to date."
+                f"The sync of '{self.sync_root_path}' stopped: {_sync_stop_reason(code)} "
+                f"Files already in search are kept. {resume}"
             ),
             payload={
                 "connector_id": self.connector_id,
                 "connector_name": self.connector_name.value,
                 "connector_scope": self.scope,
                 "error_code": code,
-                "error": str(exc),
             },
         )
 
@@ -2468,7 +2498,10 @@ class LocalFsConnector(BaseConnector):
                         deletions_overflowed=owe_a_full_run(),
                     )
 
-                    empty_streak = 0 if batch.events else empty_streak + 1
+                    if batch.events:
+                        empty_streak = 0
+                    elif not batch.preparing:
+                        empty_streak += 1
                     batch_index += 1
                     if not batch.hasMore:
                         break

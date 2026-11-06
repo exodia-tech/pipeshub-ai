@@ -9,6 +9,7 @@ export const GALLERY_ARTIFACT_TYPES = [
   'PRESENTATION',
   'DATA_FILE',
   'CODE',
+  'OTHER',
 ] as const;
 
 export const GALLERY_SORT_FIELDS = [
@@ -17,6 +18,8 @@ export const GALLERY_SORT_FIELDS = [
   'updatedAtTimestamp',
   'artifactType',
 ] as const;
+
+export const GALLERY_OWNERSHIP = ['all', 'mine', 'shared'] as const;
 
 const artifactTypesQuery = z
   .string()
@@ -78,6 +81,7 @@ export const listArtifactsSchema = z.object({
       }),
     sortBy: z.enum(GALLERY_SORT_FIELDS).optional(),
     sortOrder: z.enum(['asc', 'desc']).optional(),
+    ownership: z.enum(GALLERY_OWNERSHIP).optional(),
   }),
 });
 
@@ -88,5 +92,21 @@ export const artifactIdParamsSchema = z.object({
     artifactId: z.string().min(1).max(128).regex(ARTIFACT_ID_PATTERN, {
       message: 'artifactId must be a single path-safe identifier',
     }),
+  }),
+});
+
+const MAX_SHARE_TARGETS = 100;
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+
+export const artifactShareSchema = artifactIdParamsSchema.extend({
+  body: z.object({
+    userIds: z
+      .array(
+        z.string().regex(OBJECT_ID_PATTERN, {
+          message: 'userIds must be user IDs',
+        }),
+      )
+      .min(1)
+      .max(MAX_SHARE_TARGETS),
   }),
 });

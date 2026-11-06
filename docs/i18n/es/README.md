@@ -1,6 +1,6 @@
 <div align="center">
 
-**Translations:** [English](../../../README.md) · [Français](../fr/README.md) · [Deutsch](../de/README.md) · [简体中文](../zh-CN/README.md) · [日本語](../ja/README.md) · [Русский](../ru/README.md) · [עברית](../he/README.md) · [한국어](../ko/README.md) · **Español** · [Português](../pt/README.md) · [Türkçe](../tr/README.md) · [Tiếng Việt](../vi/README.md) · [Italiano](../it/README.md)
+**Translations:** [English](../../../README.md) · [Français](../fr/README.md) · [Deutsch](../de/README.md) · [简体中文](../zh-CN/README.md) · [日本語](../ja/README.md) · [Русский](../ru/README.md) · [עברית](../he/README.md) · [한국어](../ko/README.md) · **Español** · [Português](../pt/README.md) · [Türkçe](../tr/README.md) · [Tiếng Việt](../vi/README.md) · [Italiano](../it/README.md) · [Čeština](../cs/README.md)
 
 </div>
 
@@ -52,6 +52,19 @@
 <h2 id="about-pipeshub">PipesHub: explicable y extensible</h2>
 
 <strong>[PipesHub](https://www.pipeshub.com/)</strong> es una capa de ejecución nativa de IA, de código abierto y autoalojable, que conecta el conocimiento empresarial, ofrece búsqueda explicable con citas y automatiza flujos de trabajo en todos tus sistemas.
+
+### Cómo funciona PipesHub
+
+PipesHub construye una **capa de contexto unificada** sobre documentos, conversaciones, datos estructurados, wikis, tickets y código. Los conectores sincronizan cada fuente junto con sus permisos. El pipeline de indexación analiza, fragmenta y genera embeddings del contenido, y enlaza registros, personas y entidades en un grafo de conocimiento.
+
+Las preguntas las responde un **bucle de agente**, no una única pasada de «recuperar y luego generar». El agente planifica, llama a herramientas, lee los resultados y continúa hasta reunir la evidencia:
+
+- **Búsqueda híbrida** — recuperación semántica y por palabras clave, para encontrar tanto el significado como los términos exactos.
+- **Grep / coincidencia de patrones** — identificadores exactos, mensajes de error, claves de tickets y símbolos de código.
+- **Navegación por el grafo de conocimiento** — sigue los vínculos entre documentos, personas, tickets, pull requests e hilos.
+- **Lectura de documentos** — abre la fuente completa en lugar de fiarse de un único fragmento coincidente.
+
+Cada llamada a una herramienta se filtra según los permisos del usuario que pregunta, y cada respuesta cita los bloques de los que procede.
 
 
 ## Funcionalidades

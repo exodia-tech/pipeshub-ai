@@ -1,10 +1,10 @@
-// Modified by EXODIA: customer-facing branding.
 'use client';
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import Image from 'next/image';
 import { Box, Flex, Text } from '@radix-ui/themes';
+import { BrandMark, BrandWordmark } from '@/config';
 
 // ─── Connector icons (order matches Figma layout, left to right) ─────────────
 
@@ -49,10 +49,10 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
 
   return (
     <Box
+      className="viewport-height"
       style={{
         position: 'relative',
         flex: '0 0 57%',
-        height: '100vh',
         overflow: 'hidden',
         backgroundColor: '#0a0a14',
       }}
@@ -110,7 +110,7 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
           left: '50%',
           top: '42.3%',
           transform: 'translateX(-50%)',
-          width: '559px',
+          width: 'min(559px, 90%)',
           height: '74px',
           backgroundColor: 'rgba(31, 31, 31, 0.8)',
           backdropFilter: 'blur(5px)',
@@ -131,13 +131,19 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
             gap: '14px',
           }}
         >
-          {/* EXODIA Brain logo mark */}
-          <Image
-            src="/login-page-assets/exodia-brain/white-square.svg"
+          <BrandMark
+            size={33}
             alt=""
-            width={33}
-            height={33}
-            style={{ flexShrink: 0, opacity: 0.9, filter: 'brightness(1.8)' }}
+            style={{ opacity: 0.9 }}
+            fallback={
+              <Image
+                src="/login-page-assets/exodia-brain/white-square.svg"
+                alt=""
+                width={33}
+                height={33}
+                style={{ flexShrink: 0, opacity: 0.9, filter: 'brightness(1.8)' }}
+              />
+            }
           />
 
           {/* Search text */}
@@ -220,13 +226,7 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
           zIndex: 1,
         }}
       >
-        <Image
-          src="/login-page-assets/exodia-brain/white-horizontal.svg"
-          alt="EXODIA Brain"
-          width={240}
-          height={80}
-          style={{ opacity: 0.95, filter: 'brightness(0) invert(1)' }}
-        />
+        <BrandWordmark />
       </Box>
     </Box>
   );

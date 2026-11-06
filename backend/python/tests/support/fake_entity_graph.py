@@ -9,9 +9,15 @@ from typing import Any
 
 from app.config.constants.arangodb import CollectionNames
 from app.modules.entity_resolution.normalizer import normalize_name
+from app.services.graph_db.taxonomy import (
+    MAX_TAXONOMY_ALIASES,
+    TAXONOMY_COLLECTIONS,
+    TAXONOMY_EDGE_COLLECTIONS,
+)
 
 RECORDS = CollectionNames.RECORDS.value
 DEPARTMENTS = CollectionNames.DEPARTMENTS.value
+ORGS = CollectionNames.ORGS.value
 
 
 class FakeGraph:
@@ -31,6 +37,11 @@ class FakeGraph:
         # failed read is [] unless the caller passes raise_on_error.
         self.fail_filter_reads: list[Exception] = []
         self.fail_edge_reads: list[Exception] = []
+        # entityRelations edges: dicts with _from, _to, edgeType, origin.
+        self.entity_relations: list[dict[str, Any]] = []
+        self.org_names: dict[str, str] = {}
+        self.fail_org_lookup = False
+        self.fail_organization_writes = False
 
     # ---- setup helpers ----
     def add_record(self, key: str, org_id: str, connector_id: str = "conn-1",
@@ -42,6 +53,28 @@ class FakeGraph:
 
     def add_department(self, name: str, key: str | None = None) -> None:
         self.departments[name] = key or f"dept-{normalize_name(name)}"
+
+    def add_account(self, org_id: str, key: str, name: str, normalized: str | None = None) -> None:
+        """A CRM account of org ``org_id`` (KG-13 slice 3a)."""
+        from app.modules.entity_resolution.organizations import organization_key
+
+        self.nodes[(ORGS, key)] = {
+            "name": name, "isExternal": True, "parentOrgId": org_id,
+            "normalizedName": normalized if normalized is not None else organization_key(name),
+        }
+
+    def account_edge(self, record_key: str, key: str) -> None:
+        """An INFERRED account link from a connector."""
+        self.entity_relations.append({
+            "_from": f"{RECORDS}/{record_key}", "_to": f"{ORGS}/{key}", "edgeType": "FOR_ACCOUNT",
+            "origin": "INFERRED",
+        })
+
+    def organization_edges(self, record_key: str) -> list[tuple[str, str, str]]:
+        return sorted(
+            (e["_to"].split("/", 1)[1], e["edgeType"], e.get("origin") or "INFERRED")
+            for e in self.entity_relations if e["_from"] == f"{RECORDS}/{record_key}"
+        )
 
     def add_legacy_node(self, collection: str, key: str, name: str) -> None:
         self.nodes[(collection, key)] = {"name": name}
@@ -126,7 +159,8 @@ class FakeGraph:
         self.edges.setdefault(edge, {"from_id": child_key, "to_id": parent_key})
 
     async def add_taxonomy_aliases(
-        self, collection, key, aliases, normalized_aliases, *, org_id, max_aliases=20, transaction=None
+        self, collection, key, aliases, normalized_aliases, *, org_id, max_aliases=MAX_TAXONOMY_ALIASES,
+        transaction=None,
     ) -> None:
         self.calls.append(("add_taxonomy_aliases", (collection, key, list(aliases), list(normalized_aliases))))
         node = self.nodes.get((collection, key))
@@ -141,6 +175,119 @@ class FakeGraph:
                 current_normalized.append(normalized)
         node["aliases"] = current[:max_aliases]
         node["normalizedAliases"] = current_normalized[:max_aliases]
+
+    async def get_record_taxonomy_links(self, record_keys, transaction=None) -> list[dict[str, Any]]:
+        """Rows shaped as both providers return them: every category,
+        subcategory, topic and language edge of the given records."""
+        wanted = set(record_keys)
+        rows: list[dict[str, Any]] = []
+        for (edge_collection, frm, to), edge in self.edges.items():
+            if edge_collection not in TAXONOMY_EDGE_COLLECTIONS.values():
+                continue
+            from_collection, record_key = frm.split("/", 1)
+            to_collection, entity_key = to.split("/", 1)
+            if from_collection != RECORDS or record_key not in wanted:
+                continue
+            if to_collection not in TAXONOMY_COLLECTIONS:
+                continue
+            node = self.nodes.get((to_collection, entity_key))
+            if node is None:
+                continue
+            rows.append({
+                "recordId": record_key,
+                "collection": to_collection,
+                "entityId": entity_key,
+                "name": node.get("name"),
+                "canonical": node.get("normalizedName") is not None,
+                "extractedName": edge.get("extractedName"),
+                "extractedNames": edge.get("extractedNames"),
+                "migrated": edge.get("migratedFrom") is not None,
+            })
+        return rows
+
+    async def get_document(self, key, collection, transaction=None) -> dict[str, Any] | None:
+        if collection == ORGS and self.fail_org_lookup:  # only organisation reads fail
+            raise RuntimeError("graph down")
+        if collection == ORGS and key in self.org_names:
+            return {"_key": key, "name": self.org_names[key]}
+        return None
+
+    async def find_organizations(self, org_id, keys, transaction=None) -> list[dict[str, Any]]:
+        self.calls.append(("find_organizations", (org_id, sorted(keys))))
+        if self.fail_find:
+            raise RuntimeError("graph down")
+        wanted = set(keys)
+        return [
+            {"id": key, "name": node["name"], "normalizedName": node.get("normalizedName")}
+            for (coll, key), node in sorted(self.nodes.items())
+            if coll == ORGS and node.get("parentOrgId") == org_id and node.get("isExternal")
+            and node.get("normalizedName") in wanted
+        ]
+
+    async def create_organization_if_absent(self, org_id, node, transaction=None) -> None:
+        self.calls.append(("create_organization_if_absent", (org_id, dict(node))))
+        if self.fail_organization_writes:
+            raise RuntimeError("Document does not match the organization schema")
+        self.nodes.setdefault((ORGS, node["id"]), {
+            "name": node["name"], "normalizedName": node.get("normalizedName"),
+            "isExternal": True, "parentOrgId": org_id, "accountType": "enterprise", "isActive": True,
+        })
+
+    async def delete_record_entity_relations(self, record_id, to_collection, origin, transaction=None) -> int:
+        before = len(self.entity_relations)
+        self.entity_relations = [
+            e for e in self.entity_relations
+            if not (e["_from"] == f"{RECORDS}/{record_id}" and e["_to"].startswith(f"{to_collection}/")
+                    and (e.get("origin") or "INFERRED") == origin)
+        ]
+        return before - len(self.entity_relations)
+
+    async def batch_create_entity_relations(self, edges, transaction=None) -> bool:
+        if self.fail_organization_writes:
+            raise RuntimeError("Document does not match the entity relations schema")
+        for edge in edges:
+            self.entity_relations = [
+                e for e in self.entity_relations
+                if (e["_from"], e["_to"], e["edgeType"]) != (edge["_from"], edge["_to"], edge["edgeType"])
+            ]
+            self.entity_relations.append(dict(edge))
+        return True
+
+    async def get_organization_record_reach(
+        self, org_id, keys, transaction=None, *, record_cap=None,
+    ) -> dict[str, dict[str, Any]]:
+        self.calls.append(("get_organization_record_reach", (org_id, sorted(keys), record_cap)))
+        out = {}
+        for key in keys:
+            node = self.nodes.get((ORGS, key))
+            if not node or node.get("parentOrgId") != org_id or not node.get("isExternal"):
+                continue
+            edges = [
+                e for e in self.entity_relations
+                if e["_to"] == f"{ORGS}/{key}"
+                and self.records.get(e["_from"].split("/", 1)[1], {}).get("orgId") == org_id
+            ]
+            extracted = {e["_from"] for e in edges if (e.get("origin") or "INFERRED") == "EXTRACTED"}
+            inferred = any((e.get("origin") or "INFERRED") != "EXTRACTED" for e in edges) or bool(node.get("account"))
+            count = len(extracted) if record_cap is None else min(len(extracted), record_cap)
+            out[key] = {"records": count, "inferred": inferred}
+        return out
+
+    async def get_taxonomy_entity_membership(self, refs, org_id, transaction=None) -> dict:
+        """Organisations only: the connectors and groups of the org's records
+        linking to each."""
+        out = {}
+        for ref in refs:
+            records = [
+                self.records.get(e["_from"].split("/", 1)[1], {}) for e in self.entity_relations
+                if e["_to"] == f"{ORGS}/{ref['id']}"
+            ]
+            records = [r for r in records if r.get("orgId") == org_id]
+            out[(ref["type"], ref["id"])] = {
+                "connectorIds": sorted({r["connectorId"] for r in records if r.get("connectorId")}),
+                "recordGroupIds": sorted({r["recordGroupId"] for r in records if r.get("recordGroupId")}),
+            }
+        return out
 
     # ---- transaction-store level (GraphDBTransformer) ----
     async def get_record_by_key(self, key, *, raise_on_error: bool = False) -> dict[str, Any] | None:
@@ -186,7 +333,13 @@ class FakeGraph:
     def is_write_conflict(self, error: BaseException) -> bool:
         return "write conflict" in str(error)
 
-    async def get_edge(self, from_key, from_collection, to_key, to_collection, edge_collection) -> dict[str, Any] | None:
+    async def get_edge(self, from_key, from_collection, to_key, to_collection, edge_collection,
+                       transaction=None, *, raise_on_error=False) -> dict[str, Any] | None:
+        if self.fail_edge_reads:
+            error = self.fail_edge_reads.pop(0)
+            if raise_on_error:
+                raise error
+            return None
         return self.edges.get(
             (edge_collection, f"{from_collection}/{from_key}", f"{to_collection}/{to_key}")
         )

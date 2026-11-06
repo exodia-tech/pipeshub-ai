@@ -4,17 +4,22 @@ Dialects are negotiated by smbprotocol. SMB1 is rejected by the library.
 Permissions are APP_LEVEL; inherit_permissions is set on records so a later
 RECORD_LEVEL ACL pass can attach without a graph rewrite.
 
-Limits: one server per instance; directory symlinks are not walked; file id 0
+Limits: one share per instance; directory symlinks are not walked; file id 0
 disables rename detection; no change notify; the connectors host must reach
 TCP 445.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import asyncio
+from typing import TYPE_CHECKING, Any
 
 from app.config.constants.arangodb import Connectors, PermissionModel
-from app.connectors.core.base.connector.connector_service import BaseConnector
+from app.connectors.core.address_policy import public_only_for_scope
+from app.connectors.core.base.connector.connector_service import (
+    BaseConnector,
+    ConnectionCheckResult,
+)
 from app.connectors.core.base.sync_point.sync_point import (
     SyncDataPointType,
     SyncPoint,
@@ -30,15 +35,11 @@ from app.connectors.core.registry.connector_builder import (
     SyncStrategy,
 )
 from app.connectors.core.registry.filters import (
-    FilterCategory,
     FilterCollection,
-    FilterField,
     FilterOptionsResponse,
-    FilterType,
-    MultiselectOperator,
-    OptionSourceType,
     load_connector_filters,
 )
+from app.connectors.core.sync.full_sync_coverage import FullSyncCoverage
 from app.connectors.sources.network_share.entities_processor import (
     NetworkShareEntitiesProcessor,
 )
@@ -46,19 +47,21 @@ from app.connectors.sources.network_share.errors import (
     DirectoryListingError,
     NetworkShareAuthError,
     ShareListingError,
+    ShareWalkIncompleteError,
 )
 from app.connectors.sources.network_share.operations import (
+    ShareWalkReport,
     create_share_groups,
     reindex_records,
-    resolve_shares,
-    share_filter_options,
     stream_file,
     walk_shares,
 )
 from app.connectors.sources.network_share.record_mapper import RecordMapper
+from app.connectors.sources.smb.auth import STANDARD_PORTS, auth_problems, port_of
 from app.connectors.sources.smb.common.apps import SmbApp
 from app.models.entities import AppUser, Record, User
 from app.services.notification.types import NotificationSeverity, NotificationType
+from app.sources.client.smb.errors import describe
 from app.sources.client.smb.smb import SmbClient
 from app.sources.external.smb.smb import SmbDataSource
 
@@ -130,7 +133,7 @@ if TYPE_CHECKING:
                 name="share",
                 display_name="Share",
                 placeholder="departments",
-                description="Share name to crawl when the shares filter is empty",
+                description="Share to sync. One connector instance syncs one share.",
                 field_type="TEXT",
                 max_length=200,
             ),
@@ -148,16 +151,6 @@ if TYPE_CHECKING:
             "https://docs.pipeshub.com/connectors/smb/smb",
             "pipeshub",
         ))
-        .add_filter_field(FilterField(
-            name="shares",
-            display_name="Share Names",
-            filter_type=FilterType.MULTISELECT,
-            category=FilterCategory.SYNC,
-            description="Select specific SMB shares to sync",
-            option_source_type=OptionSourceType.DYNAMIC,
-            default_value=[],
-            default_operator=MultiselectOperator.IN.value,
-        ))
         .add_filter_field(CommonFields.folder_paths_filter("share"))
         .add_filter_field(CommonFields.file_extension_filter())
         .add_filter_field(CommonFields.modified_date_filter("Filter files by modification date."))
@@ -170,6 +163,10 @@ if TYPE_CHECKING:
     )\
     .build_decorator()
 class SmbConnector(BaseConnector):
+    # An edition swaps these two by subclassing instead of copying init / create_connector.
+    # ConnectorFactory builds the processor from processor_cls.
+    processor_cls: type[NetworkShareEntitiesProcessor] = NetworkShareEntitiesProcessor
+
     def __init__(
         self,
         logger: Logger,
@@ -195,6 +192,8 @@ class SmbConnector(BaseConnector):
         self.data_source: INetworkShareDataSource | None = None
         self.configured_share: str | None = None
         self.batch_size = 100
+        # What the last walk could not read; None until a walk has finished.
+        self._last_walk: ShareWalkReport | None = None
         self.mapper = RecordMapper()
         self.sync_filters = FilterCollection()
         self.indexing_filters = FilterCollection()
@@ -224,7 +223,7 @@ class SmbConnector(BaseConnector):
     async def init(self) -> bool:
         try:
             config = await self.config_service.get_config(
-                ConfigPaths.CONNECTOR_CONFIG.format(connector_id=self.connector_id)
+                ConfigPaths.CONNECTOR_CONFIG_PATH.format(connector_id=self.connector_id)
             )
             if not config:
                 await self._auth_error("Configuration not found", "SMB configuration not found.")
@@ -233,14 +232,13 @@ class SmbConnector(BaseConnector):
             if not auth.get("password"):
                 await self._auth_error("Credentials missing", "SMB password is required.")
                 return False
+            port = port_of(auth)
+            if self.scope != ConnectorScope.TEAM.value and port not in STANDARD_PORTS:
+                await self._auth_error("Port not allowed", _personal_port_message(port))
+                return False
             self.configured_share = (auth.get("share") or "").strip() or None
             await self._load_creator_email()
-            client = await SmbClient.build_from_services(
-                logger=self.logger,
-                config_service=self.config_service,
-                connector_instance_id=self.connector_id,
-            )
-            self.data_source = SmbDataSource(client)
+            self.data_source = await self._build_data_source()
             self.sync_filters, self.indexing_filters = await load_connector_filters(
                 self.config_service, self.filter_key, self.connector_id, self.logger
             )
@@ -250,8 +248,26 @@ class SmbConnector(BaseConnector):
             return False
         except Exception as exc:
             self.logger.exception("SMB init failed")
-            await self._auth_error("Connection failed", str(exc))
+            await self._auth_error("Connection failed", await self._describe(exc))
             return False
+
+    async def _describe(self, exc: BaseException) -> str:
+        """``exc`` as one sentence a user can act on; the raw error is in the logs."""
+        config = await self.config_service.get_config(
+            ConfigPaths.CONNECTOR_CONFIG_PATH.format(connector_id=self.connector_id)
+        )
+        auth = (config or {}).get("auth") or {}
+        server = str(auth.get("server") or "the server").strip()
+        return describe(exc, server=server, share=self.configured_share, port=port_of(auth))
+
+    async def _build_data_source(self) -> INetworkShareDataSource:
+        client = await SmbClient.build_from_services(
+            logger=self.logger,
+            config_service=self.config_service,
+            connector_instance_id=self.connector_id,
+            public_only=public_only_for_scope(self.scope),
+        )
+        return SmbDataSource(client)
 
     async def test_connection_and_access(self) -> bool:
         if not self.data_source:
@@ -263,9 +279,61 @@ class SmbConnector(BaseConnector):
             else:
                 await self.data_source.list_shares()
             return True
-        except (NetworkShareAuthError, DirectoryListingError, ShareListingError, OSError, FileNotFoundError) as exc:
+        except NetworkShareAuthError as exc:
             await self._auth_error("Connection test failed", str(exc))
             return False
+        except (DirectoryListingError, ShareListingError, OSError, FileNotFoundError) as exc:
+            self.logger.warning("SMB connection test failed: %r", exc)
+            await self._auth_error("Connection test failed", await self._describe(exc))
+            return False
+
+    @classmethod
+    def auth_config_problems(cls, auth_config: dict[str, Any]) -> list[str]:
+        return auth_problems(auth_config)
+
+    @classmethod
+    async def check_connection(
+        cls, auth_config: dict[str, Any], logger: Logger, *, public_only: bool = True
+    ) -> ConnectionCheckResult:
+        problems = auth_problems(auth_config)
+        if problems:
+            return ConnectionCheckResult(success=False, message=problems[0])
+        port = port_of(auth_config)
+        if port not in STANDARD_PORTS:
+            # Anyone may run a check, so it must not reach ports a personal connector could not.
+            return ConnectionCheckResult(
+                success=False,
+                message=(
+                    f"The connection check only uses port 445 or 139. Save the settings and enable the "
+                    f"connector to use port {port}."
+                ),
+            )
+        server = str(auth_config["server"]).strip()
+        share = str(auth_config["share"]).strip()
+        client = SmbClient(
+            server=server,
+            username=str(auth_config["username"]).strip(),
+            password=str(auth_config["password"]),
+            port=port,
+            domain=str(auth_config.get("domain") or "").strip(),
+            share=share,
+            logger=logger,
+            public_only=public_only,
+        )
+        try:
+            await asyncio.to_thread(client.list_directory, share, "")
+        # Whatever stops the share from opening is the answer to show: smbprotocol raises
+        # LogonFailure, ValueError (no connection) and others outside our error types.
+        except Exception as exc:
+            logger.info("SMB connection check to %s:%s failed: %r", server, port, exc)
+            return ConnectionCheckResult(
+                success=False,
+                message=f"Could not open share {share} on {server}. "
+                + (str(exc) if isinstance(exc, NetworkShareAuthError) else describe(exc, server=server, share=share, port=port)),
+            )
+        finally:
+            await asyncio.to_thread(client.close)
+        return ConnectionCheckResult(success=True, message=f'Connected to share "{share}" on {server}.')
 
     async def get_signed_url(self, record: Record) -> str | None:
         return None
@@ -280,7 +348,29 @@ class SmbConnector(BaseConnector):
         )
 
     async def run_sync(self) -> None:
-        await self._sync(prune=True)
+        try:
+            await self._sync(prune=True)
+        except NetworkShareAuthError as exc:
+            await self._auth_error("Sign-in refused", str(exc))
+            raise
+        except ShareWalkIncompleteError as exc:
+            title = (
+                "Sync could not read the share"
+                if self._last_walk is not None and self._last_walk.unreadable
+                else "Some folders could not be read"
+            )
+            await self.notify(
+                type=NotificationType.CONNECTOR_SYNC_ERROR,
+                severity=NotificationSeverity.ERROR,
+                title=self._notification_title(title),
+                message=exc.message,
+                payload={"connectorId": self.connector_id, "connectorName": Connectors.SMB.value},
+            )
+            raise
+
+    def full_sync_coverage(self) -> FullSyncCoverage:
+        """Only a walk that read everything may let a full sync unlink what it did not see."""
+        return self._last_walk.coverage() if self._last_walk is not None else FullSyncCoverage(complete=False)
 
     async def run_incremental_sync(self) -> None:
         # The scheduler calls run_sync. There is no change journal, and a
@@ -288,16 +378,17 @@ class SmbConnector(BaseConnector):
         await self.run_sync()
 
     async def _sync(self, *, prune: bool) -> None:
+        self._last_walk = None
         if not self.data_source:
             raise ConnectionError("SMB connector is not initialized.")
         self.sync_filters, self.indexing_filters = await load_connector_filters(
             self.config_service, self.filter_key, self.connector_id, self.logger
         )
         await self._ensure_scope_edges()
-        shares = await resolve_shares(self.sync_filters, self.configured_share)
-        if not shares:
-            self.logger.warning("No SMB shares to sync")
+        if not self.configured_share:
+            self.logger.warning("No SMB share is configured")
             return
+        shares = [self.configured_share]
         await create_share_groups(
             share_names=shares,
             processor=self.data_entities_processor,
@@ -308,7 +399,7 @@ class SmbConnector(BaseConnector):
             creator_email=self.creator_email,
             description_prefix="SMB share",
         )
-        await walk_shares(
+        report = await walk_shares(
             data_source=self.data_source,
             processor=self.data_entities_processor,
             mapper=self.mapper,
@@ -325,6 +416,18 @@ class SmbConnector(BaseConnector):
             record_sync_point=self.record_sync_point,
             prune=prune,
         )
+        self._last_walk = report
+        if report.unreadable:
+            raise ShareWalkIncompleteError(
+                f"Nothing could be listed in {', '.join(report.unreadable)}. "
+                "Check that the server is reachable and the account still has access."
+            )
+        if report.unread:
+            count = len(report.unread)
+            raise ShareWalkIncompleteError(
+                f"{count} {'folder or file' if count == 1 else 'folders or files'} could not be read. "
+                "What was synced from them before was kept; the next sync tries them again."
+            )
 
     def handle_webhook_notification(self, notification: dict) -> None:
         raise NotImplementedError("SMB change notify is not a webhook strategy")
@@ -360,15 +463,7 @@ class SmbConnector(BaseConnector):
         search: str | None = None,
         cursor: str | None = None,
     ) -> FilterOptionsResponse:
-        if filter_key != "shares":
-            raise ValueError(f"Unsupported filter key: {filter_key}")
-        return await share_filter_options(
-            data_source=self.data_source,
-            configured_share=self.configured_share,
-            page=page,
-            limit=limit,
-            search=search,
-        )
+        raise ValueError(f"Unsupported filter key: {filter_key}")
 
     async def _ensure_scope_edges(self) -> None:
         if self.scope == ConnectorScope.TEAM.value:
@@ -380,11 +475,16 @@ class SmbConnector(BaseConnector):
         if creator and getattr(creator, "email", None):
             await self.data_entities_processor.on_new_app_users(self.get_app_users([creator]))
 
+    def _notification_title(self, event: str) -> str:
+        label = Connectors.SMB.value
+        name = self.connector_instance_name
+        return f"{label} ({name}): {event}" if name and name != label else f"{label}: {event}"
+
     async def _auth_error(self, title: str, message: str) -> None:
         await self.notify(
             type=NotificationType.CONNECTOR_AUTH_ERROR,
             severity=NotificationSeverity.ERROR,
-            title=title,
+            title=self._notification_title(title),
             message=message,
             payload={"connectorId": self.connector_id, "connectorName": Connectors.SMB.value},
         )
@@ -399,17 +499,21 @@ class SmbConnector(BaseConnector):
         data_entities_processor: DataSourceEntitiesProcessor,
         **kwargs: object,
     ) -> SmbConnector:
-        processor = NetworkShareEntitiesProcessor(logger, data_store_provider, config_service)
-        org_id = kwargs.get("org_id")
-        if org_id:
-            processor.org_id = org_id
-        await processor.initialize()
+        # ConnectorFactory builds and initializes the processor from processor_cls.
+        # Building a second one here orphaned the factory's, and its Redis connection.
         return cls(
             logger,
-            processor,
+            data_entities_processor,
             data_store_provider,
             config_service,
             connector_id,
             kwargs.get("scope") or ConnectorScope.PERSONAL.value,
             kwargs.get("created_by") or "",
         )
+
+
+def _personal_port_message(port: int) -> str:
+    return (
+        f"Port {port} is not allowed: personal SMB connectors use port 445 or 139. "
+        "An administrator can set up a team connector for another port."
+    )

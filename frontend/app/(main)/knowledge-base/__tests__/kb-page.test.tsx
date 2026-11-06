@@ -5,13 +5,16 @@ import '@/lib/__tests__/test-i18n';
 import { useToastStore } from '@/lib/store/toast-store';
 import { useUploadStore } from '@/lib/store/upload-store';
 import { useAuthStore } from '@/lib/store/auth-store';
+import { usePendingChatStore } from '@/lib/store/pending-chat-store';
+import { useFeatureFlagsStore } from '@/lib/store/feature-flags-store';
+import { clearSessionCache } from '@/lib/api/session-cache';
 import { useKnowledgeBaseStore } from '../store';
 import { resetKnowledgeBaseSession } from '../utils/sidebar-session';
 import KnowledgeBasePage from '../page';
 import KnowledgeBaseSidebarSlot from '../../@sidebar/knowledge-base/page';
 import { loadMoreNodeChildrenPage, loadMoreRootAppList } from '../utils/sidebar-paginated-fetch';
 import { mergeChildrenIntoTree } from '../utils/tree-builder';
-import type { EnhancedFolderTreeNode } from '../types';
+import type { EnhancedFolderTreeNode, KnowledgeHubNode, NodePermissions } from '../types';
 import {
   collection,
   createNavigation,
@@ -19,7 +22,10 @@ import {
   hubChildrenFake,
   hubNode,
   hubResponse,
+  OWNER_PERMISSIONS,
   openRowMenu,
+  pageCursor,
+  pagedByCursor,
   queryRow,
   installBrowserShims,
   renderInTheme,
@@ -70,11 +76,18 @@ const api = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../api', () => ({
-  KnowledgeHubApi: api.hub,
-  KnowledgeBaseApi: api.kb,
-  forgetPendingNodeChildrenRequests: () => {},
-}));
+vi.mock('../api', async () => {
+  const { pagedByCursor } = await import('./kb-page-harness');
+  return {
+    KnowledgeHubApi: {
+      ...api.hub,
+      getNavigationNodes: pagedByCursor(api.hub.getNavigationNodes, 0),
+      getNodeChildren: pagedByCursor(api.hub.getNodeChildren, 2),
+    },
+    KnowledgeBaseApi: api.kb,
+    forgetPendingNodeChildrenRequests: () => {},
+  };
+});
 
 const permissions = vi.hoisted(() => ({ denied: new Set<string>() }));
 vi.mock('@/config', async (importOriginal) => {
@@ -109,17 +122,20 @@ vi.mock('@/app/components/file-preview', () => ({
     isLoading,
     error,
     onOpenChange,
+    onChat,
   }: {
     file: { name: string; url: string };
     isLoading?: boolean;
     error?: string;
     onOpenChange: (open: boolean) => void;
+    onChat?: () => void;
   }) => (
     <section aria-label="File preview">
       <h2>{file.name}</h2>
       {isLoading && <p>Loading preview</p>}
       {error && <p role="alert">{error}</p>}
       {file.url && <p>Showing {file.url}</p>}
+      {onChat && <button onClick={onChat}>Chat</button>}
       <button onClick={() => onOpenChange(false)}>Close preview</button>
     </section>
   ),
@@ -177,17 +193,30 @@ vi.mock('../components', async (importOriginal) => {
   };
 });
 
+let pushState: { mockRestore: () => void } | null = null;
+let replaceState: { mockRestore: () => void } | null = null;
+
 beforeEach(() => {
   installBrowserShims();
+  usePendingChatStore.setState({ pending: null });
   nav.current = createNavigation();
   router.push.mockImplementation((url: string) => nav.current!.setUrl(url));
   router.replace.mockImplementation((url: string) => nav.current!.setUrl(url));
+  // Navigation inside the page writes the address with history.pushState, which
+  // Next mirrors into useSearchParams; this harness does the same.
+  pushState = vi.spyOn(window.history, 'pushState').mockImplementation((_state, _unused, url) => {
+    if (url != null) nav.current!.setUrl(String(url));
+  });
+  replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation((_state, _unused, url) => {
+    if (url != null) nav.current!.setUrl(String(url));
+  });
   permissions.denied.clear();
   // Loads a previous test left in flight must not leak into this one.
   resetKnowledgeBaseSession();
   useKnowledgeBaseStore.setState(useKnowledgeBaseStore.getInitialState(), true);
   useToastStore.setState({ toasts: [] });
   useUploadStore.setState(useUploadStore.getInitialState(), true);
+  useFeatureFlagsStore.setState({ flags: {} });
   api.kb.getUploadLimits.mockResolvedValue({ maxFileSizeBytes: 5 * 1024 * 1024 });
   api.hub.getNodeChildren.mockResolvedValue(hubResponse([]));
   share.getSharedMembers.mockResolvedValue([]);
@@ -196,6 +225,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  pushState?.mockRestore();
+  replaceState?.mockRestore();
 });
 
 function sidebarIds() {
@@ -321,10 +352,10 @@ describe('Knowledge base page — collections list', () => {
     openAt('/knowledge-base');
 
     expect(await screen.findByText('No collections available')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Create Collection/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Create collection/ }));
 
     const dialog = await screen.findByRole('dialog');
-    typeInto(within(dialog).getByPlaceholderText('eg: Engineering'), '  Handbook  ');
+    typeInto(within(dialog).getByPlaceholderText('e.g. Engineering'), '  Handbook  ');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
 
     await waitFor(() => expect(api.kb.createKnowledgeBase).toHaveBeenCalledWith('Handbook', ''));
@@ -337,7 +368,7 @@ describe('Knowledge base page — collections list', () => {
     openAt('/knowledge-base');
 
     expect(await screen.findByText('No collections available')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Create Collection/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Create collection/ })).toBeNull();
   });
 
   it('tells the user when the collections could not be loaded', async () => {
@@ -380,11 +411,43 @@ describe('Knowledge base page — inside a collection', () => {
     expect(currentUrl()).toContain('nodeId=kb-eng');
   });
 
+  it('keeps the place the user went to last when an earlier folder answers after it', async () => {
+    await openEngineering();
+    let answerDesigns: (value: unknown) => void = () => {};
+    api.hub.loadFolderData.mockImplementation((_type: string, id: string) =>
+      id === 'folder-designs'
+        ? new Promise((resolve) => {
+            answerDesigns = resolve;
+          })
+        : Promise.resolve(engineeringContents([SPEC])),
+    );
+
+    fireEvent.click(row('Designs'));
+    await waitFor(() => expect(currentUrl()).toContain('nodeId=folder-designs'));
+    act(() => nav.current!.setUrl('/knowledge-base?nodeType=app&nodeId=kb-eng'));
+    await waitFor(() => expect(queryRow('Designs')).toBeNull());
+    expect(row('spec.pdf')).toBeTruthy();
+
+    await act(async () => {
+      answerDesigns(
+        folderResponse(
+          { id: 'folder-designs', name: 'Designs', nodeType: 'folder' },
+          [...ENGINEERING_TRAIL, { id: 'folder-designs', name: 'Designs', nodeType: 'folder' }],
+          [hubNode({ id: 'rec-logo', name: 'logo.png', parentId: 'folder-designs' })],
+        ),
+      );
+    });
+
+    expect(queryRow('logo.png')).toBeNull();
+    expect(row('spec.pdf')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('offers to add files to an empty collection', async () => {
     await openEngineering([]);
 
     expect(screen.getByText('Add your files or folders')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Create Folder/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Create folder/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Upload/ })).toBeTruthy();
   });
 
@@ -392,9 +455,9 @@ describe('Knowledge base page — inside a collection', () => {
     await openEngineering();
     api.kb.createFolder.mockResolvedValue({ id: 'folder-new' });
 
-    await chooseFromNewMenu('New Folder');
+    await chooseFromNewMenu('New folder');
     const dialog = await screen.findByRole('dialog');
-    typeInto(within(dialog).getByPlaceholderText('eg: Engineering'), 'Roadmaps');
+    typeInto(within(dialog).getByPlaceholderText('e.g. Engineering'), 'Roadmaps');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
 
     await waitFor(() => expect(api.kb.createFolder).toHaveBeenCalledWith('kb-eng', 'Roadmaps', '', null));
@@ -435,6 +498,7 @@ describe('Knowledge base page — inside a collection', () => {
 
     await chooseRowAction('spec.pdf', 'Delete');
     const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText("'spec.pdf' will be deleted from this collection.")).toBeTruthy();
     const confirm = within(dialog).getByRole('button', { name: 'Delete' });
     expect((confirm as HTMLButtonElement).disabled).toBe(true);
 
@@ -462,7 +526,83 @@ describe('Knowledge base page — inside a collection', () => {
         expect.any(Object),
       ),
     );
-    expect(await screen.findByText('Results')).toBeTruthy();
+    expect(await screen.findByText('Search results')).toBeTruthy();
+  });
+
+  it('offers its Recently deleted page only while the trash is on', async () => {
+    withCollections();
+    api.hub.loadFolderData.mockResolvedValue(
+      folderResponse({ id: 'kb-eng', name: 'Engineering', nodeType: 'app' }, ENGINEERING_TRAIL, [SPEC], {
+        permissions: { ...OWNER_PERMISSIONS, collectionRole: 'OWNER' },
+      }),
+    );
+    openAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
+    await screen.findByRole('row', { name: SPEC.name });
+    expect(screen.queryByRole('button', { name: /Recently deleted/ })).toBeNull();
+
+    act(() => useFeatureFlagsStore.setState({ flags: { ENABLE_SOFT_DELETE: true } }));
+    fireEvent.click(await screen.findByRole('button', { name: /Recently deleted/ }));
+
+    expect(router.push).toHaveBeenCalledWith('/knowledge-base/recently-deleted?kbId=kb-eng');
+  });
+
+  // Knowledge Hub's context role: at the collection root it is the collection permission's
+  // role; inside a folder it ranks record permissions, which have no FILEORGANIZER, so a
+  // file organizer reads as READER there. collectionRole is the role the trash API checks.
+  for (const [where, collectionRole, contextRole, shown] of [
+    ['the collection', 'OWNER', 'OWNER', true],
+    ['the collection', 'WRITER', 'WRITER', true],
+    ['the collection', 'FILEORGANIZER', 'FILEORGANIZER', true],
+    ['the collection', 'READER', 'READER', false],
+    ['the collection', 'COMMENTER', 'COMMENTER', false],
+    ['a folder', 'FILEORGANIZER', 'READER', true],
+    ['a folder', 'WRITER', 'WRITER', true],
+    ['a folder', 'READER', 'READER', false],
+  ] as const) {
+    it(`${shown ? 'offers' : 'does not offer'} Recently deleted to a ${collectionRole.toLowerCase()} inside ${where}`, async () => {
+      useFeatureFlagsStore.setState({ flags: { ENABLE_SOFT_DELETE: true } });
+      withCollections();
+      const canDelete = contextRole === 'OWNER' || contextRole === 'WRITER';
+      const permissions = {
+        ...OWNER_PERMISSIONS,
+        role: contextRole as NodePermissions['role'],
+        canDelete,
+        canEdit: canDelete,
+        collectionRole,
+      };
+      const inFolder = where === 'a folder';
+      api.hub.loadFolderData.mockResolvedValue(
+        inFolder
+          ? folderResponse(
+              { id: 'folder-designs', name: 'Designs', nodeType: 'folder' },
+              [...ENGINEERING_TRAIL, { id: 'folder-designs', name: 'Designs', nodeType: 'folder' }],
+              [hubNode({ id: 'rec-logo', name: 'logo.png', parentId: 'folder-designs' })],
+              { permissions },
+            )
+          : folderResponse({ id: 'kb-eng', name: 'Engineering', nodeType: 'app' }, ENGINEERING_TRAIL, [SPEC], { permissions }),
+      );
+      openAt(inFolder ? '/knowledge-base?nodeType=folder&nodeId=folder-designs' : '/knowledge-base?nodeType=app&nodeId=kb-eng');
+      await screen.findByRole('row', { name: inFolder ? 'logo.png' : SPEC.name });
+
+      const button = screen.queryByRole('button', { name: /Recently deleted/ });
+      expect(Boolean(button)).toBe(shown);
+      if (button) {
+        fireEvent.click(button);
+        expect(router.push).toHaveBeenCalledWith('/knowledge-base/recently-deleted?kbId=kb-eng');
+      }
+    });
+  }
+
+  it('hides Recently deleted while the collection role is unknown', async () => {
+    useFeatureFlagsStore.setState({ flags: { ENABLE_SOFT_DELETE: true } });
+    withCollections();
+    api.hub.loadFolderData.mockResolvedValue(
+      folderResponse({ id: 'kb-eng', name: 'Engineering', nodeType: 'app' }, ENGINEERING_TRAIL, [SPEC]),
+    );
+    openAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
+    await screen.findByRole('row', { name: SPEC.name });
+
+    expect(screen.queryByRole('button', { name: /Recently deleted/ })).toBeNull();
   });
 
   it('reloads the collection when Refresh is clicked', async () => {
@@ -473,6 +613,23 @@ describe('Knowledge base page — inside a collection', () => {
 
     await waitFor(() => expect(api.hub.loadFolderData).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('row', { name: 'spec.pdf' })).toBeTruthy();
+  });
+
+  it('loads the members of an open collection once, even as the tree fills in', async () => {
+    await openEngineering();
+    await waitFor(() => expect(share.getSharedMembers).toHaveBeenCalledTimes(1));
+
+    // What the sidebar tree's children fetch does once it lands.
+    act(() => {
+      useKnowledgeBaseStore.getState().addNodes([
+        hubNode({ id: 'folder-late', name: 'Late folder', nodeType: 'folder', parentId: 'kb-eng' }),
+      ]);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(share.getSharedMembers).toHaveBeenCalledTimes(1);
   });
 
   it('sends a user whose access was removed back to the collections list', async () => {
@@ -518,9 +675,9 @@ describe('Knowledge base page — failures the user must be able to recover from
     await openEngineering();
     api.kb.createFolder.mockRejectedValue({ type: 'SERVER_ERROR', message: "KeyError: 'parentId'", statusCode: 500 });
 
-    await chooseFromNewMenu('New Folder');
+    await chooseFromNewMenu('New folder');
     const dialog = await screen.findByRole('dialog');
-    typeInto(within(dialog).getByPlaceholderText('eg: Engineering'), 'Roadmaps');
+    typeInto(within(dialog).getByPlaceholderText('e.g. Engineering'), 'Roadmaps');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
 
     await waitFor(() =>
@@ -602,6 +759,36 @@ describe('Knowledge base page — failures the user must be able to recover from
     );
   });
 
+  it('does not restore collections when a list request finishes after the last one is gone', async () => {
+    const pending: { resolve: (value: unknown) => void; signal?: AbortSignal }[] = [];
+    api.hub.getNavigationNodes.mockImplementation((params?: { nodeTypes?: string }, options?: { signal?: AbortSignal }) => {
+      if (params?.nodeTypes === 'app') {
+        return new Promise((resolve) => {
+          pending.push({ resolve, signal: options?.signal });
+        });
+      }
+      return Promise.resolve(hubResponse([ENGINEERING]));
+    });
+    openAt('/knowledge-base');
+
+    await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+    const listRequest = pending[pending.length - 1];
+
+    act(() => {
+      useKnowledgeBaseStore.getState().setCategorizedNodes({ shared: [], private: [] });
+    });
+
+    expect(listRequest.signal?.aborted).toBe(true);
+    expect(useKnowledgeBaseStore.getState().isLoadingTableData).toBe(false);
+
+    await act(async () => {
+      listRequest.resolve(hubResponse([ENGINEERING]));
+    });
+
+    expect(useKnowledgeBaseStore.getState().tableData).toBeNull();
+    expect(screen.queryByRole('row', { name: 'Engineering' })).toBeNull();
+  });
+
   it('after the last collection is deleted, says there are no collections left', async () => {
     api.hub.getNavigationNodes.mockResolvedValue(hubResponse([ENGINEERING]));
     api.kb.deleteNode.mockImplementation(async () => {
@@ -613,6 +800,12 @@ describe('Knowledge base page — failures the user must be able to recover from
     await screen.findByRole('row', { name: 'Engineering' });
     await chooseRowAction('Engineering', 'Delete');
     const dialog = await screen.findByRole('dialog');
+    // A collection is named as one, never as a folder; the agents that use it lose it too, and it is gone for good.
+    expect(
+      within(dialog).getByText(
+        "'Engineering' and everything in it will be permanently deleted. It will also be removed from any agents that use it. This can't be undone.",
+      ),
+    ).toBeTruthy();
     typeInto(within(dialog).getByRole('textbox'), 'DELETE');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
@@ -764,7 +957,7 @@ describe('Knowledge base page — failures the user must be able to recover from
     );
     openAt('/knowledge-base');
     await screen.findByRole('row', { name: 'Engineering' });
-    await waitFor(() => expect(useKnowledgeBaseStore.getState().appRootListPagination).toEqual({ hasNext: true, nextPage: 2 }));
+    await waitFor(() => expect(useKnowledgeBaseStore.getState().appRootListPagination).toEqual({ hasNext: true, nextCursor: 'p2' }));
     act(() => {
       const kb = useKnowledgeBaseStore.getState();
       kb.cacheNodeChildren('kb-eng', [DESIGNS]);
@@ -797,7 +990,7 @@ describe('Knowledge base page — failures the user must be able to recover from
     );
     openAt('/knowledge-base');
     await screen.findByRole('row', { name: 'Engineering' });
-    await waitFor(() => expect(useKnowledgeBaseStore.getState().appRootListPagination).toEqual({ hasNext: true, nextPage: 2 }));
+    await waitFor(() => expect(useKnowledgeBaseStore.getState().appRootListPagination).toEqual({ hasNext: true, nextCursor: 'p2' }));
     act(() => {
       const kb = useKnowledgeBaseStore.getState();
       kb.cacheNodeChildren('kb-eng', [DESIGNS]);
@@ -840,7 +1033,7 @@ describe('Knowledge base page — failures the user must be able to recover from
 
     act(() => useKnowledgeBaseStore.setState({ pendingSidebarAction: { type: 'create-collection' } }));
     const dialog = await screen.findByRole('dialog');
-    typeInto(within(dialog).getByPlaceholderText('eg: Engineering'), 'Handbook');
+    typeInto(within(dialog).getByPlaceholderText('e.g. Engineering'), 'Handbook');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(sidebarIds().sort()).toEqual(['kb-eng', 'kb-new']));
 
@@ -889,6 +1082,25 @@ describe('Knowledge base page — working with files', () => {
     fireEvent.click(within(preview).getByRole('button', { name: 'Close preview' }));
     expect(screen.queryByRole('region', { name: 'File preview' })).toBeNull();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
+  });
+
+  it('opens a chat scoped to the file being previewed', async () => {
+    await openEngineering();
+    api.kb.getRecordDetails.mockResolvedValue({ record: { recordName: 'spec.pdf', mimeType: 'application/pdf', sizeInBytes: 2048 } });
+    api.kb.streamRecord.mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }));
+
+    fireEvent.click(row('spec.pdf'));
+
+    const preview = await screen.findByRole('region', { name: 'File preview' });
+    fireEvent.click(within(preview).getByRole('button', { name: 'Chat' }));
+
+    expect(router.push).toHaveBeenCalledWith('/chat');
+    expect(usePendingChatStore.getState().pending).toMatchObject({
+      message: '',
+      pageContext: {
+        selectedNodes: [{ id: 'rec-spec', name: 'spec.pdf', nodeType: 'record' }],
+      },
+    });
   });
 
   it('does not download a file the viewer cannot render', async () => {
@@ -1006,27 +1218,32 @@ describe('Knowledge base page — working with files', () => {
 
   it('loads the next page of a large collection', async () => {
     withCollections();
-    api.hub.loadFolderData.mockImplementation(async (_type: string, _id: string, params: { page: number }) => {
+    api.hub.loadFolderData.mockImplementation(pagedByCursor(async (_type: string, _id: string, params: { page: number }) => {
       const page = engineeringContents(params.page === 1 ? [DESIGNS, SPEC] : [NOTES]);
       page.pagination = {
         page: params.page,
         limit: 50,
         totalItems: 120,
         totalPages: 3,
+        startIndex: (params.page - 1) * 50 + 1,
+        endIndex: params.page * 50,
         hasNext: params.page < 3,
         hasPrev: params.page > 1,
       };
       return page;
-    });
+    }, 2));
     openAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
     await screen.findByRole('row', { name: 'spec.pdf' });
-    expect(screen.getByText('Showing 1-50 of 120 Items')).toBeTruthy();
+    expect(screen.getByText('Showing 1-50 of 120')).toBeTruthy();
 
     fireEvent.click(screen.getByText('Next'));
 
     expect(await screen.findByRole('row', { name: 'notes.txt' })).toBeTruthy();
-    expect(screen.getByText('Showing 51-100 of 120 Items')).toBeTruthy();
-    expect(currentUrl()).toContain('page=2');
+    expect(screen.getByText('Showing 51-100 of 120')).toBeTruthy();
+    expect(currentUrl()).toContain(`cursor=${pageCursor(2)}`);
+    expect(api.hub.loadFolderData).toHaveBeenLastCalledWith(
+      'app', 'kb-eng', expect.objectContaining({ cursor: pageCursor(2) }), expect.anything(),
+    );
   });
 });
 
@@ -1035,7 +1252,7 @@ describe('Knowledge base page — selecting several items', () => {
     await openEngineering();
     fireEvent.click(within(row('spec.pdf')).getByRole('checkbox'));
     fireEvent.click(within(row('notes.txt')).getByRole('checkbox'));
-    expect(await screen.findByText('2 Items Selected')).toBeTruthy();
+    expect(await screen.findByText('2 selected')).toBeTruthy();
   }
 
   it('deletes the selected files after confirmation', async () => {
@@ -1045,7 +1262,7 @@ describe('Knowledge base page — selecting several items', () => {
       { status: 'fulfilled', value: {} },
     ]);
 
-    const bar = screen.getByText('2 Items Selected').parentElement!;
+    const bar = screen.getByText('2 selected').parentElement!;
     fireEvent.click(within(bar).getByRole('button', { name: /Delete/ }));
     const dialog = await screen.findByRole('dialog');
     typeInto(within(dialog).getByRole('textbox'), 'DELETE');
@@ -1067,19 +1284,79 @@ describe('Knowledge base page — selecting several items', () => {
       { status: 'rejected', reason: new Error('x') },
     ]);
 
-    const bar = screen.getByText('2 Items Selected').parentElement!;
-    fireEvent.click(within(bar).getByRole('button', { name: /Re-index/ }));
+    const bar = screen.getByText('2 selected').parentElement!;
+    fireEvent.click(within(bar).getByRole('button', { name: /Reindex/ }));
 
     await waitFor(() => expect(toastTexts()).toContain('Reindexed 1 items, 1 failed'));
+  });
+
+  it('opens a new chat scoped to the selected files, without sending anything', async () => {
+    await selectSpecAndNotes();
+
+    const bar = screen.getByText('2 selected').parentElement!;
+    fireEvent.click(within(bar).getByRole('button', { name: /Chat/ }));
+
+    expect(router.push).toHaveBeenCalledWith('/chat');
+    expect(usePendingChatStore.getState().pending).toMatchObject({
+      message: '',
+      pageContext: {
+        selectedNodes: [
+          { id: 'rec-spec', name: 'spec.pdf', nodeType: 'record' },
+          { id: 'rec-notes', name: 'notes.txt', nodeType: 'record' },
+        ],
+      },
+    });
+  });
+
+  it('takes a selected folder to the chat as a folder', async () => {
+    await openEngineering();
+    fireEvent.click(within(row('Designs')).getByRole('checkbox'));
+    const bar = (await screen.findByText('1 selected')).parentElement!;
+
+    fireEvent.click(within(bar).getByRole('button', { name: /Chat/ }));
+
+    expect(usePendingChatStore.getState().pending?.pageContext.selectedNodes).toMatchObject([
+      { id: DESIGNS.id, name: 'Designs', nodeType: 'folder' },
+    ]);
+  });
+
+  it('takes to the chat exactly the files the bar counts, after moving to another page', async () => {
+    withCollections();
+    api.hub.loadFolderData.mockImplementation(pagedByCursor(async (_type: string, _id: string, params: { page: number }) => {
+      const page = engineeringContents(params.page === 1 ? [SPEC] : [NOTES]);
+      page.pagination = {
+        page: params.page,
+        limit: 50,
+        totalItems: 100,
+        totalPages: 2,
+        startIndex: (params.page - 1) * 50 + 1,
+        endIndex: params.page * 50,
+        hasNext: params.page < 2,
+        hasPrev: params.page > 1,
+      };
+      return page;
+    }, 2));
+    openAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
+    fireEvent.click(within(await screen.findByRole('row', { name: 'spec.pdf' })).getByRole('checkbox'));
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(within(await screen.findByRole('row', { name: 'notes.txt' })).getByRole('checkbox'));
+    // A collection's listing starts each page with nothing ticked.
+    const bar = (await screen.findByText('1 selected')).parentElement!;
+
+    fireEvent.click(within(bar).getByRole('button', { name: /Chat/ }));
+
+    expect(usePendingChatStore.getState().pending?.pageContext.selectedNodes?.map((node) => node.name)).toEqual([
+      'notes.txt',
+    ]);
   });
 
   it('clears the selection', async () => {
     await selectSpecAndNotes();
 
-    const bar = screen.getByText('2 Items Selected').parentElement!;
+    const bar = screen.getByText('2 selected').parentElement!;
     fireEvent.click(within(bar).getByRole('checkbox'));
 
-    await waitFor(() => expect(screen.queryByText('2 Items Selected')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('2 selected')).toBeNull());
   });
 });
 
@@ -1106,7 +1383,7 @@ describe('Knowledge base page — uploading', () => {
     );
     api.hub.loadFolderData.mockClear();
 
-    await chooseFromNewMenu('Upload Data');
+    await chooseFromNewMenu('Upload data');
     fireEvent.click(await screen.findByRole('button', { name: 'Upload chosen files' }));
 
     await waitFor(() => expect(api.kb.streamUpload).toHaveBeenCalledTimes(1));
@@ -1122,6 +1399,19 @@ describe('Knowledge base page — uploading', () => {
     await waitFor(() => expect(api.hub.loadFolderData).toHaveBeenCalled());
   });
 
+  it('does not offer Upload data on the collections list, where there is no collection to upload into', async () => {
+    withCollections();
+    openAt('/knowledge-base');
+    await screen.findByRole('row', { name: 'Engineering' });
+
+    const trigger = screen.getByTestId('new-dropdown-trigger');
+    await act(async () => {
+      fireEvent.keyDown(trigger, { key: 'Enter' });
+    });
+    expect(await screen.findByRole('menuitem', { name: /New folder$/ })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: /Upload data$/ })).toBeNull();
+  });
+
   it('marks every file failed when the upload connection drops', async () => {
     await openEngineering();
     const a = fileOfSize('a.txt', 10);
@@ -1132,7 +1422,7 @@ describe('Knowledge base page — uploading', () => {
       },
     );
 
-    await chooseFromNewMenu('Upload Data');
+    await chooseFromNewMenu('Upload data');
     fireEvent.click(await screen.findByRole('button', { name: 'Upload chosen files' }));
 
     await waitFor(() => {
@@ -1156,7 +1446,7 @@ describe('Knowledge base page — uploading', () => {
     ];
     api.kb.streamUpload.mockRejectedValue(new Error('Folder could not be created. Try again.'));
 
-    await chooseFromNewMenu('Upload Data');
+    await chooseFromNewMenu('Upload data');
     fireEvent.click(await screen.findByRole('button', { name: 'Upload chosen files' }));
 
     await waitFor(() => expect(api.kb.streamUpload).toHaveBeenCalled());
@@ -1166,6 +1456,46 @@ describe('Knowledge base page — uploading', () => {
       const failed = useUploadStore.getState().items.filter((i) => i.status === 'failed');
       expect(failed.map((i) => i.name).sort()).toEqual(['one.txt', 'two.txt']);
     });
+  });
+
+  it('stops at sign-out: the batch in flight is cancelled and no further batch is sent', async () => {
+    await openEngineering();
+    const folder = (name: string) => {
+      const file = fileOfSize(`${name}.txt`, 10);
+      return { id: name, name, size: 10, type: 'folder' as const, filesWithPaths: [{ file, relativePath: file.name }] };
+    };
+    // Two top-level folders: two batches, sent one after the other.
+    upload.items = [folder('Reports'), folder('Slides')];
+    const signals: AbortSignal[] = [];
+    api.kb.streamUpload.mockImplementation(
+      (_kb: string, _folder: string | null, _files: File[], _meta: unknown, opts: { signal: AbortSignal }) => {
+        signals.push(opts.signal);
+        return new Promise<void>((_resolve, reject) => {
+          opts.signal.addEventListener('abort', () => reject(new Error('aborted')));
+        });
+      },
+    );
+
+    await chooseFromNewMenu('Upload data');
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload chosen files' }));
+    await waitFor(() => expect(api.kb.streamUpload).toHaveBeenCalledTimes(1));
+
+    useToastStore.setState({ toasts: [] });
+    act(() => clearSessionCache());
+    // Installed on the reset store, before the cancelled upload's code resumes.
+    const finalizeSession = vi.fn();
+    useUploadStore.setState({ finalizeSession });
+
+    await waitFor(() => expect(signals[0].aborted).toBe(true));
+    // The second folder's batch would have been sent by now had the loop kept going.
+    await act(async () => {
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    });
+    expect(api.kb.streamUpload).toHaveBeenCalledTimes(1);
+    expect(finalizeSession).not.toHaveBeenCalled();
+    expect(useUploadStore.getState().items).toEqual([]);
+    expect(useToastStore.getState().toasts.filter((t) => t.variant === 'error')).toEqual([]);
+    useUploadStore.setState(useUploadStore.getInitialState(), true);
   });
 });
 
@@ -1183,9 +1513,9 @@ describe('Knowledge base page — folders and sharing', () => {
     openAt('/knowledge-base?nodeType=folder&nodeId=folder-designs');
     await screen.findByRole('row', { name: 'logo.png' });
 
-    await chooseFromNewMenu('New Folder');
+    await chooseFromNewMenu('New folder');
     const dialog = await screen.findByRole('dialog');
-    typeInto(within(dialog).getByPlaceholderText('eg: Engineering'), 'Icons');
+    typeInto(within(dialog).getByPlaceholderText('e.g. Engineering'), 'Icons');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
 
     await waitFor(() => expect(api.kb.createFolder).toHaveBeenCalledWith('kb-eng', 'Icons', '', 'folder-designs'));
@@ -1219,7 +1549,7 @@ describe('Knowledge base page — folders and sharing', () => {
     act(() => useKnowledgeBaseStore.setState({ pendingSidebarAction: { type: 'create-collection' } }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getAllByText('Create Collection').length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText('Create collection').length).toBeGreaterThan(0);
   });
 
   it('deletes a folder when asked from the sidebar', async () => {
@@ -1257,7 +1587,69 @@ describe('Knowledge base page — All Records', () => {
     openAt('/knowledge-base?view=all-records');
 
     expect(await screen.findByRole('row', { name: 'Budget.xlsx' })).toBeTruthy();
-    expect(screen.getByText('All Records')).toBeTruthy();
+    expect(screen.getByText('All records')).toBeTruthy();
+  });
+
+  it('loads the next page of all records', async () => {
+    withCollections();
+    const later = hubNode({ id: 'rec-later', name: 'Later.xlsx', origin: 'CONNECTOR', connector: 'GOOGLE_DRIVE' });
+    api.hub.getAllRootItems.mockImplementation(async (params?: { cursor?: string }) => {
+      const second = params?.cursor === 'p2';
+      return hubResponse([second ? later : CONNECTOR_FILE], {
+        pagination: {
+          page: second ? 2 : 1,
+          limit: 50,
+          totalItems: 20,
+          totalPages: 2,
+          startIndex: second ? 11 : 1,
+          endIndex: second ? 20 : 10,
+          hasNext: !second,
+          hasPrev: second,
+          nextCursor: second ? null : 'p2',
+          prevCursor: second ? 'p1' : null,
+        },
+      });
+    });
+    openAt('/knowledge-base?view=all-records');
+    await screen.findByRole('row', { name: 'Budget.xlsx' });
+
+    fireEvent.click(screen.getByText('Next'));
+
+    expect(await screen.findByRole('row', { name: 'Later.xlsx' })).toBeTruthy();
+    expect(api.hub.getAllRootItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: 'p2' }),
+      expect.anything(),
+    );
+  });
+
+  it('requests the next page number when the response has no cursor', async () => {
+    withCollections();
+    const later = hubNode({ id: 'rec-later', name: 'Later.xlsx', origin: 'CONNECTOR', connector: 'GOOGLE_DRIVE' });
+    api.hub.getAllRootItems.mockImplementation(async (params?: { page?: number }) => {
+      const second = params?.page === 2;
+      return hubResponse([second ? later : CONNECTOR_FILE], {
+        pagination: {
+          page: second ? 2 : 1,
+          limit: 50,
+          totalItems: 20,
+          totalPages: 2,
+          startIndex: second ? 11 : 1,
+          endIndex: second ? 20 : 10,
+          hasNext: !second,
+          hasPrev: second,
+        },
+      });
+    });
+    openAt('/knowledge-base?view=all-records');
+    await screen.findByRole('row', { name: 'Budget.xlsx' });
+
+    fireEvent.click(screen.getByText('Next'));
+
+    expect(await screen.findByRole('row', { name: 'Later.xlsx' })).toBeTruthy();
+    expect(api.hub.getAllRootItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2 }),
+      expect.anything(),
+    );
   });
 
   it('shows an error with a Try again button that reloads the records', async () => {
@@ -1282,8 +1674,106 @@ describe('Knowledge base page — All Records', () => {
     fireEvent.click(await screen.findByRole('row', { name: 'Shared Drive' }));
 
     expect(await screen.findByRole('row', { name: 'Budget.xlsx' })).toBeTruthy();
-    expect(api.hub.loadFolderData).toHaveBeenCalledWith('recordGroup', 'rg-drive', expect.any(Object));
+    expect(api.hub.loadFolderData).toHaveBeenCalledWith(
+      'recordGroup',
+      'rg-drive',
+      expect.any(Object),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(currentUrl()).toContain('view=all-records');
+  });
+
+  it('reindexes the rows ticked on every page, as many as the bar counts', async () => {
+    withCollections();
+    const FIRST = hubNode({ id: 'rec-a', name: 'A.xlsx', origin: 'CONNECTOR', connector: 'GOOGLE_DRIVE', parentId: 'rg-drive' });
+    const SECOND = hubNode({ id: 'rec-b', name: 'B.xlsx', origin: 'CONNECTOR', connector: 'GOOGLE_DRIVE', parentId: 'rg-drive' });
+    api.hub.loadFolderData.mockImplementation(pagedByCursor(async (_type: string, _id: string, params: { page: number }) => {
+      const page = folderResponse(
+        { id: 'rg-drive', name: 'Shared Drive', nodeType: 'recordGroup' },
+        [{ id: 'rg-drive', name: 'Shared Drive', nodeType: 'recordGroup' }],
+        [params.page === 1 ? FIRST : SECOND],
+      );
+      page.pagination = {
+        page: params.page,
+        limit: 50,
+        totalItems: 100,
+        totalPages: 2,
+        startIndex: (params.page - 1) * 50 + 1,
+        endIndex: params.page * 50,
+        hasNext: params.page < 2,
+        hasPrev: params.page > 1,
+      };
+      return page;
+    }, 2));
+    api.kb.bulkReindex.mockResolvedValue([
+      { status: 'fulfilled', value: {} },
+      { status: 'fulfilled', value: {} },
+    ]);
+    openAt('/knowledge-base?view=all-records&nodeType=recordGroup&nodeId=rg-drive');
+    await screen.findByRole('row', { name: 'A.xlsx' });
+    // Browsing a source's tree, where the bar offers Re-index.
+    act(() => useKnowledgeBaseStore.setState({ allRecordsSidebarSelection: { type: 'explorer' } }));
+    fireEvent.click(within(row('A.xlsx')).getByRole('checkbox'));
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(within(await screen.findByRole('row', { name: 'B.xlsx' })).getByRole('checkbox'));
+    const bar = (await screen.findByText('2 selected')).parentElement!;
+
+    fireEvent.click(within(bar).getByRole('button', { name: /Reindex/ }));
+
+    await waitFor(() =>
+      expect(api.kb.bulkReindex).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 'rec-a' }),
+        expect.objectContaining({ id: 'rec-b' }),
+      ]),
+    );
+  });
+
+  it('fills the tree of a source folder from its complete listing, but never an app, whose tree lives elsewhere', async () => {
+    withCollections();
+    const folder = hubNode({ id: 'fold-1', name: 'Reports', nodeType: 'folder', parentId: 'rg-drive' });
+    api.hub.loadFolderData.mockResolvedValue(hubResponse([folder]));
+
+    const first = openAt('/knowledge-base?view=all-records&nodeType=recordGroup&nodeId=rg-drive');
+    await screen.findByRole('row', { name: 'Reports' });
+    expect(useKnowledgeBaseStore.getState().nodeChildrenCache.get('rg-drive')?.map((n) => n.id)).toEqual(['fold-1']);
+    first.unmount();
+
+    openAt('/knowledge-base?view=all-records&nodeType=app&nodeId=app-drive');
+    await waitFor(() => expect(api.hub.loadFolderData).toHaveBeenCalledWith('app', 'app-drive', expect.anything(), expect.anything()));
+    await screen.findByRole('row', { name: 'Reports' });
+
+    expect(useKnowledgeBaseStore.getState().nodeChildrenCache.has('app-drive')).toBe(false);
+    expect(useKnowledgeBaseStore.getState().appChildrenCache.has('app-drive')).toBe(false);
+  });
+
+  it('scopes a question from the chat box to the connectors the filter bar picked', async () => {
+    withCollections();
+    api.hub.getAllRootItems.mockResolvedValue(hubResponse([CONNECTOR_FILE]));
+    openAt('/knowledge-base?view=all-records');
+    await screen.findByRole('row', { name: 'Budget.xlsx' });
+    act(() => {
+      useKnowledgeBaseStore.setState((state) => {
+        state.allRecordsFilter = { connectorIds: ['app-drive'], indexingStatus: ['FAILED'] };
+        state.allRecordsTableData!.filters = {
+          applied: {},
+          available: {
+            nodeTypes: [],
+            recordTypes: [],
+            origins: [],
+            indexingStatus: [],
+            connectors: [{ id: 'app-drive', label: 'Drive', connectorType: 'GOOGLE_DRIVE' }],
+          },
+        } as never;
+      });
+    });
+
+    typeInto(screen.getByPlaceholderText(/Ask/), 'what is the budget?');
+    fireEvent.keyDown(screen.getByPlaceholderText(/Ask/), { key: 'Enter' });
+
+    expect(router.push).toHaveBeenCalledWith('/chat');
+    expect(usePendingChatStore.getState().pending?.pageContext.selectedNodes).toEqual([
+      { id: 'app-drive', name: 'Drive', nodeType: 'app', connector: 'GOOGLE_DRIVE' },
+    ]);
   });
 
   it('searches across all records', async () => {
@@ -1296,12 +1786,65 @@ describe('Knowledge base page — All Records', () => {
     typeInto(screen.getByPlaceholderText('eg: Sales Docs'), 'budget');
 
     await waitFor(() =>
-      expect(api.hub.getAllRootItems).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'budget' })),
+      expect(api.hub.getAllRootItems).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: 'budget' }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      ),
     );
 
     const searchButtons = within(screen.getByPlaceholderText('eg: Sales Docs').parentElement!.parentElement!).getAllByRole('button');
     fireEvent.click(searchButtons[searchButtons.length - 1]);
-    await waitFor(() => expect(api.hub.getAllRootItems).toHaveBeenLastCalledWith(expect.not.objectContaining({ q: 'budget' })));
+    await waitFor(() =>
+      expect(api.hub.getAllRootItems).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ q: 'budget' }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      ),
+    );
+  });
+
+  it('shows the latest filter results when an earlier request finishes last', async () => {
+    withCollections();
+    api.hub.getAllRootItems.mockResolvedValue(hubResponse([CONNECTOR_FILE]));
+    openAt('/knowledge-base?view=all-records');
+    await screen.findByRole('row', { name: 'Budget.xlsx' });
+
+    const pending: { resolve: (value: unknown) => void; signal?: AbortSignal }[] = [];
+    api.hub.getAllRootItems.mockImplementation((_params, options?: { signal?: AbortSignal }) =>
+      new Promise((resolve) => {
+        pending.push({ resolve, signal: options?.signal });
+      }),
+    );
+
+    act(() => {
+      useKnowledgeBaseStore.getState().setAllRecordsFilter({ indexingStatus: ['QUEUED'] });
+    });
+    await waitFor(() => expect(pending).toHaveLength(1));
+
+    act(() => {
+      useKnowledgeBaseStore.getState().setAllRecordsFilter({ indexingStatus: ['IN_PROGRESS'] });
+    });
+    await waitFor(() => expect(pending).toHaveLength(2));
+
+    expect(pending[0].signal?.aborted).toBe(true);
+    expect(pending[1].signal?.aborted).toBe(false);
+    expect(screen.getByRole('status')).toBeTruthy();
+
+    const newer = hubNode({ id: 'rec-new', name: 'Newer.pdf', origin: 'CONNECTOR' });
+    const stale = hubNode({ id: 'rec-stale', name: 'Stale.pdf', origin: 'CONNECTOR' });
+
+    await act(async () => {
+      pending[1].resolve(hubResponse([newer]));
+    });
+
+    expect(await screen.findByRole('row', { name: 'Newer.pdf' })).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+
+    await act(async () => {
+      pending[0].resolve(hubResponse([stale]));
+    });
+
+    expect(screen.queryByRole('row', { name: 'Stale.pdf' })).toBeNull();
+    expect(screen.getByRole('row', { name: 'Newer.pdf' })).toBeTruthy();
   });
 });
 
@@ -1404,6 +1947,12 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
     );
   }
 
+  /** The table's first page of a collection with more children than fit on it. */
+  function engineeringFirstPage(items: KnowledgeHubNode[]) {
+    const response = engineeringContents(items);
+    return { ...response, pagination: { ...response.pagination!, hasNext: true, nextCursor: 'p2' } };
+  }
+
   function childRequests(id: string) {
     return api.hub.getNodeChildren.mock.calls
       .filter(([, requested]) => requested === id)
@@ -1414,7 +1963,7 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
     const folders = numberedFolders(30, 'kb-eng');
     withCollections([ENGINEERING]);
     api.hub.getNodeChildren.mockImplementation(hubChildrenFake(() => ({ 'kb-eng': folders })));
-    api.hub.loadFolderData.mockResolvedValue(engineeringContents(folders.slice(0, 3)));
+    api.hub.loadFolderData.mockResolvedValue(engineeringFirstPage(folders.slice(0, 3)));
     openWithSidebarAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
 
     await waitFor(() => expect(childIdsOf('kb-eng')).toEqual(folders.slice(0, 20).map((f) => f.id)));
@@ -1425,6 +1974,17 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
       await loadMoreNodeChildrenPage('kb-eng');
     });
     expect(childIdsOf('kb-eng')).toEqual(folders.map((f) => f.id));
+  });
+
+  it('lists a small collection once: the sidebar reuses the table listing', async () => {
+    withCollections([ENGINEERING]);
+    api.hub.getNodeChildren.mockImplementation(hubChildrenFake(() => ({ 'kb-eng': [DESIGNS, SPECS_DIR] })));
+    api.hub.loadFolderData.mockResolvedValue(engineeringContents([SPEC, SPECS_DIR, DESIGNS]));
+    openWithSidebarAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
+
+    await waitFor(() => expect(childIdsOf('kb-eng')).toEqual(['folder-designs', 'folder-specs']));
+    expect(within(sidebar).getByText('Specs')).toBeTruthy();
+    expect(childRequests('kb-eng')).toEqual([]);
   });
 
   it('keeps every folder shown and the renamed one in view after a sidebar rename', async () => {
@@ -1440,7 +2000,7 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
       renamed = true;
       return {};
     });
-    api.hub.loadFolderData.mockResolvedValue(engineeringContents(folders.slice(0, 3)));
+    api.hub.loadFolderData.mockResolvedValue(engineeringFirstPage(folders.slice(0, 3)));
     openWithSidebarAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
     await waitFor(() => expect(childIdsOf('kb-eng')).toHaveLength(20));
     await act(async () => {
@@ -1533,7 +2093,7 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
     api.hub.getNodeChildren.mockImplementation(
       hubChildrenFake(() => ({ 'kb-eng': [DESIGNS, SPECS_DIR], 'folder-designs': [MOCKUPS] })),
     );
-    api.hub.loadFolderData.mockResolvedValue(engineeringContents([DESIGNS, SPEC]));
+    api.hub.loadFolderData.mockResolvedValue(engineeringContents([DESIGNS, SPECS_DIR, SPEC]));
     openWithSidebarAt('/knowledge-base?nodeType=app&nodeId=kb-eng');
     await screen.findByRole('row', { name: 'spec.pdf' });
     await waitFor(() => expect(childIdsOf('kb-eng')).toEqual(['folder-designs', 'folder-specs']));
@@ -1643,7 +2203,7 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
     ]);
     expect(childIdsOf('folder-designs')).toHaveLength(40);
     expect(useKnowledgeBaseStore.getState().nodeChildrenPagination.get('folder-designs')).toEqual(
-      expect.objectContaining({ hasNext: true, nextPage: 3 }),
+      expect.objectContaining({ hasNext: true, nextCursor: 'p3' }),
     );
   });
 
@@ -1741,7 +2301,7 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
     sidebar = within(view.container).getByTestId('sidebar-slot');
     await screen.findByRole('row', { name: 'Designs' });
     await waitFor(() => expect(childIdsOf('kb-eng')).toEqual(['folder-designs', 'folder-specs']));
-    await waitFor(() => expect(useKnowledgeBaseStore.getState().appRootListPagination).toEqual({ hasNext: true, nextPage: 2 }));
+    await waitFor(() => expect(useKnowledgeBaseStore.getState().appRootListPagination).toEqual({ hasNext: true, nextCursor: 'p2' }));
 
     await act(async () => {
       fireEvent.click(sidebarChevron('Designs'));
@@ -1761,5 +2321,89 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
     });
     await waitFor(() => expect(childIdsOf('folder-specs')).toEqual(['folder-drafts']));
     expect(within(sidebar).getByText('Drafts')).toBeTruthy();
+  });
+});
+
+describe('Knowledge base page — asking from the chat box', () => {
+  function ask(question: string) {
+    typeInto(screen.getByPlaceholderText(/Ask/), question);
+    fireEvent.keyDown(screen.getByPlaceholderText(/Ask/), { key: 'Enter' });
+  }
+
+  function rootPages(itemsByPage: KnowledgeHubNode[][]) {
+    api.hub.getNavigationNodes.mockImplementation(async ({ page = 1 }: { page?: number }) =>
+      hubResponse(itemsByPage[page - 1] ?? [], {
+        pagination: {
+          page,
+          limit: 200,
+          totalItems: 0,
+          totalPages: itemsByPage.length,
+          hasNext: page < itemsByPage.length,
+          hasPrev: page > 1,
+        },
+      }),
+    );
+  }
+
+  it('scopes a question at the Collections root to every collection, on every page', async () => {
+    const DRIVE_APP = hubNode({ id: 'app-drive', name: 'Drive', nodeType: 'app', origin: 'CONNECTOR', connector: 'DRIVE' });
+    rootPages([[ENGINEERING, DRIVE_APP], [SALES]]);
+    openAt('/knowledge-base');
+    await screen.findByRole('row', { name: 'Engineering' });
+
+    ask('what is in these collections?');
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/chat'));
+    expect(usePendingChatStore.getState().pending?.pageContext.selectedNodes).toEqual([
+      { id: 'kb-eng', name: 'Engineering', nodeType: 'app', connector: 'KB' },
+      { id: 'kb-sales', name: 'Sales', nodeType: 'app', connector: 'KB' },
+    ]);
+  });
+
+  it('says so, and sends nothing, when there are more collections than chat can take', async () => {
+    const many = Array.from({ length: 201 }, (_, i) => collection(`kb-${i}`, `Collection ${i}`));
+    rootPages([many.slice(0, 120), many.slice(120)]);
+    openAt('/knowledge-base');
+    await screen.findByRole('row', { name: 'Collection 0' });
+
+    ask('what is in these collections?');
+
+    await waitFor(() => expect(toastTexts().some((text) => text.includes('up to 200 collections'))).toBe(true));
+    expect(router.push).not.toHaveBeenCalledWith('/chat');
+    expect(usePendingChatStore.getState().pending).toBeNull();
+    // The refused question stays in the box for another try.
+    expect((screen.getByPlaceholderText(/Ask/) as HTMLTextAreaElement).value).toBe('what is in these collections?');
+  });
+
+  it('says there is nothing to ask about, and keeps the question, when there are no collections', async () => {
+    rootPages([[]]);
+    openAt('/knowledge-base');
+    await screen.findByPlaceholderText(/Ask/);
+
+    ask('what is in these collections?');
+
+    await waitFor(() => expect(toastTexts().some((text) => text.includes('no collections'))).toBe(true));
+    expect(router.push).not.toHaveBeenCalledWith('/chat');
+    expect((screen.getByPlaceholderText(/Ask/) as HTMLTextAreaElement).value).toBe('what is in these collections?');
+  });
+
+  it("gives the chat chip a connector app's connector when asking from inside it", async () => {
+    withCollections();
+    api.hub.loadFolderData.mockResolvedValue(
+      folderResponse(
+        { id: 'app-conf', name: 'QA Confluence', nodeType: 'app', subType: 'Confluence' } as never,
+        [{ id: 'app-conf', name: 'QA Confluence', nodeType: 'app' }],
+        [hubNode({ id: 'rec-page', name: 'Page', origin: 'CONNECTOR', connector: 'CONFLUENCE', parentId: 'app-conf' })],
+      ),
+    );
+    openAt('/knowledge-base?view=all-records&nodeType=app&nodeId=app-conf');
+    await screen.findByRole('row', { name: 'Page' });
+
+    ask('what is here?');
+
+    expect(router.push).toHaveBeenCalledWith('/chat');
+    expect(usePendingChatStore.getState().pending?.pageContext.selectedNodes).toEqual([
+      { id: 'app-conf', name: 'QA Confluence', nodeType: 'app', connector: 'Confluence' },
+    ]);
   });
 });

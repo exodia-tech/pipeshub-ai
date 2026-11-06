@@ -12,6 +12,7 @@ import {
   iamUserLookupJwtGenerator,
   authJwtGenerator,
   fetchConfigJwtGenerator,
+  entityUserWriteJwtGenerator,
   scopedStorageServiceJwtGenerator,
   jwtGeneratorForValidateEmailLink,
   jwtGeneratorForOrgEmailVerification,
@@ -298,6 +299,28 @@ describe('createJwt', () => {
       const decoded = jwt.verify(token, secret) as any
       expect(decoded.exp - decoded.iat).to.equal(3600)
     })
+
+    it('should embed configId so the gateway can resolve the org itself', () => {
+      const token = slackJwtGenerator('slack@example.com', secret, undefined, {
+        configId: 'cfg-1',
+      })
+      const decoded = jwt.verify(token, secret) as any
+      expect(decoded.configId).to.equal('cfg-1')
+    })
+
+    it('should omit configId when no claims are passed', () => {
+      const token = slackJwtGenerator('slack@example.com', secret)
+      const decoded = jwt.verify(token, secret) as any
+      expect(decoded).to.not.have.property('configId')
+    })
+
+    it('should not put an orgId on the token in this edition', () => {
+      const token = slackJwtGenerator('slack@example.com', secret, undefined, {
+        configId: 'cfg-1',
+      })
+      const decoded = jwt.verify(token, secret) as any
+      expect(decoded).to.not.have.property('orgId')
+    })
   })
 
   describe('iamUserLookupJwtGenerator', () => {
@@ -400,6 +423,22 @@ describe('createJwt', () => {
       const token = fetchConfigJwtGenerator('user-1', 'org-1', secret)
       const decoded = jwt.verify(token, secret) as any
       expect(decoded.exp - decoded.iat).to.equal(3600)
+    })
+  })
+
+  describe('entityUserWriteJwtGenerator', () => {
+    it('should generate a token with userId, orgId, and ENTITY_USER_WRITE scope', () => {
+      const token = entityUserWriteJwtGenerator('user-1', 'org-1', secret)
+      const decoded = jwt.verify(token, secret) as any
+      expect(decoded.userId).to.equal('user-1')
+      expect(decoded.orgId).to.equal('org-1')
+      expect(decoded.scopes).to.deep.equal([TokenScopes.ENTITY_USER_WRITE])
+    })
+
+    it('should set expiry to 5 minutes', () => {
+      const token = entityUserWriteJwtGenerator('user-1', 'org-1', secret)
+      const decoded = jwt.verify(token, secret) as any
+      expect(decoded.exp - decoded.iat).to.equal(300)
     })
   })
 

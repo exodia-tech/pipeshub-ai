@@ -29,19 +29,20 @@ the delete:
 * a record or folder delete leaves storage alone, so ``assert_unchanged``
   counts the envelope where it was before the delete: "unchanged" means those
   bytes are still there.
-* a connector or collection delete removes its whole ``records/{id}`` tree,
-  shared envelope included, then re-indexes one surviving holder
-  (``repair_shared_records``), which files a new envelope under the holder's
-  own place. ``assert_rebuilt`` checks the content is whole again there.
+* a connector or collection delete first hands each shared envelope over to
+  one surviving holder (``StorageCleanupHelper.release_connector_storage``),
+  moving it under the holder's own place, then removes the rest of its
+  ``records/{id}`` tree. ``assert_handed_over`` checks the content is whole there.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Iterable
 
+from app.config.constants.arangodb import CollectionNames
 from helper.cleanup_errors import StoreNotEmptied
 from helper.mongo_store import is_within, records_folder
 
@@ -54,6 +55,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger("delete-footprint")
 
 POLL = 5
+RECORDS_COLLECTION = "records"
+
+# Enrichment writes these from what the LLM reads in a document, so two runs over the
+# same text can differ by a topic or a sub-category.
+CLASSIFICATION_EDGES = tuple(
+    c.value
+    for c in (
+        CollectionNames.BELONGS_TO_DEPARTMENT,
+        CollectionNames.BELONGS_TO_CATEGORY,
+        CollectionNames.BELONGS_TO_LANGUAGE,
+        CollectionNames.BELONGS_TO_TOPIC,
+    )
+)
 
 # Statuses after which indexing will not touch a record again on its own.
 SETTLED_STATUSES = frozenset({
@@ -251,7 +265,11 @@ async def capture(
     blobs = {p: await blob.count_under(p, vendor) for p in blob_keys}
     doc_keys = [f"prefix:{envelopes[v]}" for v in vrids] + [f"id:{d}" for d in sorted(paths)]
     documents = {k: await _document_count(mongo, k) for k in doc_keys}
-    connector_points = await vector.count_for_connector(connector_id) if connector_id else None
+    # Records only, as in the recreate check: entity points carry connectorIds too, and
+    # enrichment and the entity index rebuild write them after a record reads COMPLETED.
+    connector_points = (
+        await vector.count_for_connector(connector_id, collection=RECORDS_COLLECTION) if connector_id else None
+    )
     footprint = StoresFootprint(graph_fp, connector_points, points, blobs, documents, paths, envelopes)
     logger.info("Captured footprint: %s", footprint)
     return footprint
@@ -399,14 +417,27 @@ async def assert_unchanged(
     connector_id: str | None = None,
     vendor: str = "local",
     what: str,
+    handed_over: dict[str, Handover] | None = None,
 ) -> None:
-    """Every count taken before the delete is the same after it, store by store."""
+    """Every count taken before the delete is the same after it, store by store.
+
+    *handed_over* names shared content (by virtual record id) whose envelope the
+    delete may have handed to a surviving holder: it is compared where it is filed
+    now, and must have left its old folder.
+    """
+    moved: dict[str, str] = {}
+    for vrid, handover in (handed_over or {}).items():
+        moved[before.envelope_paths[vrid]] = await settled_envelope_path(
+            blob, mongo, org_id=org_id, virtual_record_id=vrid, within=handover.within,
+            vendor=vendor, leaving=handover.leaving,
+        )
+    envelopes = {v: moved.get(p, p) for v, p in before.envelope_paths.items()}
     nodes_now = await graph.count_existing_nodes(before.graph.handles)
     after_graph = GraphFootprint(before.graph.handles, await graph.count_edges_touching(before.graph.handles))
     after = await capture(
         after_graph, vector, blob, mongo,
         org_id=org_id, records=records, connector_id=connector_id, vendor=vendor,
-        upload_paths=before.upload_paths, envelope_paths=before.envelope_paths,
+        upload_paths=before.upload_paths, envelope_paths=envelopes,
     )
     changes = [] if nodes_now == len(before.graph.handles) else [
         f"graph nodes {len(before.graph.handles)} -> {nodes_now}"
@@ -415,8 +446,122 @@ async def assert_unchanged(
         changes.append(f"graph edges {before.graph.edges} -> {after.graph.edges}")
     if after.connector_points != before.connector_points:
         changes.append(f"connector points {before.connector_points} -> {after.connector_points}")
-    changes += store_changes(before, after)
+    changes += store_changes(before, after, moved=moved)
+    changes += await _left_behind(blob, mongo, moved, vendor)
     assert not changes, f"The delete changed {what}: " + "; ".join(changes)
+
+
+async def _left_behind(
+    blob: "BlobStoreProbe", mongo: "MongoStoreProbe", moved: dict[str, str], vendor: str
+) -> list[str]:
+    """What is still in a moved folder's old place: counts at the new place cannot tell a move from a copy."""
+    left: list[str] = []
+    for old, new in moved.items():
+        if old == new:
+            continue
+        counts = {
+            f"blob files {old}": await blob.count_under(old, vendor),
+            f"storage documents prefix:{old}": await mongo.count_documents_under_path(old),
+        }
+        left += [f"{where}: {count} left where it was" for where, count in counts.items() if count]
+    return left
+
+
+def relocated(fp: StoresFootprint, moved: dict[str, str]) -> StoresFootprint:
+    """*fp* with each moved envelope folder's counts keyed by the folder it is filed in now."""
+    renamed = {**moved, **{f"prefix:{old}": f"prefix:{new}" for old, new in moved.items()}}
+    return replace(
+        fp,
+        blobs={renamed.get(k, k): v for k, v in fp.blobs.items()},
+        documents={renamed.get(k, k): v for k, v in fp.documents.items()},
+        envelope_paths={v: moved.get(p, p) for v, p in fp.envelope_paths.items()},
+    )
+
+
+@dataclass(frozen=True)
+class Handover:
+    """Shared content a delete may hand to a surviving holder.
+
+    *within* is the collection folder it stays in. *leaving* is the folder it was filed
+    in when that folder belongs to the deleted record, so the content has to leave it;
+    None when it was filed under a holder that remains, and may stay where it is.
+    """
+
+    within: str
+    leaving: str | None = None
+
+
+def filed_under(path: str, record: Tracked) -> bool:
+    """Whether an envelope folder is *record*'s: the folder is named after the record it is filed under."""
+    return path.rsplit("/", 1)[-1] == record.name
+
+
+async def settled_envelope_path(
+    blob: "BlobStoreProbe",
+    mongo: "MongoStoreProbe",
+    *,
+    org_id: str,
+    virtual_record_id: str,
+    within: str,
+    vendor: str = "local",
+    leaving: str | None = None,
+    attempts: int = 36,
+) -> str:
+    """Where shared content is filed once a delete of one of its holders has settled.
+
+    The delete's event hands content filed under the deleted record to a surviving
+    holder some time after the record leaves the graph, and a read during the move can
+    see it in neither place. Two reads a poll apart must agree on the folder and on what
+    is in it; with *leaving*, the content must also have left that folder, since two
+    reads before the handover runs would agree on it too.
+    """
+
+    async def read() -> tuple[str, int, int]:
+        path = await mongo.envelope_path(org_id, virtual_record_id, within=within)
+        return path, await blob.count_under(path, vendor), await mongo.count_documents_under_path(path)
+
+    previous = await read()
+    for _ in range(attempts):
+        await asyncio.sleep(POLL)
+        current = await read()
+        if current == previous and current[0] != leaving:
+            return current[0]
+        previous = current
+    if previous[0] == leaving:
+        raise AssertionError(
+            f"The shared content {virtual_record_id} is still filed under the deleted record's "
+            f"folder {leaving!r}; it was not handed to a holder that remains."
+        )
+    raise AssertionError(f"The shared content {virtual_record_id} kept moving; last read: {previous}")
+
+
+async def assert_content_whole_at(
+    before: StoresFootprint,
+    vector: "VectorStoreProbe",
+    blob: "BlobStoreProbe",
+    mongo: "MongoStoreProbe",
+    *,
+    virtual_record_id: str,
+    new: str,
+    vendor: str = "local",
+    what: str,
+) -> None:
+    """Shared content *before* counted is all filed at *new* now, and none of it is left where it was."""
+    old = before.envelope_paths[virtual_record_id]
+    then = {
+        "embeddings": before.points[virtual_record_id],
+        "blob files": before.blobs[old],
+        "storage documents": before.documents[f"prefix:{old}"],
+    }
+    now = {
+        "embeddings": await vector.count_for_virtual_record(virtual_record_id),
+        "blob files": await blob.count_under(new, vendor),
+        "storage documents": await mongo.count_documents_under_path(new),
+    }
+    changes = [f"{store}: {then[store]} -> {now[store]}" for store in then if then[store] != now[store]]
+    changes += await _left_behind(blob, mongo, {old: new}, vendor)
+    where = new if new == old else f"{new!r} (filed at {old!r} before)"
+    assert not changes, f"{what} is not whole under {where}: " + "; ".join(changes)
 
 
 def store_changes(
@@ -439,7 +584,7 @@ def store_changes(
     return changes
 
 
-async def wait_for_rebuild(
+async def wait_for_handover(
     graph: "GraphProviderProtocol",
     mongo: "MongoStoreProbe",
     *,
@@ -448,18 +593,20 @@ async def wait_for_rebuild(
     holder: Tracked,
     timeout: int = 480,
 ) -> str:
-    """The folder the survivor's re-index filed the shared content in, once that re-index has settled."""
+    """The folder the shared content was handed over to under the survivor, once its record has settled."""
     folder = records_folder(org_id, connector_id)
     path = await mongo.envelope_path(org_id, str(holder.virtual_record_id), within=folder, timeout=timeout)
     assert is_within(path, folder), (
-        f"The shared content {holder.virtual_record_id} was rebuilt at {path!r}, not under "
+        f"The shared content {holder.virtual_record_id} was filed at {path!r}, not under "
         f"{folder!r} where its surviving holder {holder.name} lives."
     )
-    await wait_for_connector_records(graph, connector_id, [holder.name], timeout=timeout)
+    # The summary vector is counted against the one the deleted copy had; a
+    # holder still being enriched when the delete ran has none yet.
+    await wait_for_connector_records(graph, connector_id, [holder.name], timeout=timeout, enriched=True)
     return path
 
 
-async def assert_rebuilt(
+async def assert_handed_over(
     before: StoresFootprint,
     graph: "GraphProviderProtocol",
     vector: "VectorStoreProbe",
@@ -475,13 +622,12 @@ async def assert_rebuilt(
     """Shared content whose envelope went with a connector or collection is whole again under *holder*.
 
     *before* counted it where it was filed before the delete. Edges are not
-    compared: the re-index re-runs extraction, which reconciles the record's
-    category and topic edges afresh.
+    compared: the holder's own category and topic edges are its own.
     """
     vrid = str(holder.virtual_record_id)
     old = before.envelope_paths.get(vrid)
     assert old, f"{what}: no envelope of {vrid} was counted before the delete, so there is nothing to compare."
-    new = await wait_for_rebuild(graph, mongo, org_id=org_id, connector_id=connector_id, holder=holder)
+    new = await wait_for_handover(graph, mongo, org_id=org_id, connector_id=connector_id, holder=holder)
     nodes_now = await graph.count_existing_nodes(before.graph.handles)
     after = await capture_when_stable(
         before.graph, vector, blob, mongo,
@@ -492,7 +638,8 @@ async def assert_rebuilt(
         f"graph nodes {len(before.graph.handles)} -> {nodes_now}"
     ]
     changes += store_changes(before, after, moved={old: new})
-    assert not changes, f"{what} was not rebuilt whole under {new!r}: " + "; ".join(changes)
+    changes += await _left_behind(blob, mongo, {old: new}, vendor)
+    assert not changes, f"{what} is not whole under {new!r}: " + "; ".join(changes)
 
 
 async def settle(check, what: str) -> None:

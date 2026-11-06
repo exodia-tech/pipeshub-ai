@@ -30,7 +30,6 @@ from slack_behaviour_setup import (
 )
 
 from app.models.entities import FileRecord, ProgressStatus
-from app.models.permission import EntityType
 
 DM_BOB, DM_DAVE, GROUP_DM, RANDOM = "D0BOB", "D0DAVE", "G0MPIM", "C0RANDOM"
 
@@ -61,10 +60,10 @@ class TestWhatThePersonSees:
 
         await connector.run_sync()
 
-        assert set(store.record_groups) == {GENERAL, SECRET, PARTNERS, DM_BOB, GROUP_DM}
+        assert set(store.record_groups) == {GENERAL, SECRET, PARTNERS, RANDOM, DM_BOB, GROUP_DM}
         for channel in store.record_groups:
-            (grant,) = store.group_access[channel]
-            assert (grant.entity_type, grant.email) == (EntityType.USER, "alice@acme.com")
+            assert store.group_access[channel] == [], "conversations inherit the app, which only the person is linked to"
+            assert store.record_groups[channel].inherit_permissions is True
         assert store.record_groups[DM_BOB].name == "DM: Bob"
         assert store.record_groups[GROUP_DM].name.startswith("Group DM: ")
         assert {"Bob", "Carol"} <= set(store.record_groups[GROUP_DM].name.removeprefix("Group DM: ").split(", "))
@@ -129,9 +128,47 @@ class TestWhatThePersonSees:
 
         assert options.success is True
         labels = {o.id: o.label for o in options.options}
-        assert set(labels) == {GENERAL, SECRET, PARTNERS, DM_BOB, GROUP_DM}
+        assert set(labels) == {GENERAL, SECRET, PARTNERS, RANDOM, DM_BOB, GROUP_DM}
         assert (labels[GENERAL], labels[DM_BOB]) == ("general", "DM: Bob")
         assert labels[GROUP_DM] == store.record_groups[GROUP_DM].name
+
+
+class TestPublicChannelsThePersonHasNotJoined:
+    async def test_an_unjoined_public_channel_is_read_and_stays_the_persons_alone(self, workspace, store, checkpoints) -> None:
+        unjoined = ts_minutes_ago(30)
+        workspace.post(RANDOM, unjoined, BOB, "open to everyone in the workspace")
+        connector, _ = await personal_connector(store, checkpoints)
+
+        await connector.run_sync()
+
+        assert block_ts(store, RANDOM) == [unjoined]
+        assert store.group_access[RANDOM] == []
+        assert store.record_groups[RANDOM].inherit_permissions is True
+        assert [u.email for u in store.app_users.values()] == ["alice@acme.com"]
+
+    async def test_a_private_channel_the_person_is_not_in_is_still_left_out(self, workspace, store, checkpoints) -> None:
+        workspace.add_channel("G0OTHER", "others", kind="private", members=[BOB], is_member=False)
+        connector, _ = await personal_connector(store, checkpoints)
+
+        await connector.run_sync()
+
+        assert "G0OTHER" not in store.record_groups
+
+
+class TestArchivedChannels:
+    async def test_an_archived_channel_is_synced_and_stays_the_persons_alone(self, workspace, store, checkpoints) -> None:
+        kept = ts_minutes_ago(30)
+        workspace.post(SECRET, kept, BOB, "before archiving")
+        workspace.channels[SECRET]["is_archived"] = True
+        connector, _ = await personal_connector(store, checkpoints)
+
+        await connector.run_sync()
+
+        assert not any(c.params.get("exclude_archived") for c in workspace.calls_to("conversations.list"))
+        assert block_ts(store, SECRET) == [kept]
+        assert store.group_access[SECRET] == []
+        assert store.record_groups[SECRET].inherit_permissions is True
+        assert SECRET in {o.id for o in (await connector.get_filter_options("channel_ids", limit=100)).options}
 
 
 class TestAccountAndTokens:
@@ -150,7 +187,9 @@ class TestAccountAndTokens:
 
         await connector.run_sync()
 
-        assert store.access_emails(DM_BOB) == {"alice@acme.com"}
+        assert [u.email for u in store.app_users.values()] == ["alice@acme.com"]
+        assert DM_BOB in store.record_groups
+        assert store.group_access[DM_BOB] == []
 
     async def test_the_persons_own_token_is_preferred_over_a_bot_token(self, workspace, store, checkpoints) -> None:
         config = personal_config()
@@ -185,11 +224,47 @@ class TestAccountAndTokens:
         assert dm in store.records
 
 
+CHANNELS_ONLY_SCOPES = {"channels:history", "channels:read", "groups:history", "groups:read", "users:read"}
+
+
+class TestTokenScopes:
+    async def test_a_token_without_dm_scopes_still_syncs_its_channels(self, workspace, store, checkpoints, caplog) -> None:
+        workspace.granted_scopes = set(CHANNELS_ONLY_SCOPES)
+        posted = ts_minutes_ago(10)
+        workspace.post(GENERAL, posted, BOB, "hello")
+        connector, _ = await personal_connector(store, checkpoints)
+
+        await connector.run_sync()
+
+        assert set(store.record_groups) == {GENERAL, SECRET, PARTNERS, RANDOM}
+        assert posted in store.records
+        assert [c.params["types"] for c in workspace.calls_to("conversations.list")] == [
+            "public_channel,private_channel",
+        ]
+        assert "im:read, mpim:read" in caplog.text
+
+    async def test_a_token_that_can_list_none_of_the_selected_types_fails_the_sync(self, workspace, store, checkpoints) -> None:
+        workspace.granted_scopes = set(CHANNELS_ONLY_SCOPES)
+        dms_only = {"sync": {"values": {"channel_types": {
+            "operator": "in", "value": ["Direct Messages", "Group Direct Messages"], "type": "multiselect",
+        }}}}
+        connector, _ = await personal_connector(store, checkpoints, personal_config(filters=dms_only))
+
+        with pytest.raises(RuntimeError, match="im:read, mpim:read"):
+            await connector.run_sync()
+        assert workspace.calls_to("conversations.list") == []
+
+    async def test_a_refused_channel_listing_fails_the_sync_and_names_the_scope(self, workspace, store, checkpoints) -> None:
+        workspace.granted_scopes = set(CHANNELS_ONLY_SCOPES)
+        workspace.scopes_header = False
+        connector, _ = await personal_connector(store, checkpoints)
+
+        with pytest.raises(RuntimeError, match=r"missing_scope.*Needed scope: im:read"):
+            await connector.run_sync()
+        assert store.record_groups == {}
+
+
 class TestSyncing:
-    @pytest.mark.xfail(strict=True, reason=(
-        "When a later page of history fails, the personal connector still moves the checkpoint "
-        "to the newest message it saw, so the older messages on the failed pages are never synced."
-    ))
     async def test_a_failed_later_page_does_not_lose_older_messages(self, workspace, store, checkpoints) -> None:
         stamps = [ts_minutes_ago(m) for m in (400, 300, 200, 100)]
         for ts in stamps:

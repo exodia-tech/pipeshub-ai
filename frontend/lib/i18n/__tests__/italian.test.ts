@@ -16,6 +16,8 @@ describe('Italian interface', () => {
     expect(SUPPORTED_LANGUAGES['it-IT'].menuName).toBe('Italiano (Italia)');
     expect(locales['it-IT']).toEqual(italian);
     expect(i18n.t('nav.collections')).toBe('Raccolte');
+    expect(i18n.t('collections.trash.restoreSelected', { count: 2 })).toBe('Ripristina 2 elementi');
+    expect(i18n.t('collections.trash.restoreFailedTitle', { name: 'Contratto' })).toBe("Impossibile ripristinare 'Contratto'");
     expect(i18n.t('workspaceMenu.language')).toBe('Lingua');
     expect(i18n.t('chat.newChat')).toBe('Nuova chat');
     expect(i18n.t('chat.heyUser', { name: 'Mo' })).toBe('Ciao, Mo 👋');

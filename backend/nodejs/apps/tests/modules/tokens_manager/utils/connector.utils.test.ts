@@ -123,14 +123,14 @@ describe('tokens_manager/utils/connector.utils', () => {
       const result = handleBackendError(error, 'test operation') as ServiceUnavailableError
       expect(result).to.be.instanceOf(ServiceUnavailableError)
       expect(result.message).to.equal(
-        'This part of PipesHub is briefly unavailable. Please try again in 5 seconds.',
+        'This part of EXODIA Brain is briefly unavailable. Please try again in 5 seconds.',
       )
     })
 
     it('should give a 429 and a 504 with no detail a plain message', () => {
       const busy = handleBackendError({ statusCode: 429, data: {}, message: '' }, 'test operation')
       expect(busy.message).to.equal(
-        'PipesHub is handling a lot of requests right now. Please try again in a few seconds.',
+        'EXODIA Brain is handling a lot of requests right now. Please try again in a few seconds.',
       )
       const slow = handleBackendError({ statusCode: 504, data: undefined, message: '' }, 'test operation')
       expect(slow.message).to.equal(
@@ -144,7 +144,7 @@ describe('tokens_manager/utils/connector.utils', () => {
         { statusCode: 503, data: {}, headers: { 'retry-after': inTen }, message: '' },
         'test operation',
       )
-      expect(result.message).to.match(/^This part of PipesHub is briefly unavailable\. Please try again in (9|10) seconds\.$/)
+      expect(result.message).to.match(/^This part of EXODIA Brain is briefly unavailable\. Please try again in (9|10) seconds\.$/)
     })
 
     it('should fall back to "a few seconds" for a past or invalid Retry-After', () => {
@@ -155,7 +155,7 @@ describe('tokens_manager/utils/connector.utils', () => {
           'test operation',
         )
         expect(result.message).to.equal(
-          'This part of PipesHub is briefly unavailable. Please try again in a few seconds.',
+          'This part of EXODIA Brain is briefly unavailable. Please try again in a few seconds.',
         )
       }
     })

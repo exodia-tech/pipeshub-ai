@@ -25,7 +25,9 @@ from app.connectors.sources.web.connector import (
 from app.connectors.sources.web.fetch_strategy import (
     FetchResponse,
     build_stealth_headers,
+    unsafe_address_response,
 )
+from app.connectors.core.base.connector.connector_service import ConnectorInitError
 from app.models.entities import RecordType
 from app.connectors.core.registry.filters import (
     FilterCollection,
@@ -54,6 +56,7 @@ def _make_connector():
     data_entities_processor.on_new_record_groups = AsyncMock()
     data_entities_processor.on_new_records = AsyncMock()
     data_entities_processor.get_record_by_external_id = AsyncMock(return_value=None)
+    data_entities_processor.get_records_in_record_group = AsyncMock(return_value=[])
     data_entities_processor.get_file_record_by_id = AsyncMock(return_value=None)
     data_entities_processor.get_user_by_user_id = AsyncMock(return_value=None)
     data_entities_processor.on_record_deleted = AsyncMock()
@@ -345,7 +348,8 @@ class TestWebConnectorConnection:
         connector.session = MagicMock()
         with patch("app.connectors.sources.web.connector.fetch_url_with_fallback", new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = None
-            assert await connector.test_connection_and_access() is False
+            with pytest.raises(ConnectorInitError, match="could not be reached"):
+                await connector.test_connection_and_access()
 
     @pytest.mark.asyncio
     async def test_test_connection_high_status(self):
@@ -357,7 +361,30 @@ class TestWebConnectorConnection:
                 status_code=500, content_bytes=b"Error", headers={},
                 final_url="https://example.com", strategy="aiohttp",
             )
-            assert await connector.test_connection_and_access() is False
+            with pytest.raises(ConnectorInitError, match="HTTP status 500"):
+                await connector.test_connection_and_access()
+
+    @pytest.mark.asyncio
+    async def test_test_connection_private_address_says_why(self) -> None:
+        connector = _make_connector()
+        connector.url = "http://localhost:3001"
+        connector.session = MagicMock()
+        with patch("app.connectors.sources.web.connector.fetch_url_with_fallback", new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = unsafe_address_response("http://localhost:3001")
+            with pytest.raises(ConnectorInitError, match="private or internal address"):
+                await connector.test_connection_and_access()
+
+    @pytest.mark.asyncio
+    async def test_test_connection_error_hides_url_secrets(self) -> None:
+        connector = _make_connector()
+        connector.url = "https://user:pw@example.com/docs?token=abc"
+        connector.session = MagicMock()
+        with patch("app.connectors.sources.web.connector.fetch_url_with_fallback", new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = None
+            with pytest.raises(ConnectorInitError) as raised:
+                await connector.test_connection_and_access()
+        assert "https://example.com/docs is not accessible" in str(raised.value)
+        assert "pw" not in str(raised.value) and "token" not in str(raised.value)
 
     @pytest.mark.asyncio
     async def test_test_connection_exception(self):
@@ -366,7 +393,8 @@ class TestWebConnectorConnection:
         connector.session = MagicMock()
         with patch("app.connectors.sources.web.connector.fetch_url_with_fallback", new_callable=AsyncMock) as mock_fetch:
             mock_fetch.side_effect = Exception("network error")
-            assert await connector.test_connection_and_access() is False
+            with pytest.raises(ConnectorInitError, match="could not be reached"):
+                await connector.test_connection_and_access()
 
 
 # ===================================================================
@@ -377,22 +405,14 @@ class TestWebConnectorRecordGroup:
     async def test_create_record_group(self):
         connector = _make_connector()
         connector.url = "https://example.com"
-        from app.models.entities import AppUser
-        app_users = [
-            AppUser(
-                app_name=Connectors.WEB, connector_id="web-conn-1",
-                source_user_id="u1", org_id="org-1",
-                email="test@example.com", full_name="Test User", is_active=True,
-            )
-        ]
-        await connector.create_record_group(app_users)
+        await connector.create_record_group()
         connector.data_entities_processor.on_new_record_groups.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_create_record_group_no_url(self):
         connector = _make_connector()
         connector.url = None
-        await connector.create_record_group([])
+        await connector.create_record_group()
         connector.data_entities_processor.on_new_record_groups.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -401,7 +421,7 @@ class TestWebConnectorRecordGroup:
         connector.url = "https://example.com"
         connector.data_entities_processor.on_new_record_groups = AsyncMock(side_effect=Exception("fail"))
         with pytest.raises(Exception):
-            await connector.create_record_group([])
+            await connector.create_record_group()
 
 
 # ===================================================================
@@ -1146,7 +1166,8 @@ class TestWebConnectorFetchAndProcessDeep:
         connector.retry_urls = {}
         connector._normalize_url = MagicMock(return_value="https://example.com/page")
         with patch("app.connectors.sources.web.connector.fetch_url_with_fallback",
-                    new_callable=AsyncMock, return_value=None):
+                    new_callable=AsyncMock, return_value=None), \
+                patch.object(connector, "_ensure_crawl4ai_fetcher", new_callable=AsyncMock, return_value=None):
             result = await connector._fetch_and_process_url("https://example.com/page", 0)
         assert result is None
         assert "https://example.com/page" in connector.retry_urls
@@ -1162,7 +1183,8 @@ class TestWebConnectorFetchAndProcessDeep:
         connector.retry_urls = {}
         connector._normalize_url = MagicMock(return_value="https://example.com/page")
         with patch("app.connectors.sources.web.connector.fetch_url_with_fallback",
-                    new_callable=AsyncMock) as mock_fetch:
+                    new_callable=AsyncMock) as mock_fetch, \
+                patch.object(connector, "_ensure_crawl4ai_fetcher", new_callable=AsyncMock, return_value=None):
             mock_fetch.return_value = FetchResponse(
                 status_code=429, content_bytes=b"Rate limited",
                 headers={}, final_url="https://example.com/page", strategy="aiohttp",
@@ -1411,6 +1433,7 @@ def _make_connector_cov():
     dep.on_new_record_groups = AsyncMock()
     dep.on_new_records = AsyncMock()
     dep.get_record_by_external_id = AsyncMock(return_value=None)
+    dep.get_records_in_record_group = AsyncMock(return_value=[])
     dep.get_file_record_by_id = AsyncMock(return_value=None)
     dep.get_user_by_user_id = AsyncMock(return_value=None)
     dep.on_record_deleted = AsyncMock()
@@ -1994,6 +2017,7 @@ def _make_connector_fullcov():
     dep.on_new_record_groups = AsyncMock()
     dep.on_new_records = AsyncMock()
     dep.get_record_by_external_id = AsyncMock(return_value=None)
+    dep.get_records_in_record_group = AsyncMock(return_value=[])
     dep.get_file_record_by_id = AsyncMock(return_value=None)
     dep.get_user_by_user_id = AsyncMock(return_value=None)
     dep.on_record_deleted = AsyncMock()
@@ -3049,9 +3073,10 @@ class TestUploadNewToStorage:
         assert session.calls[0]["method"] == "post"
         assert session.calls[0].get("allow_redirects") is False
         assert session.calls[1]["method"] == "put"
-        assert session.calls[1]["url"] == presigned
+        assert str(session.calls[1]["url"]) == presigned
         assert session.calls[1]["data"] == content
         assert session.calls[1]["headers"]["Content-Length"] == str(len(content))
+        assert session.calls[1].get("skip_auto_headers") == {"Content-Type"}
         assert session.calls[1].get("allow_redirects") is False
 
     @pytest.mark.asyncio
@@ -3088,7 +3113,7 @@ class TestUploadNewToStorage:
         # fake session's response Location must never trigger a follow-up call.
         assert len(session.calls) == 2
         assert session.calls[1]["method"] == "put"
-        assert session.calls[1]["url"] == presigned
+        assert str(session.calls[1]["url"]) == presigned
         assert session.calls[1].get("allow_redirects") is False
 
     @pytest.mark.asyncio
