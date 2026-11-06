@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useState, useEffect, useRef } from 'react';
 import { Flex, Box, Text, Button, TextField, Spinner } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
@@ -255,9 +256,7 @@ export function StepStorage({
                       onClick={() => setShowSecret((v) => !v)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center' }}
                     >
-                      <span className="material-icons-outlined" style={{ fontSize: '14px', color: 'var(--gray-9)' }}>
-                        {showSecret ? 'visibility_off' : 'visibility'}
-                      </span>
+                      <MaterialIcon name={showSecret ? 'visibility_off' : 'visibility'} size={14} style={{ fontSize: '14px', color: 'var(--gray-9)' }} />
                     </button>
                   </TextField.Slot>
                 </TextField.Root>
@@ -340,9 +339,7 @@ export function StepStorage({
                     onClick={() => setShowAccountKey((v) => !v)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center' }}
                   >
-                    <span className="material-icons-outlined" style={{ fontSize: '14px', color: 'var(--gray-9)' }}>
-                      {showAccountKey ? 'visibility_off' : 'visibility'}
-                    </span>
+                    <MaterialIcon name={showAccountKey ? 'visibility_off' : 'visibility'} size={14} style={{ fontSize: '14px', color: 'var(--gray-9)' }} />
                   </button>
                 </TextField.Slot>
               </TextField.Root>

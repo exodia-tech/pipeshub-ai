@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { Trans, useTranslation } from 'react-i18next';
 
 import React, { useEffect, useState } from 'react';
@@ -62,17 +63,12 @@ function TourStepRow({
         {label}
       </Text>
 
-      <span
-        className="material-icons-outlined"
-        style={{
+      <MaterialIcon name="chevron_right" size={16} style={{
           fontSize: '16px',
           color: 'var(--olive-9)',
           flexShrink: 0,
           marginLeft: '8px',
-        }}
-      >
-        chevron_right
-      </span>
+        }} />
     </button>
   );
 }
@@ -126,7 +122,7 @@ export function OnboardingTour() {
         boxShadow:
           '0 0 0 1px rgba(221, 234, 248, 0.08), 0 8px 40px rgba(0, 0, 0, 0.45), 0 12px 32px -16px rgba(221, 234, 248, 0.08)',
         overflow: 'hidden',
-        fontFamily: 'Manrope, sans-serif',
+        fontFamily: 'var(--default-font-family)',
       }}
     >
       {/* ── Accent top edge ──────────────────────────── */}
@@ -167,9 +163,7 @@ export function OnboardingTour() {
                 transition: 'opacity 0.15s ease',
               }}
             >
-              <span className="material-icons-outlined" style={{ fontSize: '16px', color: 'var(--olive-11)' }}>
-                close
-              </span>
+              <MaterialIcon name="close" size={16} style={{ fontSize: '16px', color: 'var(--olive-11)' }} />
             </button>
           )}
         </Flex>

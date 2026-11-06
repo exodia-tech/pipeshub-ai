@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { useState, useEffect } from 'react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 import type { PreviewCitation } from '../types';
@@ -239,9 +240,7 @@ export function DocxRenderer({ fileUrl, fileName, fileBlob, citations, activeCit
             padding: 'var(--space-6)',
           }}
         >
-          <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--red-9)' }}>
-            error_outline
-          </span>
+          <MaterialIcon name="error_outline" size={48} style={{ fontSize: '48px', color: 'var(--red-9)' }} />
           <Text size="3" weight="medium" color="red">{error}</Text>
         </Flex>
       )}

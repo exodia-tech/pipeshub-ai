@@ -1,5 +1,18 @@
 @import '@radix-ui/themes/styles.css';
-@font-face { font-family: 'Sora'; src: url('/fonts/sora/Sora.ttf') format('truetype'); font-weight: 100 800; font-style: normal; font-display: swap; }
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter/InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter/InterVariable-Italic.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
 
 @font-face {
   font-family: 'ClashGrotesk';
@@ -235,7 +248,9 @@
    ======================== */
 
 body {
-  font-family: 'Sora', sans-serif;
+  font-optical-sizing: auto;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   margin: 0;
   overflow: hidden;
 }
@@ -410,7 +425,7 @@ body {
 
 /* Override Radix Themes default font and cursors */
 .radix-themes {
-  --default-font-family: 'Sora', sans-serif;
+  --default-font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   /* Override Radix Themes cursor tokens to use pointer for interactive elements */
   --cursor-button: pointer !important;
@@ -952,13 +967,6 @@ li > blockquote {
   to { opacity: 1; transform: none; }
 }
 
-/* Same box as the old outlined set, with a lighter stroke. */
-.material-icons-outlined {
-  font-family: 'Material Symbols Outlined' !important;
-  font-weight: 300;
-  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 40 !important;
-}
-
 /* Icon-only segmented controls: square items instead of 12px side padding around a glyph. */
 .rt-SegmentedControlRoot[data-icon-only] .rt-SegmentedControlItemLabel {
   padding-left: 4px;
@@ -990,7 +998,7 @@ li > blockquote {
 
 .agent-builder-flow {
   background: var(--agent-flow-canvas-bg);
-  font-family: Sora, var(--default-font-family), sans-serif;
+  font-family: var(--default-font-family);
   color: var(--agent-flow-text);
   -webkit-font-smoothing: antialiased;
 }
@@ -1300,7 +1308,7 @@ li > blockquote {
  * Plain del text: standard line-through via CSS.
  *
  * del code: CSS text-decoration position is calculated from the *declaring*
- * element's font metrics (Sora). When the child uses a different font
+ * element's font metrics (Inter). When the child uses a different font
  * (monospace) the offset never lands at the visual centre.
  * Fix: display:inline-block stops the parent's decoration propagating through,
  * then a ::after pseudo draws the line at exactly 50% of the element's height.
@@ -1733,3 +1741,13 @@ th code {
 
 /* Keep the royal-blue product mark legible on dark backgrounds. */
 .dark .exodia-brain-mark { filter: brightness(1.8); }
+
+/* Softer controls and surfaces share the same corners in both themes. */
+.radix-themes {
+  --radius-1: 4px;
+  --radius-2: 8px;
+  --radius-3: 12px;
+  --radius-4: 16px;
+  --radius-5: 20px;
+  --radius-6: 24px;
+}

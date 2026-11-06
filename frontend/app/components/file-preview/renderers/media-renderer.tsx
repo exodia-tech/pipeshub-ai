@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { Box, Flex, Text } from '@radix-ui/themes';
 
 interface MediaRendererProps {
@@ -15,9 +16,7 @@ export function MediaRenderer({ fileUrl, fileName: _fileName, fileType }: MediaR
   if (!fileUrl || fileUrl.trim() === '') {
     return (
       <Flex direction="column" align="center" justify="center" gap="3" style={{ height: '100%', padding: 'var(--space-6)' }}>
-        <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--slate-9)' }}>
-          {isVideo ? 'movie' : 'audio_file'}
-        </span>
+        <MaterialIcon name={isVideo ? 'movie' : 'audio_file'} size={48} style={{ fontSize: '48px', color: 'var(--slate-9)' }} />
         <Text size="3" weight="medium" color="gray">
           {isVideo ? 'Video' : 'Audio'} file URL not available
         </Text>

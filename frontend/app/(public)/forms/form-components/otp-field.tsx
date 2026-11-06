@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useState } from 'react';
 import { Flex, Text, TextField, IconButton } from '@radix-ui/themes';
 
@@ -89,12 +90,7 @@ const OtpField = React.forwardRef<HTMLInputElement, OtpFieldProps>(function OtpF
             onClick={() => setVisible((v) => !v)}
             aria-label={visible ? 'Hide OTP' : 'Show OTP'}
           >
-            <span
-              className="material-icons-outlined"
-              style={{ fontSize: '16px', color: 'var(--gray-10)' }}
-            >
-              {visible ? 'visibility_off' : 'visibility'}
-            </span>
+            <MaterialIcon name={visible ? 'visibility_off' : 'visibility'} size={16} style={{ fontSize: '16px', color: 'var(--gray-10)' }} />
           </IconButton>
         </TextField.Slot>
       </TextField.Root>

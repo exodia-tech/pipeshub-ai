@@ -108,9 +108,7 @@ export function ServiceGate({ children, services }: ServiceGateProps) {
             onClick={() => router.push('/workspace/services/')}
             style={{ marginTop: 8, cursor: 'pointer', gap: 6 }}
           >
-            <span className="material-icons-outlined" style={{ fontSize: 16 }}>
-              monitor_heart
-            </span>
+            <MaterialIcon name="monitor_heart" size={16} style={{ fontSize: 16 }} />
             {t('healthGate.serviceGate.viewStatus')}
           </Button>
         )}

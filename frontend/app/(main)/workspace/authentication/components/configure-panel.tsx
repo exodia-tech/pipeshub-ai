@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useRef, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, Button } from '@radix-ui/themes';
@@ -73,7 +74,7 @@ export function ConfigurePanel({ open, method, onClose, onSaveSuccess }: Configu
       onClick={() => window.open(METHOD_DOC_URLS[method], '_blank')}
       style={{ cursor: 'pointer', gap: 'var(--space-1)' }}
     >
-      <span className="material-icons-outlined" style={{ fontSize: 14 }}>open_in_new</span>
+      <MaterialIcon name="open_in_new" size={14} style={{ fontSize: 14 }} />
       <Text size="1">{t('workspaceMenu.documentation')}</Text>
     </Button>
   );

@@ -459,7 +459,7 @@ export function ArchivedChatsSidebar({
         borderRight: '1px solid var(--olive-3)',
         backgroundColor: 'var(--olive-1)',
         overflow: 'hidden',
-        fontFamily: 'Manrope, sans-serif',
+        fontFamily: 'var(--default-font-family)',
       }}
     >
       {/* Header */}

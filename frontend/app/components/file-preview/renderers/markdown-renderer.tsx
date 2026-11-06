@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 import { useThemeAppearance } from '@/app/components/theme-provider';
@@ -206,9 +207,7 @@ export function MarkdownRenderer({ fileUrl, fileName: _fileName, citations, acti
   if (error) {
     return (
       <Flex direction="column" align="center" justify="center" gap="3" style={{ height: '100%', padding: 'var(--space-6)' }}>
-        <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--red-9)' }}>
-          error_outline
-        </span>
+        <MaterialIcon name="error_outline" size={48} style={{ fontSize: '48px', color: 'var(--red-9)' }} />
         <Text size="3" weight="medium" color="red">
           {error}
         </Text>

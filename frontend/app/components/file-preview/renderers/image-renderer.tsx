@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { useState, useMemo } from 'react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 import { useThemeAppearance } from '@/app/components/theme-provider';
@@ -47,9 +48,7 @@ export function ImageRenderer({ fileUrl, fileName, citations, activeCitationId, 
   if (!fileUrl || fileUrl.trim() === '') {
     return (
       <Flex direction="column" align="center" justify="center" gap="3" style={{ height: '100%', padding: 'var(--space-6)' }}>
-        <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--slate-9)' }}>
-          image
-        </span>
+        <MaterialIcon name="image" size={48} style={{ fontSize: '48px', color: 'var(--slate-9)' }} />
         <Text size="3" weight="medium" color="gray">
           Image file URL not available
         </Text>
@@ -60,9 +59,7 @@ export function ImageRenderer({ fileUrl, fileName, citations, activeCitationId, 
   if (error) {
     return (
       <Flex direction="column" align="center" justify="center" gap="3" style={{ height: '100%', padding: 'var(--space-6)' }}>
-        <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--red-9)' }}>
-          broken_image
-        </span>
+        <MaterialIcon name="broken_image" size={48} style={{ fontSize: '48px', color: 'var(--red-9)' }} />
         <Text size="3" weight="medium" color="red">
           Failed to load image
         </Text>

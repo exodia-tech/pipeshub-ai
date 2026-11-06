@@ -1,6 +1,6 @@
 services:
   pipeshub-ai:
-    image: exodia-pipeshub:50be81e21a0b6646c1e6d7cca1a161e27e9aa8a4
+    image: exodia-pipeshub:${SOURCE_COMMIT:-main}
     restart: always
     build:
       context: .
@@ -57,6 +57,8 @@ services:
         compress: 'true'
     environment:
     - NODE_ENV=${NODE_ENV:-production}
+    - GIT_COMMIT=${SOURCE_COMMIT:-}
+    - APP_VERSION=${APP_VERSION:-exodia-main}
     - LOG_LEVEL=${LOG_LEVEL:-info}
     - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
     - WEB_CONNECTOR_ALLOWED_HOSTS=${WEB_CONNECTOR_ALLOWED_HOSTS:-}
@@ -228,7 +230,7 @@ services:
     expose:
     - '3000'
     labels:
-      org.opencontainers.image.revision: 50be81e21a0b6646c1e6d7cca1a161e27e9aa8a4
+      org.opencontainers.image.revision: ${SOURCE_COMMIT:-unknown}
       org.opencontainers.image.source: https://github.com/exodia-tech/pipeshub-ai
   mongodb:
     image: library/mongo@sha256:9814652e33f0cf8b9fddea8b46dfc9d8e19b130dcfdd7b510ca58bb0d40c8b71

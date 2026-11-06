@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Avatar, Badge } from '@radix-ui/themes';
+import { Avatar } from '@radix-ui/themes';
 
 // ─────────────────────────────────────────────
 // UserAvatar — standalone avatar circle
@@ -52,7 +52,7 @@ const NON_LETTERS = new RegExp('[^\\p{L}]+', 'gu');
 /**
  * Derive initials from a free-form name string by splitting on separators.
  * Returns '' when no usable characters remain (caller decides the fallback).
- * e.g. "Acme Corporation" → "AC", "EXODIA Brain Inc." → "PI", "sofia.chen" → "SC", .
+ * e.g. "Acme Corporation" → "AC", "EXODIA Brain Inc." → "EI", "sofia.chen" → "SC", .
  */
 function initialsFromName(name: string): string {
   const parts = name.split(/[\s._-]+/).filter(Boolean);
@@ -74,7 +74,7 @@ export function getInitials({ fullName, firstName, lastName, email }: UserAvatar
     fullName = undefined;
   }
 
-  // 1. fullName (e.g. "Acme Corporation" → "AC", "EXODIA Brain Inc." → "PI")
+  // 1. fullName (e.g. "Acme Corporation" → "AC", "EXODIA Brain Inc." → "EI")
   const fromFullName = initialsFromName(fullName?.trim() ?? '');
   if (fromFullName) return fromFullName;
 
@@ -106,36 +106,14 @@ export function UserAvatar({
   size = 32,
   radius = 'full',
 }: UserAvatarProps) {
-  if (src) {
-    return (
-      <Avatar
-        size={toRadixSize(size)}
-        variant="soft"
-        radius={radius}
-        fallback={getInitials({ fullName, firstName, lastName, email })}
-        src={src}
-        style={{ width: `${size}px`, height: `${size}px`, flexShrink: 0 }}
-      />
-    );
-  }
-
   return (
-    <Badge
-      style={{
-        backgroundColor: 'var(--accent-a3)',
-        color: 'var(--accent-a11)',
-        padding: 'var(--space-1)',
-        borderRadius: 'var(--radius-2)',
-        flexShrink: 0,
-        width: 'var(--space-6)',
-        height: 'var(--space-6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '14px'
-      }}
-    >
-      {getInitials({ fullName, firstName, lastName, email })}
-    </Badge>
+    <Avatar
+      size={toRadixSize(size)}
+      variant="soft"
+      radius={radius}
+      fallback={getInitials({ fullName, firstName, lastName, email })}
+      src={src || undefined}
+      style={{ width: size, height: size, flexShrink: 0 }}
+    />
   );
 }

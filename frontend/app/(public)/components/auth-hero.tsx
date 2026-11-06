@@ -97,7 +97,7 @@ export default function AuthHero({ splitLayout }: AuthHeroProps) {
           textTransform: 'uppercase',
           letterSpacing: '0.02em',
           zIndex: 1,
-          fontFamily: 'Sora, sans-serif',
+          fontFamily: 'var(--default-font-family)',
         }}
       >
         {t('auth.hero.title')}

@@ -66,8 +66,8 @@ describe('DemoSuggestions', () => {
     expect(caption?.textContent).toBe(hint);
     expect(screen.getByText('bob@acme-demo.example').style.whiteSpace).toBe('nowrap');
     // One lock, on the pricing question's chip.
-    expect(screen.getAllByText('lock')).toHaveLength(1);
-    expect(screen.getByText(pricing).closest('button')?.textContent).toContain('lock');
+    expect(Array.from(document.querySelectorAll('[data-icon="lock"]'))).toHaveLength(1);
+    expect(screen.getByText(pricing).closest('button')?.querySelector('[data-icon="lock"]')).not.toBeNull();
   });
 
   it('does not send a member to an account whose password only the admin knows', () => {
@@ -91,7 +91,7 @@ describe('DemoSuggestions', () => {
       access.mockReturnValue(state);
       renderSuggestions();
 
-      expect(screen.queryByText('lock')).toBeNull();
+      expect(document.querySelector('[data-icon="lock"]')).toBeNull();
       expect(screen.queryByText(/Pricing committee only/)).toBeNull();
       cleanup();
     }

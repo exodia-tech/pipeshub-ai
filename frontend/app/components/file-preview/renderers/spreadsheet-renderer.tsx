@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useEffect, useMemo, useRef, useCallback, useReducer, memo } from 'react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 import * as XLSX from 'xlsx';
@@ -282,7 +283,7 @@ const TableCellMemo = memo(function TableCellMemo({
         whiteSpace: 'nowrap',
         backgroundColor: bg,
         color: isDark ? '#e1e3e7' : 'var(--olive-12)',
-        fontFamily: "'Manrope', sans-serif",
+        fontFamily: 'var(--default-font-family)',
       }}
     >
       {text || (isHeaderRow ? <span style={{ color: isDark ? '#666' : 'var(--olive-8)', fontStyle: 'italic' }}>(Empty)</span> : '')}
@@ -603,7 +604,7 @@ export function SpreadsheetRenderer({ fileUrl, fileName, fileType, citations, ac
   if (state.error || !state.workbookData) {
     return (
       <Flex direction="column" align="center" justify="center" gap="3" style={{ height: '100%', padding: 'var(--space-6)' }}>
-        <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--red-9)' }}>error_outline</span>
+        <MaterialIcon name="error_outline" size={48} style={{ fontSize: '48px', color: 'var(--red-9)' }} />
         <Text size="3" weight="medium" color="red">{state.error || 'Failed to load spreadsheet'}</Text>
       </Flex>
     );
@@ -616,7 +617,7 @@ export function SpreadsheetRenderer({ fileUrl, fileName, fileType, citations, ac
         <Flex align="center" justify="center" direction="column" gap="3"
           style={{ flex: 1, backgroundColor: isDark ? '#1e2125' : 'white', borderRadius: 'var(--radius-3)', border: `1px solid ${isDark ? '#404448' : 'var(--olive-6)'}`, margin: 'var(--space-4)' }}
         >
-          <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--olive-8)' }}>table_chart</span>
+          <MaterialIcon name="table_chart" size={48} style={{ fontSize: '48px', color: 'var(--olive-8)' }} />
           <Text size="2" color="gray">This sheet is empty</Text>
         </Flex>
         {state.availableSheets.length > 1 && (
@@ -665,7 +666,7 @@ export function SpreadsheetRenderer({ fileUrl, fileName, fileType, citations, ac
             minWidth: '100%',
             tableLayout: 'fixed',
             borderCollapse: 'collapse',
-            fontFamily: "'Manrope', sans-serif",
+            fontFamily: 'var(--default-font-family)',
           }}
         >
           {/* Column letter header (A, B, C...) */}
@@ -790,7 +791,7 @@ export function SpreadsheetRenderer({ fileUrl, fileName, fileType, citations, ac
             borderTop: `1px solid ${isDark ? '#404448' : 'var(--olive-4)'}`,
           }}
         >
-          <span className="material-icons-outlined" style={{ fontSize: '16px', color: 'var(--olive-9)' }}>info</span>
+          <MaterialIcon name="info" size={16} style={{ fontSize: '16px', color: 'var(--olive-9)' }} />
           <Text size="1" color="gray">
             Showing first {displayedDataRows.toLocaleString()} of {totalDataRows.toLocaleString()} rows. Download to view all data.
           </Text>
@@ -844,7 +845,7 @@ function SheetTabs({
                 : (isDark ? '#999' : 'var(--olive-10)'),
               backgroundColor: 'transparent',
               transition: 'color 0.15s ease, border-color 0.15s ease',
-              fontFamily: "'Manrope', sans-serif",
+              fontFamily: 'var(--default-font-family)',
             }}
             onMouseEnter={(e) => {
               if (!isActive) {

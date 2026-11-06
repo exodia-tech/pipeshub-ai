@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React from 'react';
 import { Flex, Text, DropdownMenu, Button } from '@radix-ui/themes';
 import { useLanguageStore, Language } from '@/lib/store/language-store';
@@ -30,9 +31,7 @@ export function LanguageSwitcher() {
       <DropdownMenu.Trigger>
         <Button variant="ghost" size="2">
           <Flex align="center" gap="2">
-            <span className="material-icons-outlined" style={{ fontSize: '18px' }}>
-              language
-            </span>
+            <MaterialIcon name="language" size={18} style={{ fontSize: '18px' }} />
             <Text size="2">{currentLanguage?.nativeLabel || 'EN'}</Text>
           </Flex>
         </Button>
@@ -55,12 +54,7 @@ export function LanguageSwitcher() {
             <Flex align="center" justify="between" style={{ width: '100%' }}>
               <Text size="2">{lang.nativeLabel}</Text>
               {language === lang.value && (
-                <span
-                  className="material-icons-outlined"
-                  style={{ fontSize: '16px', color: 'var(--accent-11)' }}
-                >
-                  check
-                </span>
+                <MaterialIcon name="check" size={16} style={{ fontSize: '16px', color: 'var(--accent-11)' }} />
               )}
             </Flex>
           </DropdownMenu.Item>

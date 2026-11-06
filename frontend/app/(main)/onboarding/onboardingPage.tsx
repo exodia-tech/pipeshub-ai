@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useEffect, useRef, useState, Suspense } from 'react';
 import { useIsMobile, useIsBelowDesktop } from '@/lib/hooks/use-is-mobile';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -339,9 +340,7 @@ function OnboardingPageInner() {
               onClick={handlePrev}
               style={{ cursor: 'pointer' }}
             >
-              <span className="material-icons-outlined" style={{ fontSize: '16px' }}>
-                arrow_back
-              </span>
+              <MaterialIcon name="arrow_back" size={16} style={{ fontSize: '16px' }} />
               {t('onboarding.nav.prev')}
             </Button>
           ) : (
@@ -370,9 +369,7 @@ function OnboardingPageInner() {
                 ) : (
                   <>
                     {t('onboarding.nav.enterPipeshub')}
-                    <span className="material-icons-outlined" style={{ fontSize: '16px' }}>
-                      arrow_forward
-                    </span>
+                    <MaterialIcon name="arrow_forward" size={16} style={{ fontSize: '16px' }} />
                   </>
                 )}
               </Button>
@@ -408,9 +405,7 @@ function OnboardingPageInner() {
                   }}
                 >
                   {t('onboarding.nav.next')}
-                  <span className="material-icons-outlined" style={{ fontSize: '16px' }}>
-                    arrow_forward
-                  </span>
+                  <MaterialIcon name="arrow_forward" size={16} style={{ fontSize: '16px' }} />
                 </Button>
               </Flex>
             )

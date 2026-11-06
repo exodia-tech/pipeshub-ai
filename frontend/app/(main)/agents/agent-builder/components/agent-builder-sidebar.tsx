@@ -223,7 +223,7 @@ export function AgentBuilderSidebar(props: {
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
-        fontFamily: 'Manrope, sans-serif',
+        fontFamily: 'var(--default-font-family)',
       }}
     >
       <Box

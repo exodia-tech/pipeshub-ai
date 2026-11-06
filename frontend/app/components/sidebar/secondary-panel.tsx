@@ -34,7 +34,7 @@ export function SecondaryPanel({ header, children }: SecondaryPanelProps) {
         backgroundColor: 'var(--olive-1)',
         ...(isMobile ? {} : { borderRight: '1px solid var(--olive-3)' }),
         flexShrink: 0,
-        fontFamily: 'Manrope, sans-serif',
+        fontFamily: 'var(--default-font-family)',
       }}
     >
       {/* Header — fixed height */}

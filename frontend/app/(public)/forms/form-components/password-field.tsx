@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useState } from 'react';
 import { Flex, Text, TextField, IconButton } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
@@ -108,12 +109,7 @@ const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldProps>(fun
             onClick={() => setVisible((v) => !v)}
             aria-label={visible ? t('auth.common.hidePassword') : t('auth.common.showPassword')}
           >
-            <span
-              className="material-icons-outlined"
-              style={{ fontSize: '16px', color: 'var(--gray-10)' }}
-            >
-              {visible ? 'visibility_off' : 'visibility'}
-            </span>
+            <MaterialIcon name={visible ? 'visibility_off' : 'visibility'} size={16} style={{ fontSize: '16px', color: 'var(--gray-10)' }} />
           </IconButton>
         </TextField.Slot>
       </TextField.Root>

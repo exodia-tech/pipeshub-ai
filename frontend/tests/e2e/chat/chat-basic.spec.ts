@@ -109,7 +109,7 @@ test.describe('Chat — page structure', () => {
     // Send button rendered as IconButton containing arrow_upward icon
     const sendBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'arrow_upward' }) })
+      .filter({ has: page.locator('[data-icon="arrow_upward"]') })
       .last();
 
     if (await sendBtn.isVisible()) {
@@ -123,7 +123,7 @@ test.describe('Chat — page structure', () => {
 
     const sendBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'arrow_upward' }) })
+      .filter({ has: page.locator('[data-icon="arrow_upward"]') })
       .last();
 
     if (await sendBtn.isVisible()) {
@@ -143,8 +143,7 @@ test.describe('Chat — page structure', () => {
   test('model selector button is visible in the toolbar', async ({ page }) => {
     // The model selector shows a "memory" icon
     const modelIcon = page
-      .locator('span.material-icons-outlined')
-      .filter({ hasText: 'memory' })
+      .locator('[data-icon="memory"]')
       .first();
     await expect(modelIcon).toBeVisible({ timeout: 5_000 });
   });
@@ -162,8 +161,7 @@ test.describe('Chat — page structure', () => {
 
   test('connectors/apps button is visible in the toolbar', async ({ page }) => {
     const appsIcon = page
-      .locator('span.material-icons-outlined')
-      .filter({ hasText: 'apps' })
+      .locator('[data-icon="apps"]')
       .first();
     await expect(appsIcon).toBeVisible({ timeout: 5_000 });
   });
@@ -205,7 +203,7 @@ test.describe('Chat — new chat navigation', () => {
 
     const iconBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: /edit_square|add|create/ }) })
+      .filter({ has: page.locator('[data-icon="edit_square"], [data-icon="add"], [data-icon="create"]') })
       .first();
 
     const isVisible =

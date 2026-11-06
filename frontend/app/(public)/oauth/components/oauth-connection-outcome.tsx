@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { Badge, Box, Button, Flex, Text } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
 
@@ -67,17 +68,11 @@ export function OAuthConnectionOutcome({
           background: iconBg,
         }}
       >
-        <span
-          className="material-icons-outlined"
-          style={{
+        <MaterialIcon name={iconName} size={22} style={{
             fontSize: 22,
             color: accentColor,
             lineHeight: 1,
-          }}
-          aria-hidden
-        >
-          {iconName}
-        </span>
+          }} aria-hidden />
       </Flex>
 
       <Text
@@ -115,13 +110,7 @@ export function OAuthConnectionOutcome({
             }}
           >
             <Flex align="center" gap="2">
-              <span
-                className="material-icons-outlined"
-                style={{ fontSize: 18, lineHeight: 1 }}
-                aria-hidden
-              >
-                refresh
-              </span>
+              <MaterialIcon name="refresh" size={18} style={{ fontSize: 18, lineHeight: 1 }} aria-hidden />
               {primaryActionLabel}
             </Flex>
           </Button>

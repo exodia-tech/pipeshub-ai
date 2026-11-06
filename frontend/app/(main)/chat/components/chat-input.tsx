@@ -1836,7 +1836,7 @@ export function ChatInput({
             style={{
               flex: 1,
               fontSize: 'var(--font-size-2)',
-              fontFamily: 'Manrope, sans-serif',
+              fontFamily: 'var(--default-font-family)',
               lineHeight: '20px',
               minWidth: 0,
               height: 20,
@@ -1921,7 +1921,7 @@ export function ChatInput({
     letterSpacing: 0,
     resize: 'none',
     maxHeight: '160px',
-    fontFamily: 'Manrope, sans-serif',
+    fontFamily: 'var(--default-font-family)',
     height: 'auto',
     overflow: 'auto',
     padding: 0,
@@ -1952,7 +1952,7 @@ export function ChatInput({
         boxSizing: 'border-box',
         overflow: 'hidden',
         pointerEvents: 'auto',
-        fontFamily: 'Manrope, sans-serif',
+        fontFamily: 'var(--default-font-family)',
         backdropFilter:
           dockGlass || !(composerActive || message.trim() || isListening) ? 'var(--frost-filter)' : 'none',
         WebkitBackdropFilter:

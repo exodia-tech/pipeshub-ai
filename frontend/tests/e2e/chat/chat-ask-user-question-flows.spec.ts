@@ -629,7 +629,7 @@ test.describe('Ask user question — journeys', () => {
     });
     const regen = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'refresh' }) })
+      .filter({ has: page.locator('[data-icon="refresh"]') })
       .first();
     await expect(regen).toBeVisible({ timeout: 8_000 });
     await regen.click();

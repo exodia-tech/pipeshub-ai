@@ -1,13 +1,13 @@
 # Radix UI Implementation Guide
 
-This guide documents how Radix UI Themes is implemented in the PipesHub Dashboard UI application.
+This guide documents how Radix UI Themes is implemented in the EXODIA Brain UI application.
 
 ## Overview
 
 - **Library**: Radix UI Themes v3.2.1
 - **Styling Approach**: Radix components + inline styles with CSS variables (no Tailwind CSS)
-- **Font**: Manrope (Google Fonts)
-- **Icons**: Google Material Icons Outlined
+- **Font**: Inter 4.1 variable (self-hosted WOFF2, normal and italic; SIL OFL)
+- **Icons**: Lucide React SVGs, 1.8px strokes. Use the shared `MaterialIcon` compatibility component; saved icon IDs map in `app/components/ui/lucide-icon-map.ts`.
 
 ---
 
@@ -23,11 +23,10 @@ The application uses a custom `ThemeProvider` that wraps Radix UI's `Theme` comp
 import { Theme } from '@radix-ui/themes';
 
 <Theme
-  accentColor="jade"           // Fallback accent color
+  accentColor="blue"           // Fallback accent color
   grayColor="olive"            // Gray scale with green tint
   appearance={appearance}      // 'light' or 'dark'
-  radius="medium"              // Border radius scale
-  data-accent-color="emerald"  // Custom emerald mapping
+  radius="large"              // Border radius scale
 >
   {children}
 </Theme>
@@ -37,10 +36,10 @@ import { Theme } from '@radix-ui/themes';
 
 | Property | Value | Description |
 |----------|-------|-------------|
-| `accentColor` | `"jade"` | Fallback Radix accent (overridden by custom emerald) |
+| `accentColor` | `"blue"` | EXODIA Brain blue |
 | `grayColor` | `"olive"` | Gray scale with subtle green tint |
 | `appearance` | `"light"` / `"dark"` | Theme mode (auto-detects system preference) |
-| `radius` | `"medium"` | Default border radius for components |
+| `radius` | `"large"` | Rounded controls and surfaces; shared tokens in globals.css |
 
 ### Dark/Light Mode
 

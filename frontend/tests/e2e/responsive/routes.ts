@@ -139,7 +139,7 @@ const CHAT_CONVERSATION = `/chat/?conversationId=${CONV_ID}`;
 const RICH_CHAT = `/chat/?conversationId=${RICH_CONV_ID}`;
 
 function icon(page: Page | Locator, name: string) {
-  return page.locator('span.material-icons-outlined, span.material-icons', { hasText: new RegExp(`^${name}$`) });
+  return page.locator(`[data-icon="${name}"]`);
 }
 
 const NO_PROJECT = (seed: SeedIds) => (seed.projectId ? undefined : 'the API did not create the audit project');

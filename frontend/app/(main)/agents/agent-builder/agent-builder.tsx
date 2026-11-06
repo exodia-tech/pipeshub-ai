@@ -1222,7 +1222,7 @@ export function AgentBuilder({ agentKey }: { agentKey: string | null }) {
               borderTop: '1px solid var(--olive-3)',
               flexShrink: 0,
               background: 'var(--olive-1)',
-              fontFamily: 'Manrope, sans-serif',
+              fontFamily: 'var(--default-font-family)',
             }}
           >
             {isMobile ? null : (

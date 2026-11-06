@@ -441,12 +441,7 @@ export function OAuthAuthorizeView() {
                 background: 'var(--red-3)',
               }}
             >
-              <span
-                className="material-icons-outlined"
-                style={{ fontSize: 24, color: 'var(--red-11)' }}
-              >
-                error_outline
-              </span>
+              <MaterialIcon name="error_outline" size={24} style={{ fontSize: 24, color: 'var(--red-11)' }} />
             </Flex>
 
             <Text size="4" weight="bold" style={{ color: 'var(--gray-12)' }}>
@@ -488,17 +483,12 @@ export function OAuthAuthorizeView() {
                 }}
               >
                 <Flex gap="2" align="start">
-                  <span
-                    className="material-icons-outlined"
-                    style={{
+                  <MaterialIcon name="info" size={16} style={{
                       fontSize: 16,
                       color: 'var(--gray-10)',
                       marginTop: 1,
                       flexShrink: 0,
-                    }}
-                  >
-                    info
-                  </span>
+                    }} />
                   <Text size="2" style={{ color: 'var(--gray-11)', lineHeight: 1.5 }}>
                     {errorHint}
                   </Text>
@@ -622,9 +612,7 @@ export function OAuthAuthorizeView() {
                   flexShrink: 0,
                 }}
               >
-                <span className="material-icons-outlined" style={{ fontSize: 14 }}>
-                  settings_applications
-                </span>
+                <MaterialIcon name="settings_applications" size={14} style={{ fontSize: 14 }} />
               </Flex>
             )}
             <Text size="3" weight="medium" style={{ color: 'var(--gray-12)' }}>

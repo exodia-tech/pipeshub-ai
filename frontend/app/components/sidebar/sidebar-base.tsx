@@ -143,7 +143,7 @@ export function SidebarBase({ header, children, footer, footerHeight = FOOTER_HE
             inset: 0,
             outline: 'none',
             zIndex: 200,
-            fontFamily: 'Manrope, sans-serif',
+            fontFamily: 'var(--default-font-family)',
           }}
         >
           {secondaryPanel}
@@ -161,7 +161,7 @@ export function SidebarBase({ header, children, footer, footerHeight = FOOTER_HE
           inset: 0,
           zIndex: 200,
           backgroundColor: 'var(--olive-1)',
-          fontFamily: 'Manrope, sans-serif',
+          fontFamily: 'var(--default-font-family)',
         }}
       >
         {/* Mobile header: logo area + × close button */}
@@ -238,7 +238,7 @@ export function SidebarBase({ header, children, footer, footerHeight = FOOTER_HE
         backgroundColor: 'var(--olive-1)',
         borderRight: '1px solid var(--olive-3)',
         flexShrink: 0,
-        fontFamily: 'Manrope, sans-serif',
+        fontFamily: 'var(--default-font-family)',
         position: 'relative',
       }}
     >

@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React from 'react';
 import { Flex, Text, Tooltip } from '@radix-ui/themes';
 import type { ConfidenceLevel } from '@/chat/types';
@@ -41,15 +42,10 @@ export function ConfidenceIndicator({ confidence }: ConfidenceIndicatorProps) {
           cursor: 'default',
         }}
       >
-        <span
-          className="material-icons-outlined"
-          style={{
+        <MaterialIcon name="auto_awesome" size={11} style={{
             fontSize: '11px',
             color,
-          }}
-        >
-          auto_awesome
-        </span>
+          }} />
         <Text
           size="1"
           weight="medium"

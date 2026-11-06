@@ -125,7 +125,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         accentColor="blue"
         grayColor="olive"
         appearance={appearance}
-        radius="medium"
+        radius="large"
       >
         {/* Global default for Radix tooltips — 700ms (library default) feels
             sluggish; 200ms is snappy but still avoids accidental flashes.

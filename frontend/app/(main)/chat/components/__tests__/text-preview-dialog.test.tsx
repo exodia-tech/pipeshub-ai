@@ -115,7 +115,7 @@ describe('TextPreviewDialog', () => {
     await waitFor(() => expect(screen.getByText('line one', { exact: false })).toBeTruthy());
     const copy = screen.getByRole('button', { name: /^copy$/i });
     expect(() => fireEvent.click(copy)).not.toThrow();
-    await waitFor(() => expect(copy.textContent).toContain('close'));
+    await waitFor(() => expect(copy.querySelector('[data-icon="close"]')).not.toBeNull());
   });
 
   it('calls onShowInTextField with the loaded text and closes the dialog', async () => {

@@ -351,15 +351,10 @@ export default function ServicesPage() {
               disabled={isRefreshing}
               style={{ cursor: isRefreshing ? 'wait' : 'pointer', flexShrink: 0, gap: 6 }}
             >
-              <span
-                className="material-icons-outlined"
-                style={{
+              <MaterialIcon name="refresh" size={15} style={{
                   fontSize: 15,
                   animation: isRefreshing ? 'spin 1s linear infinite' : undefined,
-                }}
-              >
-                refresh
-              </span>
+                }} />
               {isRefreshing ? t('workspace.services.checking') : t('workspace.services.checkNow')}
             </Button>
           </Flex>

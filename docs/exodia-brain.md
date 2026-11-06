@@ -15,3 +15,9 @@ Company website: https://exodiatech.com
 ## Software notices
 
 This product is maintained by EXODIA. Original software attribution and license notices are preserved in the repository LICENSE files.
+
+## Release source
+
+Coolify builds this fork's `main` branch with the commit selector set to `HEAD`, using `deployment/docker-compose/docker-compose.exodia.yml`. A source sync is complete for production only after the main-branch deployment finishes and its actual commit and browser health are verified. Upstream is merged into the fork so EXODIA customizations survive; production does not deploy directly from the upstream repository.
+
+The app image and runtime build information use Coolify's `SOURCE_COMMIT`. Database image digests and named volumes stay independent of app releases. Keep the last successful deployment commit in the local deployment checkpoint for rollback.
