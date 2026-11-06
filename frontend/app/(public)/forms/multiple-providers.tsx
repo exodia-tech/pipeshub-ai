@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -135,9 +136,7 @@ export default function MultipleProviders({
       <Box style={{ position: 'relative', marginBottom: 'var(--space-5)' }}>
         {canScrollLeft && (
           <button type="button" onClick={() => scrollBy('left')} style={arrowButtonStyle('left')}>
-            <span className="material-icons-outlined" style={{ fontSize: 16 }}>
-              chevron_left
-            </span>
+            <MaterialIcon name="chevron_left" size={16} style={{ fontSize: 16 }} />
           </button>
         )}
 
@@ -186,12 +185,7 @@ export default function MultipleProviders({
                     style={{ width: 14, height: 14, objectFit: 'contain', flexShrink: 0 }}
                   />
                 ) : (
-                  <span
-                    className="material-icons-outlined"
-                    style={{ fontSize: 14, flexShrink: 0 }}
-                  >
-                    {tab.icon}
-                  </span>
+                  <MaterialIcon name={tab.icon} size={14} style={{ fontSize: 14, flexShrink: 0 }} />
                 )}
                 <Text
                   size="1"
@@ -207,9 +201,7 @@ export default function MultipleProviders({
 
         {canScrollRight && (
           <button type="button" onClick={() => scrollBy('right')} style={arrowButtonStyle('right')}>
-            <span className="material-icons-outlined" style={{ fontSize: 16 }}>
-              chevron_right
-            </span>
+            <MaterialIcon name="chevron_right" size={16} style={{ fontSize: 16 }} />
           </button>
         )}
       </Box>

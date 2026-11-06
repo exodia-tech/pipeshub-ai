@@ -149,7 +149,7 @@ export function MessageActionIndicator({
             resize: 'none',
             minHeight: '24px',
             maxHeight: '120px',
-            fontFamily: 'Manrope, sans-serif',
+            fontFamily: 'var(--default-font-family)',
             height: 'auto',
             overflow: editText.split('\n').length > 5 ? 'auto' : 'hidden',
           }}

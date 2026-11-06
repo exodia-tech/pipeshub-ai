@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React from 'react';
 import { Flex, Text } from '@radix-ui/themes';
 
@@ -20,17 +21,12 @@ export function InfoBanner({ message }: InfoBannerProps) {
         marginBottom: '16px',
       }}
     >
-      <span
-        className="material-icons-outlined"
-        style={{
+      <MaterialIcon name="info" size={16} style={{
           fontSize: '16px',
           color: 'var(--accent-11)',
           flexShrink: 0,
           marginTop: '1px',
-        }}
-      >
-        info
-      </span>
+        }} />
       <Text size="1" style={{ color: 'var(--accent-11)', lineHeight: '1.5' }}>
         {message}
       </Text>

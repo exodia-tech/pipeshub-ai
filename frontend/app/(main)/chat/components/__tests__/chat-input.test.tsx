@@ -1255,7 +1255,7 @@ describe('ChatInput — connectors and collections', () => {
   it('opens the connectors panel and applies the collections picked there', () => {
     renderInput();
 
-    fireEvent.click(screen.getByText('apps').closest('button') as HTMLButtonElement);
+    fireEvent.click(document.querySelector('[data-icon="apps"]').closest('button') as HTMLButtonElement);
     fireEvent.click(screen.getByText('Choose the handbook'));
 
     expect(useChatStore.getState().settings.filters.kb).toEqual(['kb-handbook']);
@@ -1264,7 +1264,7 @@ describe('ChatInput — connectors and collections', () => {
   it('can switch the connectors panel to the larger overlay and back', () => {
     renderInput();
 
-    fireEvent.click(screen.getByText('apps').closest('button') as HTMLButtonElement);
+    fireEvent.click(document.querySelector('[data-icon="apps"]').closest('button') as HTMLButtonElement);
     fireEvent.click(screen.getByText('Toggle panel size'));
     expect(screen.getByRole('dialog', { name: 'Expanded panel' })).toBeTruthy();
 
@@ -1276,7 +1276,7 @@ describe('ChatInput — connectors and collections', () => {
     useChatStore.setState({ settings: { ...useChatStore.getState().settings, queryMode: 'agent' } });
     renderInput();
 
-    fireEvent.click(screen.getByText('apps').closest('button') as HTMLButtonElement);
+    fireEvent.click(document.querySelector('[data-icon="apps"]').closest('button') as HTMLButtonElement);
 
     expect(screen.getByText('Universal agent resources')).toBeTruthy();
   });
@@ -1284,14 +1284,14 @@ describe('ChatInput — connectors and collections', () => {
   it('opens the scoped resources panel in an agent chat', () => {
     renderInput({ isAgentChat: true, agentId: 'agent-1' });
 
-    fireEvent.click(screen.getByText('apps').closest('button') as HTMLButtonElement);
+    fireEvent.click(document.querySelector('[data-icon="apps"]').closest('button') as HTMLButtonElement);
 
     expect(screen.getByText('Scoped resources for agent')).toBeTruthy();
   });
 
   it('closes an open panel when the user clicks outside the composer', () => {
     renderInput();
-    fireEvent.click(screen.getByText('apps').closest('button') as HTMLButtonElement);
+    fireEvent.click(document.querySelector('[data-icon="apps"]').closest('button') as HTMLButtonElement);
     expect(screen.getByText('Choose the handbook')).toBeTruthy();
 
     fireEvent.mouseDown(document.body);
@@ -1301,7 +1301,7 @@ describe('ChatInput — connectors and collections', () => {
 
   it('keeps the panel open for a click inside a dialog opened from it', () => {
     renderInput();
-    fireEvent.click(screen.getByText('apps').closest('button') as HTMLButtonElement);
+    fireEvent.click(document.querySelector('[data-icon="apps"]').closest('button') as HTMLButtonElement);
     // Like an MCP server's key dialog: portaled to the body, outside the composer.
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
@@ -1451,7 +1451,7 @@ describe('ChatInput — on a phone', () => {
     device.isMobile = true;
     renderInput();
 
-    fireEvent.click(screen.getByText('more_horiz').closest('button') as HTMLButtonElement);
+    fireEvent.click(document.querySelector('[data-icon="more_horiz"]').closest('button') as HTMLButtonElement);
 
     expect(screen.getByText('Query options')).toBeTruthy();
   });

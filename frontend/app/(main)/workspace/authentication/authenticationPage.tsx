@@ -284,9 +284,7 @@ export default function AuthenticationPage() {
             }
             style={{ cursor: 'pointer', flexShrink: 0, gap: 6 }}
           >
-            <span className="material-icons-outlined" style={{ fontSize: 15 }}>
-              open_in_new
-            </span>
+            <MaterialIcon name="open_in_new" size={15} style={{ fontSize: 15 }} />
             {t('workspaceMenu.documentation')}
           </Button>
         </Flex>
@@ -335,9 +333,7 @@ export default function AuthenticationPage() {
                 disabled={isLoading}
                 style={{ cursor: 'pointer', gap: 6 }}
               >
-                <span className="material-icons-outlined" style={{ fontSize: 15 }}>
-                  edit
-                </span>
+                <MaterialIcon name="edit" size={15} style={{ fontSize: 15 }} />
                 {t('workspace.aiModels.actionEdit')}
               </Button>
             )}
@@ -447,12 +443,7 @@ export default function AuthenticationPage() {
             >
               {enabledAlternativeLabels.map((label) => (
                 <Flex key={label} align="center" gap="1" style={{ marginBottom: 'var(--space-1)' }}>
-                  <span
-                    className="material-icons-outlined"
-                    style={{ fontSize: 14, color: 'var(--slate-10)' }}
-                  >
-                    arrow_right
-                  </span>
+                  <MaterialIcon name="arrow_right" size={14} style={{ fontSize: 14, color: 'var(--slate-10)' }} />
                   <Text size="2">{label}</Text>
                 </Flex>
               ))}
@@ -468,12 +459,7 @@ export default function AuthenticationPage() {
                 border: '1px solid var(--amber-a6)',
               }}
             >
-              <span
-                className="material-icons-outlined"
-                style={{ fontSize: 16, color: 'var(--amber-11)', flexShrink: 0, marginTop: 1 }}
-              >
-                warning
-              </span>
+              <MaterialIcon name="warning" size={16} style={{ fontSize: 16, color: 'var(--amber-11)', flexShrink: 0, marginTop: 1 }} />
               <Text size="2" style={{ color: 'var(--amber-11)', lineHeight: '20px' }}>
                 {enabledAlternativeLabels.length === 1
                   ? t('workspace.authentication.riskDialog.warningSingle', { method: enabledAlternativeLabels[0] })

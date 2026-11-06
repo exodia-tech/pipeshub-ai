@@ -32,7 +32,7 @@ test.describe('Users Actions', () => {
 
     const actionsButton = row
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'more_horiz' }) })
+      .filter({ has: page.locator('[data-icon="more_horiz"]') })
       .first();
     await expect(actionsButton, 'each user row should offer an actions menu').toBeVisible({
       timeout: 5_000,

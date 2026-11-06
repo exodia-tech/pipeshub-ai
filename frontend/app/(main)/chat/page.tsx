@@ -1384,7 +1384,7 @@ function ChatContent() {
                       style={{
                         textAlign: 'center',
                         marginBottom: isMobile ? 'var(--space-5)' : 'var(--space-6)',
-                        fontFamily: 'Manrope, sans-serif',
+                        fontFamily: 'var(--default-font-family)',
                       }}
                     >
                       <Text

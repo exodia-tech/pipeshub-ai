@@ -72,7 +72,7 @@ export function SubPanel({ isOpen, title, onBack, children }: SubPanelProps) {
         display: 'flex',
         flexDirection: 'column',
         gap: 2,
-        fontFamily: 'Manrope, sans-serif',
+        fontFamily: 'var(--default-font-family)',
         width: 250,
       }}
     >

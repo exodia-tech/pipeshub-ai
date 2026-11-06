@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
@@ -52,12 +53,7 @@ export default function PasswordResetFailure({
           borderRadius: 'var(--radius-3)',
         }}
       >
-        <span
-          className="material-icons-outlined"
-          style={{ fontSize: '18px', color: 'var(--red-11)', marginTop: '1px', flexShrink: 0 }}
-        >
-          error_outline
-        </span>
+        <MaterialIcon name="error_outline" size={18} style={{ fontSize: '18px', color: 'var(--red-11)', marginTop: '1px', flexShrink: 0 }} />
         <Text size="2" style={{ color: 'var(--red-11)' }}>
           {message}
         </Text>

@@ -37,7 +37,7 @@ test.describe('Users Invite', () => {
 
     // A tag pill should appear
     await page.waitForTimeout(300);
-    const closePills = page.locator('span.material-icons-outlined').filter({ hasText: 'close' });
+    const closePills = page.locator('[data-icon="close"]');
     const pillCount = await closePills.count();
     expect(pillCount).toBeGreaterThanOrEqual(1);
   });
@@ -62,7 +62,7 @@ test.describe('Users Invite', () => {
       await page.waitForTimeout(100);
     }
 
-    const closePills = page.locator('span.material-icons-outlined').filter({ hasText: 'close' });
+    const closePills = page.locator('[data-icon="close"]');
     const pillCount = await closePills.count();
     expect(pillCount).toBeGreaterThanOrEqual(3);
   });

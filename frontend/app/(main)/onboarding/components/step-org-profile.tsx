@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useState, useEffect, useRef } from 'react';
 import { Flex, Box, Text, Button, TextField, Spinner } from '@radix-ui/themes';
 import { useOnboardingStore } from '../store';
@@ -332,9 +333,7 @@ export function StepOrgProfile({ onSuccess }: StepOrgProfileProps) {
               </Flex>
             ) : savedSuccessfully ? (
               <Flex align="center" gap="2">
-                <span className="material-icons-outlined" style={{ fontSize: '16px' }}>
-                  check
-                </span>
+                <MaterialIcon name="check" size={16} style={{ fontSize: '16px' }} />
                 Account Created
               </Flex>
             ) : (

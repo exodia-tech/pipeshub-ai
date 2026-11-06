@@ -112,7 +112,7 @@ export function AgentChatHeader({
               border: 'none',
               borderRadius: 'var(--radius-2)',
               cursor: 'pointer',
-              fontFamily: 'var(--default-font-family, Manrope, sans-serif)',
+              fontFamily: 'var(--default-font-family)',
             }}
             aria-label={t('chat.agentHeaderMenuAria')}
           >

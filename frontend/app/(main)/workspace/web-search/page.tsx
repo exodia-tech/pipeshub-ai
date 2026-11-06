@@ -285,9 +285,7 @@ export default function WebSearchPage() {
             }
             style={{ cursor: 'pointer', flexShrink: 0, gap: 6 }}
           >
-            <span className="material-icons-outlined" style={{ fontSize: 15 }}>
-              open_in_new
-            </span>
+            <MaterialIcon name="open_in_new" size={15} style={{ fontSize: 15 }} />
             {t('workspace.bots.documentation')}
           </Button>
         </Flex>

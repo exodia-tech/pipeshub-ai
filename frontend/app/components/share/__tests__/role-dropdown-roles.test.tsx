@@ -8,7 +8,7 @@ import '@/lib/__tests__/test-i18n';
 import { installBrowserShims, renderInTheme } from '@/app/(main)/agents/agent-builder/__tests__/agent-builder-harness';
 
 // The real icon renders its ligature name as text; that text must stay out of the accessible name.
-vi.mock('@/app/components/ui/MaterialIcon', () => ({ MaterialIcon: ({ name }: { name: string }) => <span>{name}</span> }));
+vi.mock('@/app/components/ui/MaterialIcon', () => ({ MaterialIcon: ({ name }: { name: string }) => <span data-icon={name}>{name}</span> }));
 
 import { RoleDropdownMenu } from '../role-dropdown-menu';
 

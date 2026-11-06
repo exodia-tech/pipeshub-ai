@@ -1,6 +1,7 @@
 // Modified by EXODIA: customer-facing branding.
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React, { useEffect, useState } from 'react';
 import { Flex, Text } from '@radix-ui/themes';
 import { isLegacyWordDocFile } from '../utils';
@@ -53,9 +54,7 @@ export function DocumentPreview({ fileUrl, fileName, fileBlob }: FilePreviewRend
         padding: 'var(--space-6)',
       }}
     >
-      <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--slate-9)' }}>
-        description
-      </span>
+      <MaterialIcon name="description" size={48} style={{ fontSize: '48px', color: 'var(--slate-9)' }} />
       <Text size="4" weight="medium" style={{ textAlign: 'center' }}>
         {fileName}
       </Text>
@@ -88,9 +87,7 @@ export function DocumentPreview({ fileUrl, fileName, fileBlob }: FilePreviewRend
             e.currentTarget.style.backgroundColor = 'var(--accent-9)';
           }}
         >
-          <span className="material-icons-outlined" style={{ fontSize: '18px' }}>
-            download
-          </span>
+          <MaterialIcon name="download" size={18} style={{ fontSize: '18px' }} />
           Download File
         </a>
       )}
@@ -145,9 +142,7 @@ export function UnknownPreview({ fileName, fileUrl, fileBlob, webUrl, previewRen
         padding: 'var(--space-6)',
       }}
     >
-      <span className="material-icons-outlined" style={{ fontSize: '48px', color: 'var(--slate-9)' }}>
-        insert_drive_file
-      </span>
+      <MaterialIcon name="insert_drive_file" size={48} style={{ fontSize: '48px', color: 'var(--slate-9)' }} />
       <Text size="4" weight="medium" style={{ textAlign: 'center' }}>
         {fileName}
       </Text>
@@ -167,9 +162,7 @@ export function UnknownPreview({ fileName, fileUrl, fileBlob, webUrl, previewRen
               e.currentTarget.style.backgroundColor = 'var(--accent-9)';
             }}
           >
-            <span className="material-icons-outlined" style={{ fontSize: '18px' }}>
-              download
-            </span>
+            <MaterialIcon name="download" size={18} style={{ fontSize: '18px' }} />
             Download File
           </a>
         )}
@@ -186,9 +179,7 @@ export function UnknownPreview({ fileName, fileUrl, fileBlob, webUrl, previewRen
               e.currentTarget.style.backgroundColor = 'var(--olive-4)';
             }}
           >
-            <span className="material-icons-outlined" style={{ fontSize: '18px' }}>
-              open_in_new
-            </span>
+            <MaterialIcon name="open_in_new" size={18} style={{ fontSize: '18px' }} />
             Open in Browser
           </a>
         )}

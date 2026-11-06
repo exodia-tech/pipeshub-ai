@@ -1,5 +1,6 @@
 'use client';
 
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import React from 'react';
 import { Flex, Text } from '@radix-ui/themes';
 
@@ -28,17 +29,12 @@ export default function ErrorBanner({ message }: ErrorBannerProps) {
         borderRadius: 'var(--radius-3)',
       }}
     >
-      <span
-        className="material-icons-outlined"
-        style={{
+      <MaterialIcon name="error_outline" size={16} style={{
           fontSize: '16px',
           color: 'var(--red-11)',
           marginTop: '1px',
           flexShrink: 0,
-        }}
-      >
-        error_outline
-      </span>
+        }} />
       <Text size="2" style={{ color: 'var(--red-11)' }}>
         {message}
       </Text>

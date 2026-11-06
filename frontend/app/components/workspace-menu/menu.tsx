@@ -137,7 +137,7 @@ export function WorkspaceMenu({ isOpen, onClose, triggerRef }: WorkspaceMenuProp
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
-          fontFamily: 'Manrope, sans-serif',
+          fontFamily: 'var(--default-font-family)',
           pointerEvents: isOpen ? undefined : 'none',
         }}
       >

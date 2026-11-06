@@ -62,7 +62,7 @@ function markdownOf(editor: Editor): string {
 }
 
 function toolbarButton(container: HTMLElement, icon: string): HTMLButtonElement {
-  const button = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === icon);
+  const button = Array.from(container.querySelectorAll('button')).find((b) => b.querySelector(`[data-icon="${icon}"]`));
   if (!button) throw new Error(`no toolbar button for ${icon}`);
   return button;
 }

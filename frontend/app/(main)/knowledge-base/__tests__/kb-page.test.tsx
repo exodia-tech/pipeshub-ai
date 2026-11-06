@@ -1862,7 +1862,7 @@ describe('Knowledge base sidebar — folders stay usable after the collection li
       for (let depth = 0; depth < 6 && el; depth += 1) {
         el = el.parentElement;
         const icon = el
-          ? Array.from(el.querySelectorAll('span')).find((span) => ['chevron_right', 'expand_more'].includes(span.textContent ?? ''))
+          ? Array.from(el.querySelectorAll('span')).find((span) => ['chevron_right', 'expand_more'].includes(span.getAttribute('data-icon') ?? ''))
           : undefined;
         if (icon?.parentElement) return icon.parentElement;
       }

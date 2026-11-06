@@ -166,7 +166,7 @@ async function sendMessage(page: import('@playwright/test').Page, message: strin
 function sendButton(page: import('@playwright/test').Page) {
   return page
     .locator('button')
-    .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'arrow_upward' }) })
+    .filter({ has: page.locator('[data-icon="arrow_upward"]') })
     .filter({ visible: true });
 }
 
@@ -752,7 +752,7 @@ test.describe('Chat — stop streaming (assistant)', () => {
 
     const regenBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'refresh' }) })
+      .filter({ has: page.locator('[data-icon="refresh"]') })
       .first();
     await expect(regenBtn).toBeVisible({ timeout: 8_000 });
     await regenBtn.click();

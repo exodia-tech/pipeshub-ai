@@ -160,7 +160,7 @@ test.describe('Chat — message actions: like / dislike', () => {
     const likeBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_up_off_alt' }),
+        has: page.locator('[data-icon="thumb_up_off_alt"]'),
       })
       .first();
 
@@ -173,7 +173,7 @@ test.describe('Chat — message actions: like / dislike', () => {
     const likeBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_up_off_alt' }),
+        has: page.locator('[data-icon="thumb_up_off_alt"]'),
       })
       .first();
 
@@ -208,7 +208,7 @@ test.describe('Chat — message actions: like / dislike', () => {
     const likeBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_up_off_alt' }),
+        has: page.locator('[data-icon="thumb_up_off_alt"]'),
       })
       .first();
 
@@ -236,7 +236,7 @@ test.describe('Chat — message actions: like / dislike', () => {
     const dislikeBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_down_off_alt' }),
+        has: page.locator('[data-icon="thumb_down_off_alt"]'),
       })
       .first();
 
@@ -249,7 +249,7 @@ test.describe('Chat — message actions: like / dislike', () => {
     const dislikeBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_down_off_alt' }),
+        has: page.locator('[data-icon="thumb_down_off_alt"]'),
       })
       .first();
 
@@ -280,7 +280,7 @@ test.describe('Chat — message actions: like / dislike', () => {
     const dislikeBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_down_off_alt' }),
+        has: page.locator('[data-icon="thumb_down_off_alt"]'),
       })
       .first();
 
@@ -314,12 +314,12 @@ test.describe('Chat — message actions: like / dislike', () => {
 
     const likeBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_up_off_alt' }) })
+      .filter({ has: page.locator('[data-icon="thumb_up_off_alt"]') })
       .first();
 
     const dislikeBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_down_off_alt' }) })
+      .filter({ has: page.locator('[data-icon="thumb_down_off_alt"]') })
       .first();
 
     await expect(likeBtn).toBeVisible({ timeout: 8_000 });
@@ -358,7 +358,7 @@ function assistantCopyButton(page: import('@playwright/test').Page) {
   return page
     .locator('[data-testid="message-actions"] button')
     .filter({
-      has: page.locator('span.material-icons-outlined').filter({ hasText: 'content_copy' }),
+      has: page.locator('[data-icon="content_copy"]'),
     })
     .first();
 }
@@ -437,7 +437,7 @@ test.describe('Chat — message actions: regenerate', () => {
     const regenBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'refresh' }),
+        has: page.locator('[data-icon="refresh"]'),
       })
       .first();
 
@@ -462,7 +462,7 @@ test.describe('Chat — message actions: regenerate', () => {
     const regenBtn = page
       .locator('button')
       .filter({
-        has: page.locator('span.material-icons-outlined').filter({ hasText: 'refresh' }),
+        has: page.locator('[data-icon="refresh"]'),
       })
       .first();
 
@@ -540,7 +540,7 @@ test.describe('Chat — feedback "Other" comment flow', () => {
 
     const likeBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_up_off_alt' }) })
+      .filter({ has: page.locator('[data-icon="thumb_up_off_alt"]') })
       .first();
 
     await expect(likeBtn, 'the thumbs-up button should be shown after an answer').toBeVisible({ timeout: 8_000 });
@@ -579,7 +579,7 @@ test.describe('Chat — feedback "Other" comment flow', () => {
 
     const likeBtn = page
       .locator('button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'thumb_up_off_alt' }) })
+      .filter({ has: page.locator('[data-icon="thumb_up_off_alt"]') })
       .first();
 
     await expect(likeBtn, 'the thumbs-up button should be shown after an answer').toBeVisible({ timeout: 8_000 });
@@ -606,7 +606,7 @@ test.describe('Chat — feedback "Other" comment flow', () => {
     // Submit via the send icon button (arrow_upward) inside the popover
     const submitBtn = page
       .locator('[role="dialog"] button, [data-radix-popper-content-wrapper] button')
-      .filter({ has: page.locator('span.material-icons-outlined').filter({ hasText: 'arrow_upward' }) })
+      .filter({ has: page.locator('[data-icon="arrow_upward"]') })
       .first();
 
     await expect(submitBtn).toBeVisible({ timeout: 5_000 });

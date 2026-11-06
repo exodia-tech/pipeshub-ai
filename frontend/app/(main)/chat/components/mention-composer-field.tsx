@@ -329,7 +329,7 @@ export const MentionComposerField = forwardRef<HTMLTextAreaElement, MentionCompo
     const textStyle: React.CSSProperties = {
       fontSize: style?.fontSize ?? 'var(--font-size-2)',
       lineHeight: style?.lineHeight ?? (multiline ? 1.5 : '20px'),
-      fontFamily: style?.fontFamily ?? 'Manrope, sans-serif',
+      fontFamily: style?.fontFamily ?? 'var(--default-font-family)',
       // A textarea does not inherit these and the backdrop does; they must match glyph for glyph.
       fontWeight: style?.fontWeight ?? 400,
       letterSpacing: style?.letterSpacing ?? 'normal',

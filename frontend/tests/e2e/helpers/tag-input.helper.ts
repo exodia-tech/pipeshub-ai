@@ -55,13 +55,13 @@ export async function addSingleEmail(page: Page, email: string): Promise<void> {
 export async function getTagCount(page: Page): Promise<number> {
   // Tag pills contain a close icon (material-icons-outlined "close")
   // Each pill is a Flex with a Text + close icon
-  return page.locator('span.material-icons-outlined:text("close")').count();
+  return page.locator('[data-icon="close"]').count();
 }
 
 /** Get all tag values as text */
 export async function getTagValues(page: Page): Promise<string[]> {
   // Each tag pill has a Text element with the value, followed by a close icon
-  const pills = page.locator('span.material-icons-outlined:text("close")').locator('..');
+  const pills = page.locator('[data-icon="close"]').locator('..');
   const count = await pills.count();
   const values: string[] = [];
   for (let i = 0; i < count; i++) {
