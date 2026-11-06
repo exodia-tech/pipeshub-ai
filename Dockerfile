@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # -----------------------------------------------------------------------------
 # Stage 1: Node.js Backend Build
 # -----------------------------------------------------------------------------
-FROM node:20-slim AS nodejs-backend
+FROM node:22-bookworm-slim AS nodejs-backend
 WORKDIR /app/backend
 
 COPY backend/nodejs/apps/package*.json ./
@@ -74,7 +74,7 @@ RUN mkdir -p /app/templates && cd src && find . -name '*.hbs' -exec cp --parents
 # Stage 2: Frontend Build (Next.js in `frontend/`)
 # -----------------------------------------------------------------------------
 # Static export so the Node.js API can serve files from `backend/dist/public`.
-FROM node:20-slim AS frontend-build
+FROM node:22-bookworm-slim AS frontend-build
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
@@ -131,6 +131,10 @@ ENV PYTHONWARNINGS="ignore::SyntaxWarning"
 # Copy Python site-packages from build stage
 COPY --from=python-deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=python-deps /usr/local/bin /usr/local/bin
+
+# Pinned runtime bases predate the Node 22 minimum required by the current app.
+COPY --from=nodejs-backend /usr/local/bin/node /usr/local/bin/node
+RUN node -e "if (Number(process.versions.node.split('.')[0]) < 22) process.exit(1); console.log(process.version)"
 
 # Copy ML model data (dense HF embeddings + reranker, sparse fastembed, NLTK)
 COPY --chown=1000:1000 --from=python-deps /root/.cache/huggingface /root/.cache/huggingface

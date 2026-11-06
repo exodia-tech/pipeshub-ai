@@ -116,8 +116,8 @@ export function ChatSidebarHeader() {
       lastName={profile?.lastName}
       email={profile?.email}
       src={profile?.avatarUrl}
-      size={HEADER_ELEMENT_SIZE}
-      radius="small"
+      size={36}
+      radius="full"
     />
   );
 
