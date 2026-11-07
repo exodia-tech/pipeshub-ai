@@ -5768,6 +5768,7 @@
     "metric": "图表指标",
     "overTime": "用量趋势",
     "chartData": "查看图表数据",
+    "filters": "筛选",
     "topModels": "最常用的模型",
     "byWorkload": "按工作负载统计用量",
     "byMember": "按成员统计用量",

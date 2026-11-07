@@ -12,6 +12,10 @@ export function metricValue(row: Totals, metric: UsageMetric): number | null {
     : row.input_tokens + row.output_tokens;
 }
 
+export function chartMaximum(rows: Totals[], metric: UsageMetric): number {
+  return Math.max(0, ...rows.map((row) => metricValue(row, metric) ?? 0));
+}
+
 export function seriesSegments(rows: Totals[], metric: UsageMetric) {
   const segments: { index: number; value: number }[][] = [];
   let current: { index: number; value: number }[] = [];
@@ -38,6 +42,6 @@ export function money(value: number | null, locale: string): string {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
-    maximumFractionDigits: value > 0 && value < 0.01 ? 8 : 4,
+    maximumFractionDigits: value > 0 && value < 0.01 ? 9 : 4,
   }).format(value);
 }

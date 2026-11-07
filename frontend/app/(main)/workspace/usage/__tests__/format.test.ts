@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { exclusiveEnd, metricValue, money, seriesSegments } from "../format";
+import {
+  chartMaximum,
+  exclusiveEnd,
+  metricValue,
+  money,
+  seriesSegments,
+} from "../format";
 import type { Totals } from "../api";
 
 describe("usage presentation", () => {
@@ -11,6 +17,7 @@ describe("usage presentation", () => {
     expect(money(null, "en-US")).toBe("—");
     expect(money(0, "en-US")).toBe("$0.00");
     expect(money(0.000469, "en-US")).toBe("$0.000469");
+    expect(money(0.000000001, "en-US")).toBe("$0.000000001");
   });
   it("does not add cache or reasoning tokens to the provider totals again", () => {
     const row: Totals = {
@@ -30,6 +37,7 @@ describe("usage presentation", () => {
     };
     expect(metricValue(row, "tokens")).toBe(150);
     expect(metricValue(row, "cost")).toBe(0.000469);
+    expect(chartMaximum([row], "cost")).toBe(0.000469);
   });
   it("keeps unpriced chart values unknown and leaves gaps in the timeline", () => {
     const row = {

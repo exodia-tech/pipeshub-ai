@@ -133,7 +133,7 @@ describe("usage dashboard", () => {
   it("does not present entirely unpriced activity as free", () => {
     show();
     expect(
-      screen.getByRole("heading", { name: "—", exact: true }),
+      screen.getAllByRole("heading", { name: "—", exact: true })[0],
     ).toBeTruthy();
     expect(
       screen.queryByRole("heading", { name: "$0.00", exact: true }),
@@ -145,6 +145,26 @@ describe("usage dashboard", () => {
       screen.queryByRole("combobox", { name: "Member", exact: true }),
     ).toBeNull();
     expect(screen.queryByRole("tab", { name: /^Model pricing/ })).toBeNull();
+  });
+  it("keeps secondary filters collapsed and makes chart values accessible without an extra dropdown", () => {
+    fixture.report!.timeline = [
+      {
+        ...fixture.report!.summary,
+        id: "day",
+        label: "2026-11-07",
+        unpriced_requests: 0,
+        unknown_requests: 0,
+      },
+    ];
+    show();
+    const filters = screen.getByRole("button", { name: "Filters" });
+    expect(filters.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("combobox", { name: "Provider" })).toBeNull();
+    fireEvent.click(filters);
+    expect(filters.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
+    expect(screen.getByRole("table", { name: "Usage over time" })).toBeTruthy();
+    expect(screen.queryByText("View chart data")).toBeNull();
   });
   it("shows unknown counters distinctly in call history", () => {
     show();
