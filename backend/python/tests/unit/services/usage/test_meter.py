@@ -16,7 +16,11 @@ from app.agent_loop_lib.core.messages import AssistantMessage
 from app.agent_loop_lib.core.responses import ModelResponse, TokenUsage
 from app.agent_loop_lib.transport.base import LLMTransport
 from app.services.model_identity.call_context import ModelCallContext, bind_call_context
-from app.services.model_identity.principal import service_principal, user_principal
+from app.services.model_identity.principal import (
+    service_principal,
+    user_principal,
+    warmup_principal,
+)
 from app.services.model_identity.workload import Workload
 from app.services.usage.ledger import UsageLedger
 from app.services.usage.meter import (
@@ -66,6 +70,28 @@ class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
             {},
             interval="month",
         )["events"]
+
+    def test_startup_probe_belongs_only_to_a_verified_single_organization(self) -> None:
+        from app.services.usage.meter import health
+
+        before = health()["missing_identity"]
+        principal = warmup_principal([{"_key": "org-a"}])
+        with bind_call_context(
+            ModelCallContext(principal=principal, workload=Workload.SYSTEM)
+        ):
+            emit(
+                "test",
+                "embedding",
+                {"input_tokens": 10},
+                time.monotonic(),
+                kind="embedding",
+            )
+        event = self.events()[0]
+        self.assertIsNone(event["user_id"])
+        self.assertEqual(event["workload"], "system")
+        self.assertEqual(health()["missing_identity"], before)
+        for organizations in ([], [{"_key": "a"}, {"_key": "b"}], [{}]):
+            self.assertEqual(warmup_principal(organizations).org_id, "")
 
     def test_provider_cache_normalization(self) -> None:
         usage, measurement = normalize_usage(

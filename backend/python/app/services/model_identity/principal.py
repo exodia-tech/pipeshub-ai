@@ -96,3 +96,9 @@ def service_principal(name: str = SYSTEM_SERVICE_NAME, org_id: str = "") -> Prin
         subject_id=service,
         service_name=service,
     )
+
+
+def warmup_principal(organizations: list[dict[str, Any]]) -> Principal:
+    """Attribute shared startup probes only when their organization is unambiguous."""
+    org_id = _clean(organizations[0].get("_key")) if len(organizations) == 1 else None
+    return service_principal("warmup", org_id or "")
