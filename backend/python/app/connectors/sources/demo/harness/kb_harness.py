@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Knowledge-base harness for the Acme Corp fixture.
+"""Knowledge-base harness for the Mobart Ben fixture.
 
 Uploads the fixture as markdown into knowledge bases on a PipesHub instance,
 then asks each golden question N times and scores the citations against the
@@ -214,8 +214,9 @@ def kb_names_for(fx: dict, persona: str) -> list[str]:
     """The knowledge bases an upload run for `persona` loads, by name: shared first."""
     names = {g["id"]: g["name"] for g in fx["groups"]}
     _, restricted = upload_plan(fx)
-    return ["Acme Corp (shared)"] + [
-        f"Acme Corp ({names[g].lower()})" for g in sorted(upload_groups(fx, persona) & set(restricted))
+    company = fx["company"]
+    return [f"{company} (shared)"] + [
+        f"{company} ({names[g].lower()})" for g in sorted(upload_groups(fx, persona) & set(restricted))
     ]
 
 
@@ -461,7 +462,7 @@ def main() -> None:
 
     env = load_env(args.env)
     origin = env["PIPESHUB_ORIGIN"].rstrip("/")
-    fx = yaml.safe_load(open(args.fixture))
+    fx = yaml.safe_load(open(args.fixture, encoding="utf-8"))
     # Checked before any upload, so a typo fails in seconds rather than after indexing.
     questions = select_questions(fx, set(args.only.split(",")) if args.only else None)
     if args.persona in ("alice", "bob"):
@@ -496,18 +497,18 @@ def main() -> None:
             names = {g["id"]: g["name"] for g in fx["groups"]}
             shared, restricted = upload_plan(fx)
             if args.skip_shared:
-                kb_shared = find_kb(ph, "Acme Corp (shared)") or sys.exit(
-                    "--skip-shared: no knowledge base named 'Acme Corp (shared)'; run once without --skip-shared"
+                kb_shared = find_kb(ph, f"{fx['company']} (shared)") or sys.exit(
+                    f"--skip-shared: no knowledge base named {fx['company'] + ' (shared)'!r}; run once without --skip-shared"
                 )
             else:
-                kb_shared = ensure_kb(ph, "Acme Corp (shared)", fresh=True)
+                kb_shared = ensure_kb(ph, f"{fx['company']} (shared)", fresh=True)
                 print(f"== uploading {len(shared)} shared records")
                 upload(ph, kb_shared, shared)
             kb_ids = [kb_shared]
             expected = [len(shared)]
             for group in sorted(readable & set(restricted)):
                 print(f"== uploading {len(restricted[group])} records for {names[group]}")
-                kb_ids.append(ensure_kb(ph, f"Acme Corp ({names[group].lower()})", fresh=True))
+                kb_ids.append(ensure_kb(ph, f"{fx['company']} ({names[group].lower()})", fresh=True))
                 upload(ph, kb_ids[-1], restricted[group])
                 expected.append(len(restricted[group]))
             print("== waiting for indexing")

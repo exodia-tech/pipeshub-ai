@@ -1157,42 +1157,32 @@
         ]
       }
     },
-    "demoBanner": "You're looking at Acme Corp, a small fictional company loaded as demo data. Try one of these, or",
+    "demoBanner": "You're looking at Mobart Ben, a small fictional company loaded as demo data. Try one of these, or",
     "demoConnectYourOwn": "connect your own sources",
     "demoSuggestions": {
       "1": {
-        "text": "Why was the payment service architecture changed, and how was the decision made?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "Which customers reported export timeouts, and what fixed it?",
-        "icons": [
-          "jira",
-          "github"
-        ]
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
+        "icons": ["sheets"]
       },
       "3": {
-        "text": "What's our policy on being on-call over a public holiday?",
-        "icons": [
-          "sheets"
-        ]
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
       },
       "4": {
-        "text": "Who reviewed and approved PR #482 in the billing worker, and what did Dana ask for before it merged?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "What is the enterprise pricing strategy for 2026?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -4285,11 +4275,11 @@
       "moreAgents": "More agents",
       "moreChats": "More chats",
       "demoData": {
-        "description": "Acme Corp is a fictional company loaded so you can try EXODIA Brain. This only changes what you see; nothing is deleted.",
+        "description": "Mobart Ben is a fictional company loaded so you can try EXODIA Brain. This only changes what you see; nothing is deleted.",
         "everyoneDescription": "Turning it off hides the demo from everyone's answers, search and records, and stops the sample accounts signing in. Nothing is deleted.",
         "everyoneLabel": "Offer the demo to everyone",
         "followingDefault": "Following the default: shown until your organization has data of its own, then hidden.",
-        "label": "Show Acme Corp demo data in my answers, search and records",
+        "label": "Show Mobart Ben demo data in my answers, search and records",
         "offForEveryone": "Turned off for everyone by an admin.",
         "title": "Demo data",
         "useDefault": "Use the default",
@@ -5718,17 +5708,17 @@
   "demoData": {
     "badge": {
       "label": "Demo",
-      "tooltip": "Sample data from the Acme Corp demo, not one of your company's records"
+      "tooltip": "Sample data from the Mobart Ben demo, not one of your company's records"
     },
     "removalNotice": {
-      "title": "The Acme Corp demo data is still in your workspace",
+      "title": "The Mobart Ben demo data is still in your workspace",
       "description": "Your company's own data is now in EXODIA Brain. The demo is hidden from answers by default, but anyone can turn it back on, and its sample accounts can still sign in. Turn it off for everyone, or remove it permanently.",
       "remove": "Remove permanently",
       "keep": "Keep for now",
       "turnOff": "Turn off for everyone"
     },
     "removeDialog": {
-      "title": "Remove the Acme Corp demo data permanently?",
+      "title": "Remove the Mobart Ben demo data permanently?",
       "description": "This deletes the Demo connector with all of its records, groups and permissions. To hide it without deleting anything, turn it off for everyone instead. You can add it again later from the Connectors page.",
       "deleteAccounts": "Also delete the sample accounts: {{names}}",
       "deleteAccountsHint": "They were created with a starting password, so anyone who knows it can sign in as them.",
@@ -5744,7 +5734,7 @@
     "switch": {
       "errorTitle": "Couldn't change the demo data setting",
       "errorDescription": "Nothing changed. Try again in a moment.",
-      "hiddenTitle": "Acme Corp demo data hidden",
+      "hiddenTitle": "Mobart Ben demo data hidden",
       "hiddenDescription": "It's out of your answers, search and records. Turn it back on anytime in Profile → Demo data.",
       "undo": "Undo"
     },
