@@ -49,6 +49,8 @@ servers:
         default: app.pipeshub.com
         description: Host name, with an optional port, of a PipesHub instance served over HTTPS. For a plain-HTTP instance, such as a local one, set the full server URL instead.
 tags:
+  - name: Usage Analytics
+    description: Private personal usage, administrator organization analytics, estimated USD costs and monthly warning budgets.
   - name: User Account
     description: User authentication including multi-step MFA, password reset, OTP login, and token management
   - name: Organization Auth Config
@@ -802,6 +804,124 @@ components:
             mcp:write: Add, configure and authenticate MCP servers
             mcp:delete: Remove MCP servers and their credentials
   schemas:
+    UsageTotals:
+      type: object
+      description: Token subsets are not added twice. Spend excludes unpriced calls and is an estimate, not an invoice.
+      properties:
+        requests: { type: integer }
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+        cache_read_tokens: { type: integer }
+        cache_write_tokens: { type: integer }
+        reasoning_tokens: { type: integer, nullable: true }
+        cost_usd: { type: number }
+        unpriced_requests: { type: integer }
+        estimated_requests: { type: integer }
+        unknown_requests: { type: integer }
+        incomplete_requests: { type: integer }
+        average_duration_ms: { type: number }
+        units: { type: integer }
+    UsageBreakdown:
+      allOf:
+        - $ref: '#/components/schemas/UsageTotals'
+        - type: object
+          properties:
+            id: { type: string, nullable: true }
+            label: { type: string }
+    UsageEvent:
+      type: object
+      description: One logical model operation, including embedding batches. Contains no prompts, answers or credentials. Failed/abandoned operations without counters remain unknown.
+      properties:
+        id: { type: string }
+        occurred_at: { type: string, format: date-time }
+        provider: { type: string }
+        model: { type: string }
+        user_id: { type: string, nullable: true }
+        user_label: { type: string, nullable: true }
+        connector_id: { type: string, nullable: true }
+        agent_id: { type: string, nullable: true }
+        request_id: { type: string, nullable: true }
+        workload: { type: string }
+        purpose: { type: string }
+        kind: { type: string }
+        status: { type: string, enum: [success, failed, cancelled] }
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+        cache_read_tokens: { type: integer }
+        cache_write_tokens: { type: integer }
+        reasoning_tokens: { type: integer, nullable: true }
+        measurement: { type: string, enum: [reported, estimated, unknown] }
+        duration_ms: { type: integer }
+        units: { type: integer }
+        cost_usd: { type: number, nullable: true }
+        pricing_source: { type: string, enum: [catalog, custom, unpriced] }
+    UsageReport:
+      type: object
+      properties:
+        summary: { $ref: '#/components/schemas/UsageTotals' }
+        timeline: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        provider: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        model: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        user_id: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        connector_id: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        workload: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        kind: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        status: { type: array, items: { $ref: '#/components/schemas/UsageBreakdown' } }
+        events: { type: array, items: { $ref: '#/components/schemas/UsageEvent' } }
+        tracking_since: { type: string, nullable: true, format: date-time }
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        timezone: { type: string, enum: [UTC] }
+        currency: { type: string, enum: [USD] }
+        view: { type: string, enum: [personal, organization] }
+        offset: { type: integer }
+        limit: { type: integer }
+        tracking_health:
+          type: object
+          description: Accounting failure counters for the reporting process. Other services emit their own diagnostics in logs.
+          properties:
+            enabled: { type: boolean }
+            written: { type: integer }
+            failed: { type: integer }
+            missing_identity: { type: integer }
+            scope: { type: string, enum: [this_process] }
+    UsageRate:
+      type: object
+      required: [provider, model, rates]
+      properties:
+        provider: { type: string, minLength: 1, maxLength: 200 }
+        model: { type: string, minLength: 1, maxLength: 200 }
+        updated_at: { type: string, format: date-time, readOnly: true }
+        rates:
+          type: object
+          description: Actual USD per million tokens, applied to future events only. Explicit zero means no provider charge; infrastructure costs are excluded.
+          required: [input, output, cache_read, cache_write]
+          properties:
+            input: { type: number, minimum: 0, maximum: 100000 }
+            output: { type: number, minimum: 0, maximum: 100000 }
+            cache_read: { type: number, minimum: 0, maximum: 100000 }
+            cache_write: { type: number, minimum: 0, maximum: 100000 }
+    UsageBudgetInput:
+      type: object
+      required: [scope, amount_usd]
+      properties:
+        scope: { type: string, enum: [organization, user_id, connector_id, model] }
+        subject: { type: string, maxLength: 200, description: Required except for organization scope. Model scope includes all providers with this model ID. }
+        amount_usd: { type: number, minimum: 0.000000001, maximum: 1000000000 }
+        warning_percent: { type: integer, minimum: 1, maximum: 100, default: 80 }
+    UsageBudget:
+      allOf:
+        - $ref: '#/components/schemas/UsageBudgetInput'
+        - type: object
+          properties:
+            id: { type: string }
+            spent_usd: { type: number }
+            percent: { type: number }
+            unpriced_requests: { type: integer }
+            period_start: { type: string, format: date-time }
+            period_end: { type: string, format: date-time }
+            state: { type: string, enum: [within_budget, warning, exceeded] }
+            enforced: { type: boolean, enum: [false] }
     AIGatewayIdentityPolicy:
       type: object
       additionalProperties: false
@@ -24705,6 +24825,130 @@ security:
   - bearerAuth: []
   - oauth2: []
 paths:
+  /usage:
+    get:
+      tags: [Usage Analytics]
+      summary: Filter personal or organization model usage
+      description: |
+        Requires org:read for OAuth/PAT clients. Personal view always uses the verified caller's
+        organization and user, ignoring a supplied user_id. Organization view additionally requires
+        a live organization administrator. Background work has no personal owner. Dates are UTC,
+        from is inclusive and to is exclusive. Maximum range 366 days (31 for hourly reports).
+        Breakdowns return the 100 most active groups. Tracking begins when enabled; no fabricated historical backfill.
+      parameters:
+        - { name: view, in: query, schema: { type: string, enum: [personal, organization], default: personal } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: interval, in: query, schema: { type: string, enum: [hour, day, week, month], default: day } }
+        - { name: provider, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: model, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: user_id, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: connector_id, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: workload, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: kind, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: status, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Content-free usage and spend estimates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsageReport' }
+        '401': { description: Authentication required }
+        '403': { description: Insufficient scope or organization administrator required }
+        '422': { description: Invalid filters, date range or pagination }
+        '503': { description: Persistent tracking storage is not configured }
+  /usage/rates:
+    get:
+      tags: [Usage Analytics]
+      summary: List administrator pricing overrides
+      description: Requires an organization administrator and config:read for OAuth/PAT clients.
+      responses:
+        '200':
+          description: Custom rates only; the installed local catalog is used for other recognized models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rates: { type: array, items: { $ref: '#/components/schemas/UsageRate' } }
+                  currency: { type: string, enum: [USD] }
+                  unit: { type: string, enum: [per_million_tokens] }
+        '403': { description: Administrator or config:read scope required }
+    put:
+      tags: [Usage Analytics]
+      summary: Set a model's USD token rates for future calls
+      description: Requires an organization administrator and config:write for OAuth/PAT clients. Existing event cost snapshots are preserved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UsageRate' }
+      responses:
+        '200': { description: Saved; applies to future events }
+        '403': { description: Administrator or config:write scope required }
+        '422': { description: Rates must be finite, nonnegative and at most 100000 USD per million tokens }
+    delete:
+      tags: [Usage Analytics]
+      summary: Restore catalog pricing for future model calls
+      description: Requires an organization administrator and config:write for OAuth/PAT clients. Historical event costs remain unchanged. If the catalog has no applicable price, future costs remain unpriced.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, model]
+              properties:
+                provider: { type: string, minLength: 1, maxLength: 200 }
+                model: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        '200': { description: Custom rate removed for future calls }
+        '403': { description: Administrator or config:write scope required }
+  /usage/budgets:
+    get:
+      tags: [Usage Analytics]
+      summary: Get current monthly warning budgets and progress
+      description: Requires org:read for OAuth/PAT clients. Personal view exposes only budgets for the verified caller; organization view requires an administrator. Unpriced calls are reported alongside spend.
+      parameters:
+        - { name: view, in: query, schema: { type: string, enum: [personal, organization], default: personal } }
+      responses:
+        '200':
+          description: Current UTC calendar-month budgets; no automatic usage blocking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  budgets: { type: array, items: { $ref: '#/components/schemas/UsageBudget' } }
+                  period: { type: string, enum: [calendar_month_utc] }
+                  enforced: { type: boolean, enum: [false] }
+        '403': { description: Insufficient scope or organization administrator required }
+    put:
+      tags: [Usage Analytics]
+      summary: Create or update a monthly warning budget
+      description: Requires an organization administrator and config:write for OAuth/PAT clients. Upserts by scope and subject. Warnings appear in the dashboard; this version does not block model calls or send messages.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UsageBudgetInput' }
+      responses:
+        '200': { description: Saved; enforcement remains off }
+        '403': { description: Administrator or config:write scope required }
+        '422': { description: Invalid scope, target, amount or warning threshold }
+  /usage/budgets/{budgetId}:
+    delete:
+      tags: [Usage Analytics]
+      summary: Remove a monthly warning budget
+      description: Requires an organization administrator and config:write for OAuth/PAT clients. Usage history is never removed.
+      parameters:
+        - { name: budgetId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Budget deleted }
+        '403': { description: Administrator or config:write scope required }
+        '404': { description: No budget with this ID in the verified organization }
   /health:
     get:
       tags:

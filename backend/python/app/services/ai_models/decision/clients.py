@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -108,8 +109,17 @@ class DecisionModel(ABC):
         names = [question.name for question in questions]
         if len(set(names)) != len(names):
             raise ValueError("Question names must be unique within a request")
-        payload = await self._post(self._request_body(content, questions), max_attempts)
-        result = self._parse(payload, questions)
+        from app.services.usage.meter import call_identity, emit_async
+
+        started, identity = time.monotonic(), call_identity()
+        try:
+            payload = await self._post(self._request_body(content, questions), max_attempts)
+            result = self._parse(payload, questions)
+        except BaseException:
+            await emit_async(self.provider, self.model_name, None, started, identity=identity, kind="decision", status="failed")
+            raise
+        await emit_async(self.provider, self.model_name, result.usage.model_dump(exclude_none=True), started,
+             identity=identity, kind="decision", normalized=True)
         if all(answer.missing for answer in result.answers.values()):
             logger.warning(
                 "%s decision response had no answer we could read; check the endpoint serves this API",

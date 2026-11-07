@@ -100,4 +100,6 @@ class MultimodalEmbeddingFactory:
         if builder is None:
             return None
         require_allowed_endpoint(config.base_url)
-        return builder(config)
+        from app.services.usage.meter import metered_image_embeddings
+
+        return metered_image_embeddings(builder(config), config.provider or "unknown", config.model_name or "unknown")

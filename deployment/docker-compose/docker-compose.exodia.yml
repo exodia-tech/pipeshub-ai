@@ -56,6 +56,7 @@ services:
         max-file: ${LOG_MAX_FILE:-15}
         compress: 'true'
     environment:
+    - PIPESHUB_USAGE_DB=/data/pipeshub/usage.sqlite3
     - NODE_ENV=${NODE_ENV:-production}
     - GIT_COMMIT=${SOURCE_COMMIT:-}
     - APP_VERSION=${APP_VERSION:-exodia-main}

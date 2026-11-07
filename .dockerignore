@@ -52,6 +52,9 @@ tests
 **/.mypy_cache/
 **/.ruff_cache/
 **/venv/
+**/usage.sqlite3
+**/usage.sqlite3-wal
+**/usage.sqlite3-shm
 **/.venv/
 **/env/
 **/.env

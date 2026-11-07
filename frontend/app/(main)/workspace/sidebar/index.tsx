@@ -42,6 +42,7 @@ interface NavItem {
 }
 
 const OVERVIEW_ITEMS: NavItem[] = [
+  { icon: 'analytics', labelKey: 'usage.title', route: '/workspace/usage' },
   { icon: 'business', labelKey: 'workspace.sidebar.nav.general', route: '/workspace/general' },
   { icon: 'science', labelKey: 'workspace.sidebar.nav.labs', route: '/workspace/labs', adminOnly: true },
 ];

@@ -145,6 +145,9 @@ def model_http_client(
     client = DefaultAsyncHttpxClient()
     guard_httpx_client(client, base_url)
     instrument_http_client(client, settings_from_config(config))
+    from app.services.usage.meter import install_media_hook
+
+    install_media_hook(client)
     return client
 
 
