@@ -1375,7 +1375,7 @@ function ChatContent() {
                 ) : (
                   <>
                     <Box style={{ marginBottom: 'var(--space-4)' }}>
-                      <ChatCompanion size={isMobile ? 72 : 88} interactive />
+                      <ChatCompanion size={isMobile ? 72 : 88} interactive followChat />
                     </Box>
                     <Box
                       style={{

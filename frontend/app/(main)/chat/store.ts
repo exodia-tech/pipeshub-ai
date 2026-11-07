@@ -379,6 +379,7 @@ interface ChatState {
   // ── Slot dictionary ──
   slots: Record<string, ChatSlot>;
   activeSlotId: string | null;
+  composerTypingSlotId: string | null;
 
   // ── URL sync ──
   hasConsumedUrlNavigation: boolean;
@@ -809,6 +810,7 @@ interface ChatState {
 const initialState = {
   slots: {} as Record<string, ChatSlot>,
   activeSlotId: null as string | null,
+  composerTypingSlotId: null as string | null,
   hasConsumedUrlNavigation: false,
 
   conversations: [] as Conversation[],

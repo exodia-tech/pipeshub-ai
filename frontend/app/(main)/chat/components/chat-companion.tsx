@@ -3,10 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { Flex, IconButton, Text, VisuallyHidden } from "@radix-ui/themes";
 import { useTranslation } from "react-i18next";
+import { useChatStore } from '@/chat/store';
 
 interface ChatCompanionProps {
   size?: number;
-  variant?: "still" | "loader" | "thinking" | "listening";
+  variant?: "still" | "loader" | "thinking" | "listening" | "typing";
+  followChat?: boolean;
   interactive?: boolean;
   showLabel?: boolean;
   style?: React.CSSProperties;
@@ -14,12 +16,19 @@ interface ChatCompanionProps {
 
 export function ChatCompanion({
   size = 32,
-  variant = "still",
+  variant: requestedVariant = "still",
+  followChat = false,
   interactive = false,
   showLabel = false,
   style,
 }: ChatCompanionProps) {
   const { t } = useTranslation();
+  const variant = useChatStore((s) => {
+    if (!followChat) return requestedVariant;
+    const slot = s.activeSlotId ? s.slots[s.activeSlotId] : null;
+    if (slot && !slot.stopping && (slot.isStreaming || slot.remoteRunInProgress)) return 'thinking';
+    return s.composerTypingSlotId === (s.activeSlotId ?? 'new-chat') ? 'typing' : 'still';
+  });
   const [greeting, setGreeting] = useState(false);
   useEffect(() => {
     if (!greeting) return;
@@ -35,14 +44,14 @@ export function ChatCompanion({
       fill="none"
       aria-hidden="true"
       focusable="false"
-      className={`chat-companion${thinking ? " chat-companion--thinking" : ""}${greeting ? " chat-companion--greeting" : ""}`}
+      className={`chat-companion${thinking ? " chat-companion--thinking" : ""}${variant === 'typing' ? " chat-companion--typing" : ""}${greeting ? " chat-companion--greeting" : ""}`}
       style={{ display: "inline-flex", flexShrink: 0, ...style }}
     >
       <g className="chat-companion__head">
         <g className="chat-companion__eyes" fill="var(--accent-11)">
           <ellipse
             cx={thinking ? 27 : 28}
-            cy={thinking ? 32 : 35}
+            cy={thinking ? 32 : variant === 'typing' ? 38 : 35}
             rx="3"
             ry={variant === "listening" ? 6 : 4.5}
           />
@@ -57,7 +66,7 @@ export function ChatCompanion({
           ) : (
             <ellipse
               cx={thinking ? 49 : 52}
-              cy={thinking ? 32 : 35}
+              cy={thinking ? 32 : variant === 'typing' ? 38 : 35}
               rx="3"
               ry={variant === "listening" ? 6 : 4.5}
             />

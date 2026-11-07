@@ -55,6 +55,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { getUserIdFromToken } from '@/lib/utils/jwt';
 import { useComposerDraft } from '@/chat/hooks/use-composer-draft';
+import { useCompanionTyping } from '@/chat/hooks/use-companion-typing';
 import { buildDraftKey } from '@/chat/utils/composer-draft';
 import { useChatSpeechRecognition } from '@/lib/hooks/use-chat-speech-recognition';
 import { PastedTextChip } from '@/chat/components/pasted-text-chip';
@@ -311,6 +312,11 @@ export function ChatInput({
     [draftAccessToken, draftStoreUserId],
   );
   const draftSlotId = useChatStore((s) => s.activeSlotId);
+  const noteTyping = useCompanionTyping(draftSlotId, persistDraft, message);
+  const handleMessageChange = (text: string) => {
+    setMessage(text);
+    noteTyping(text);
+  };
   const draftConvId = useChatStore((s) =>
     s.activeSlotId ? (s.slots[s.activeSlotId]?.convId ?? null) : null,
   );
@@ -1823,7 +1829,7 @@ export function ChatInput({
           <MentionComposerField
             value={displayValue}
             mentions={mentions}
-            onChange={setMessage}
+            onChange={handleMessageChange}
             onMentionsChange={setMentions}
             onKeyDown={handleKeyDown}
             onFocus={handleExpand}
@@ -2396,7 +2402,7 @@ export function ChatInput({
         <MentionComposerField
           value={message}
           mentions={mentions}
-          onChange={setMessage}
+          onChange={handleMessageChange}
           onMentionsChange={setMentions}
           onKeyDown={handleKeyDown}
           onFocus={() => setIsInputFocused(true)}
@@ -2419,7 +2425,7 @@ export function ChatInput({
           ref={textareaRef}
           value={displayValue}
           mentions={mentions}
-          onChange={setMessage}
+          onChange={handleMessageChange}
           onMentionsChange={setMentions}
           onKeyDown={handleKeyDown}
           onFocus={() => setIsInputFocused(true)}
