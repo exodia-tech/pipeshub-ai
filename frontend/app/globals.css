@@ -1764,6 +1764,7 @@ th code {
 }
 .chat-companion--thinking .chat-companion__eyes { animation-duration: 3.8s; }
 .chat-companion__head { transform-origin: 40px 40px; transition: transform 180ms ease; }
+.chat-companion-button:is(:hover, :active) { background: transparent; }
 .chat-companion-button:hover .chat-companion__head { transform: translateY(-1px); }
 .chat-companion--greeting .chat-companion__head { transform: rotate(-6deg); }
 @media (prefers-reduced-motion: reduce) {

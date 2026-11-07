@@ -31,7 +31,7 @@ export function ChatCompanion({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 80 80"
+      viewBox="16 16 48 48"
       fill="none"
       aria-hidden="true"
       focusable="false"
@@ -39,18 +39,6 @@ export function ChatCompanion({
       style={{ display: "inline-flex", flexShrink: 0, ...style }}
     >
       <g className="chat-companion__head">
-        <rect
-          x="7"
-          y="10"
-          width="66"
-          height="62"
-          rx="29"
-          fill="var(--accent-a3)"
-          stroke="var(--accent-a7)"
-          strokeWidth="1.5"
-        />
-        <ellipse cx="22" cy="45" rx="5" ry="3" fill="var(--accent-a5)" />
-        <ellipse cx="58" cy="45" rx="5" ry="3" fill="var(--accent-a5)" />
         <g className="chat-companion__eyes" fill="var(--accent-11)">
           <ellipse
             cx={thinking ? 27 : 28}
