@@ -166,6 +166,32 @@ describe("usage dashboard", () => {
     expect(screen.getByRole("table", { name: "Usage over time" })).toBeTruthy();
     expect(screen.queryByText("View chart data")).toBeNull();
   });
+  it("shows no-data charts when there was no activity", () => {
+    fixture.report!.summary.requests = 0;
+    fixture.report!.summary.unpriced_requests = 0;
+    fixture.report!.summary.unknown_requests = 0;
+    show();
+    expect(screen.queryByRole("img", { name: "Usage over time" })).toBeNull();
+    expect(screen.getAllByText(translations.noData).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "$0.00" })).toBeTruthy();
+  });
+  it("shows a visible point for one known timeline value", () => {
+    fixture.report!.timeline = [
+      {
+        ...fixture.report!.summary,
+        id: "one",
+        label: "2026-11-07",
+        unknown_requests: 0,
+        input_tokens: 100,
+      },
+    ];
+    show();
+    const chart = screen.getByRole("img", { name: "Usage over time" });
+    expect(chart.querySelector("circle")).toBeTruthy();
+    expect(
+      screen.getByRole("table", { name: "Usage over time" }).textContent,
+    ).toContain("100");
+  });
   it("shows unknown counters distinctly in call history", () => {
     show();
     fireEvent.keyDown(screen.getByRole("tab", { name: /^Call history/ }), {
