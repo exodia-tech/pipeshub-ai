@@ -71,8 +71,8 @@ class TestUsageLedger(unittest.TestCase):
         self.assertEqual((row["input_tokens"], row["output_tokens"]), (100, 50))
 
     def test_dedup_restart_and_tenant_isolation(self) -> None:
-        self.db.record(event())
-        self.db.record(event())
+        self.assertIsNotNone(self.db.record(event()))
+        self.assertIsNone(self.db.record(event()))
         self.db.record(event(id="other", org_id="org-b", user_id="user-a"))
         self.db = UsageLedger(self.db.path)
         self.assertEqual(self.report()["summary"]["requests"], 1)

@@ -180,7 +180,7 @@ class UsageLedger:
         finally:
             db.close()
 
-    def record(self, event: dict[str, Any]) -> None:
+    def record(self, event: dict[str, Any]) -> dict[str, Any] | None:
         if not event.get("org_id"):
             raise ValueError("Usage must belong to a verified organization")
         counts = (
@@ -225,10 +225,11 @@ class UsageLedger:
             e["pricing_snapshot"] = json.dumps(rates, sort_keys=True) if rates else None
             allowed = [r[1] for r in db.execute("PRAGMA table_info(usage_events)")]
             values = {k: e.get(k) for k in allowed}
-            db.execute(
+            inserted = db.execute(
                 f"INSERT OR IGNORE INTO usage_events ({','.join(allowed)}) VALUES ({','.join('?' for _ in allowed)})",
                 list(values.values()),
-            )
+            ).rowcount
+        return e if inserted else None
 
     @staticmethod
     def _where(
