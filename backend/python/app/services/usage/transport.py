@@ -51,7 +51,10 @@ class MeteredTransport(LLMTransport):
             started,
             identity=identity,
             normalized=True,
-            measurement="reported" if usage and any(usage.values()) else "unknown",
+            # Transports default absent counters to zero; zero-sided calls cannot be priced confidently.
+            measurement="reported"
+            if usage and usage["input_tokens"] > 0 and usage["output_tokens"] > 0
+            else "unknown",
             status=status,
         )
 

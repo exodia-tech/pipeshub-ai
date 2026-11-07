@@ -101,6 +101,22 @@ class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
             normalize_usage({"input_tokens": 10}, kind="embedding")[1], "reported"
         )
 
+    def test_partial_agent_transport_usage_is_not_priced(self) -> None:
+        inner = SimpleNamespace(provider="test", model_name="model")
+        transport = MeteredTransport(inner)
+        for usage in (TokenUsage(input_tokens=100), TokenUsage(output_tokens=20)):
+            transport.report(
+                ModelResponse(message=AssistantMessage(content=""), usage=usage),
+                time.monotonic(),
+                (context(), "main"),
+            )
+        self.assertTrue(
+            all(
+                e["measurement"] == "unknown" and e["cost_usd"] is None
+                for e in self.events()
+            )
+        )
+
     async def test_shared_chat_callback_keeps_parallel_tenants_separate(self) -> None:
         model = GenericFakeChatModel(
             messages=iter(

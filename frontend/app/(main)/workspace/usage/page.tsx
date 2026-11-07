@@ -262,7 +262,9 @@ export default function UsagePage() {
     >
       <Flex justify="between" align="start" wrap="wrap" gap="3" mb="4">
         <Box>
-          <Heading size="6">{label("title")}</Heading>
+          <Heading size="6" pl={{ initial: "6", md: "0" }}>
+            {label("title")}
+          </Heading>
           <Text as="p" color="gray" mt="2">
             {label("subtitle")}
           </Text>
