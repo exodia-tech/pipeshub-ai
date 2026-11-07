@@ -1599,6 +1599,20 @@
         "done": "已完成",
         "error": "失敗"
       }
+    },
+    "timeGreeting": {
+      "morning": "早安",
+      "morningNamed": "{{name}}，早安",
+      "afternoon": "午安",
+      "afternoonNamed": "{{name}}，午安",
+      "evening": "晚安",
+      "eveningNamed": "{{name}}，晚安",
+      "night": "夜深了，你好",
+      "nightNamed": "{{name}}，夜深了，你好"
+    },
+    "companion": {
+      "sayHello": "打聲招呼",
+      "hello": "你好！"
     }
   },
   "workspaceMenu": {

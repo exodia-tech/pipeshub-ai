@@ -1536,6 +1536,20 @@
         "done": "Listo",
         "error": "Error"
       }
+    },
+    "timeGreeting": {
+      "morning": "Buenos días",
+      "morningNamed": "Buenos días, {{name}}",
+      "afternoon": "Buenas tardes",
+      "afternoonNamed": "Buenas tardes, {{name}}",
+      "evening": "Buenas tardes",
+      "eveningNamed": "Buenas tardes, {{name}}",
+      "night": "Buenas noches",
+      "nightNamed": "Buenas noches, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Saludar",
+      "hello": "¡Hola!"
     }
   },
   "workspaceMenu": {

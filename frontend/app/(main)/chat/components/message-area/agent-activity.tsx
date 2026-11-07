@@ -19,7 +19,7 @@ import { Badge, Box, Flex, Table, Text } from '@radix-ui/themes';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { ICON_SIZES } from '@/lib/constants/icon-sizes';
 import { useCopyText } from '@/lib/hooks/use-copy-text';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import { markdownUrlTransform } from '@/lib/utils/image-url-policy';
 import type { MessagePart, StatusMessage } from '../../types';
 import { looksLikeJson, safeLink, toolResultView, type ToolResultView } from '../../tool-result-view';
@@ -328,7 +328,7 @@ export function AgentActivityTimeline({ parts, isNested = false, isStreaming = f
             of a disconnected element below the (possibly-suppressed)
             answer. See ChatResponse for the simple-response fallback. */}
         {showStatus && (
-          <TimelineRow icon={{ kind: 'lottie', node: <LottieLoader variant="thinking" size={18} /> }} isLast>
+          <TimelineRow icon={{ kind: 'lottie', node: <ChatCompanion variant="thinking" size={18} /> }} isLast>
             <StatusTimelineEntry status={currentStatus} />
           </TimelineRow>
         )}

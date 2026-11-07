@@ -139,8 +139,8 @@ vi.mock('../components/search', () => ({
   ChatSearch: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Search chats" /> : null),
 }));
 
-vi.mock('@/app/components/ui/lottie-loader', () => ({
-  LottieLoader: ({ showLabel }: { showLabel?: boolean }) => (showLabel ? <div role="status">Loading</div> : null),
+vi.mock('@/app/(main)/chat/components/chat-companion', () => ({
+  ChatCompanion: ({ showLabel }: { showLabel?: boolean }) => (showLabel ? <div role="status">Loading</div> : null),
 }));
 vi.mock('@/app/components/workspace-menu/hooks/use-github-stars', () => ({ useGitHubStars: () => '1.2k' }));
 vi.mock('@/app/components/sidebar/sidebar-expand-button', () => ({ SidebarExpandButton: () => null }));
@@ -263,9 +263,10 @@ function ctrl(key: string, shiftKey = false) {
   fireEvent.keyDown(window, { key, ctrlKey: true, metaKey: true, shiftKey });
 }
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 beforeEach(() => {
+  vi.spyOn(Date.prototype, "getHours").mockReturnValue(9);
   vi.clearAllMocks();
   // Agent and project details are cached for 60 s; each case starts from an empty cache.
   clearSessionCache();
@@ -304,7 +305,7 @@ describe('Chat page — new chat', () => {
     });
     renderPage();
 
-    expect(screen.getByText('Hey, Asha Rao 👋')).toBeTruthy();
+    expect(screen.getByText('Good morning, Asha Rao')).toBeTruthy();
     expect(screen.getByText('What do you want to explore today?')).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Message composer' })).toBeTruthy();
   });
@@ -317,12 +318,12 @@ describe('Chat page — new chat', () => {
       },
     });
     renderPage();
-    expect(screen.getByText('Hey, sam.lee 👋')).toBeTruthy();
+    expect(screen.getByText('Good morning, sam.lee')).toBeTruthy();
     cleanup();
 
     useUserStore.setState({ profile: null });
     renderPage();
-    expect(screen.getByText('Hey, there 👋')).toBeTruthy();
+    expect(screen.getByText('Good morning')).toBeTruthy();
   });
 
   it('starts a thread and asks the demo question the user picked', () => {

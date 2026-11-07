@@ -1514,6 +1514,20 @@
         "done": "पूरा हुआ",
         "error": "विफल"
       }
+    },
+    "timeGreeting": {
+      "morning": "सुप्रभात",
+      "morningNamed": "सुप्रभात, {{name}}",
+      "afternoon": "शुभ दोपहर",
+      "afternoonNamed": "शुभ दोपहर, {{name}}",
+      "evening": "शुभ संध्या",
+      "eveningNamed": "शुभ संध्या, {{name}}",
+      "night": "शुभ रात्रि",
+      "nightNamed": "शुभ रात्रि, {{name}}"
+    },
+    "companion": {
+      "sayHello": "नमस्ते कहें",
+      "hello": "नमस्ते!"
     }
   },
   "workspaceMenu": {

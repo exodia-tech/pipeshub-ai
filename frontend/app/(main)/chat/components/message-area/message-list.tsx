@@ -17,7 +17,7 @@ import type { CitationMaps } from './response-tabs/citations';
 import { emptyCitationMaps, useCitationActions, isCitationPopoverKeyStillValid } from './response-tabs/citations';
 import { useInlineCitationPopoverStore } from './response-tabs/citations/citation-popover-store';
 import { InlineCitationPopoverHost } from './response-tabs/citations/inline-citation-popover-host';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import { ProgressiveBlur } from '@/app/components/ui/progressive-blur';
 import { loadOlderMessagesForSlot } from '../../streaming';
 import { extractAnswerMarkers } from '../../utils/parse-download-markers';
@@ -1105,13 +1105,13 @@ export function MessageList({ composer }: { composer?: React.ReactNode } = {}) {
           {/* Loading older messages indicator — shown at the very top while fetching */}
           {isLoadingOlder && (
             <Flex align="center" justify="center" style={{ padding: 'var(--space-4)', flexShrink: 0 }}>
-              <LottieLoader variant="loader" size={32} />
+              <ChatCompanion variant="loader" size={32} />
             </Flex>
           )}
 
           {isLoadingConversation && (
             <Flex align="center" justify="center" style={{ padding: 'var(--space-6)' }}>
-              <LottieLoader variant="loader" size={48} showLabel />
+              <ChatCompanion variant="loader" size={48} showLabel />
             </Flex>
           )}
 

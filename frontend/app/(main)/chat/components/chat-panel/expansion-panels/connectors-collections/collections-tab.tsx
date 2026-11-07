@@ -19,7 +19,7 @@ import {
   type KnowledgeSearchScope,
   type KnowledgeTreeNode,
 } from './knowledge-tree';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import type { ChatKnowledgeFilters } from '@/chat/types';
 
 // ── Types ──
@@ -409,7 +409,7 @@ export function CollectionsTab({
       >
         {isLoading && (
           <Flex align="center" justify="center" style={{ flex: 1, minHeight: 0 }}>
-            <LottieLoader variant="loader" size={48} />
+            <ChatCompanion variant="loader" size={48} />
           </Flex>
         )}
 

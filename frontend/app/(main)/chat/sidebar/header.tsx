@@ -12,7 +12,7 @@ import { UserAvatar } from '@/app/components/ui/user-avatar';
 import { useUserStore } from '@/lib/store/user-store';
 import { useSidebarWidthStore } from '@/lib/store/sidebar-width-store';
 import { useIsMobile } from '@/lib/hooks/use-is-mobile';
-import { BrandMark } from '@/config';
+import { ChatCompanion } from '../components/chat-companion';
 import { useChatStore } from '@/chat/store';
 
 /** A count you check rather than a place you browse to, so it rides the bar with its number on the glyph. */
@@ -140,7 +140,7 @@ export function ChatSidebarHeader() {
         aria-label={t('nav.home')}
         style={{ lineHeight: 0, display: 'inline-flex' }}
       >
-        <BrandMark size={HEADER_ELEMENT_SIZE} color="var(--accent-11)" />
+        <ChatCompanion size={HEADER_ELEMENT_SIZE} />
       </Link>
       <Flex align="center" gap="1">
         <Link href="/workspace/profile/" className="touch-hit" aria-label={t('common.openProfile')} style={{ textDecoration: 'none', lineHeight: 0, display: 'inline-flex' }}>

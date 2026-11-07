@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Flex, Text } from '@radix-ui/themes';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import type { StatusMessage } from '@/chat/types';
 
 interface StatusMessageProps {
@@ -26,7 +26,7 @@ export function StatusMessageComponent({ status }: StatusMessageProps) {
       {/* Keep the loader aligned with the first line of text even when the
           status wraps across multiple lines. */}
       <span style={{ flex: '0 0 auto', display: 'inline-flex', paddingTop: 2 }}>
-        <LottieLoader variant="thinking" size={20} />
+        <ChatCompanion variant="thinking" size={20} />
       </span>
 
       {/* Shimmer status text: base layer always legible, overlay sweeps a bright band.

@@ -48,7 +48,8 @@ import type { SharedAvatarMember } from '@/app/components/share';
 import { createChatShareAdapter, toChatSharedMembers } from './share-adapter';
 import { ChatSearch } from './components/search';
 import { isCommandKey } from '@/lib/utils/platform';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { WelcomeGreeting } from './components/welcome-greeting';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import { useGitHubStars } from '@/app/components/workspace-menu/hooks/use-github-stars';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { useUserStore, selectIsAdmin } from '@/lib/store/user-store';
@@ -1327,7 +1328,7 @@ function ChatContent() {
             justify="center"
             style={{ flex: 1, width: '100%' }}
           >
-            <LottieLoader variant="loader" size={48} showLabel />
+            <ChatCompanion variant="loader" size={48} showLabel />
           </Flex>
         ) : showSearchView ? (
           <Flex
@@ -1374,11 +1375,7 @@ function ChatContent() {
                 ) : (
                   <>
                     <Box style={{ marginBottom: 'var(--space-4)' }}>
-                      <LottieLoader
-                        autoplay
-                        loop
-                        style={{ width: isMobile ? 64 : 80, height: isMobile ? 64 : 80 }}
-                      />
+                      <ChatCompanion size={isMobile ? 72 : 88} interactive />
                     </Box>
                     <Box
                       style={{
@@ -1392,7 +1389,7 @@ function ChatContent() {
                         weight="medium"
                         style={{ color: 'var(--slate-12)', display: 'block', marginBottom: 'var(--space-1)' }}
                       >
-                        {t('chat.heyUser', { name: greetingName || t('chat.heyUserDefaultName') })}
+                        <WelcomeGreeting name={greetingName} />
                       </Text>
                       <Text size="4" weight="medium" style={{ color: 'var(--slate-12)' }}>
                         {t('chat.greeting')}

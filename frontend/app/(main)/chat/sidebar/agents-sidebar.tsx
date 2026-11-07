@@ -6,7 +6,7 @@ import { useIsMainChatRoute } from '@/chat/hooks/use-is-main-chat-route';
 import { Flex, Box, Text, TextField, IconButton } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import { SecondaryPanel } from '@/app/components/sidebar';
 import { ICON_SIZE_DEFAULT, SECTION_HEADER_PADDING } from '@/app/components/sidebar';
 import { buildChatHref } from '@/chat/build-chat-url';
@@ -210,7 +210,7 @@ export const AgentsSidebar = React.memo(function AgentsSidebar({ onBack }: Agent
         >
           {isLoading ? (
             <Flex align="center" justify="center" style={{ padding: 'var(--space-5) var(--space-3)' }}>
-              <LottieLoader variant="loader" size={28} showLabel />
+              <ChatCompanion variant="loader" size={28} showLabel />
             </Flex>
           ) : loadError ? (
             <Flex align="center" justify="center" style={{ padding: 'var(--space-4) var(--space-3)' }}>
@@ -251,7 +251,7 @@ export const AgentsSidebar = React.memo(function AgentsSidebar({ onBack }: Agent
                 <Box ref={sentinelRef} style={{ padding: 'var(--space-2) 0', textAlign: 'center' }}>
                   {isLoadingMore && (
                     <Flex align="center" justify="center" gap="2" style={{ padding: 'var(--space-1) 0' }}>
-                      <LottieLoader variant="loader" size={20} showLabel />
+                      <ChatCompanion variant="loader" size={20} showLabel />
                     </Flex>
                   )}
                 </Box>
