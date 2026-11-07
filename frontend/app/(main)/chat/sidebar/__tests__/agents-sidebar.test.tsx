@@ -31,8 +31,8 @@ vi.mock('@/config', async () => {
 const agentsApi = vi.hoisted(() => ({ getAgents: vi.fn(), deleteAgent: vi.fn() }));
 vi.mock('@/app/(main)/agents/api', () => ({ AgentsApi: agentsApi }));
 vi.mock('@/app/components/ui/MaterialIcon', () => ({ MaterialIcon: () => null }));
-vi.mock('@/app/components/ui/lottie-loader', () => ({
-  LottieLoader: () => <div role="status">Loading</div>,
+vi.mock('@/app/(main)/chat/components/chat-companion', () => ({
+  ChatCompanion: () => <div role="status">Loading</div>,
 }));
 vi.mock('@/lib/hooks/use-is-mobile', () => ({ useIsMobile: () => false }));
 

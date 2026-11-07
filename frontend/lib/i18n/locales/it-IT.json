@@ -1626,7 +1626,21 @@
         "error": "Non riuscito"
       }
     },
-    "showMoreCitations_many": "Mostra altre {{count}} citazioni"
+    "showMoreCitations_many": "Mostra altre {{count}} citazioni",
+    "timeGreeting": {
+      "morning": "Buongiorno",
+      "morningNamed": "Buongiorno, {{name}}",
+      "afternoon": "Buon pomeriggio",
+      "afternoonNamed": "Buon pomeriggio, {{name}}",
+      "evening": "Buonasera",
+      "eveningNamed": "Buonasera, {{name}}",
+      "night": "Buonanotte",
+      "nightNamed": "Buonanotte, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Saluta",
+      "hello": "Ciao!"
+    }
   },
   "workspaceMenu": {
     "appearance": "Aspetto",

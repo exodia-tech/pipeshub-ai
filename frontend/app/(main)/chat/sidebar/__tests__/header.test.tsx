@@ -18,7 +18,6 @@ vi.mock('@/lib/navigation', () => ({
     </a>
   ),
 }));
-vi.mock('@/config', () => ({ BrandMark: () => <span>logo</span> }));
 vi.mock('@/app/components/ui/user-avatar', () => ({ UserAvatar: () => null }));
 vi.mock('@/app/components/ui/MaterialIcon', () => ({ MaterialIcon: () => null }));
 
@@ -48,7 +47,7 @@ function renderHeader() {
 }
 
 describe('Chat sidebar header: Home', () => {
-  it('links the logo to /chat/', () => {
+  it('links the companion to /chat/', () => {
     renderHeader();
     expect(screen.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/chat/');
   });

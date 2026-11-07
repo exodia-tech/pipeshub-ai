@@ -1593,6 +1593,20 @@
         "done": "Done",
         "error": "Failed"
       }
+    },
+    "timeGreeting": {
+      "morning": "Good morning",
+      "morningNamed": "Good morning, {{name}}",
+      "afternoon": "Good afternoon",
+      "afternoonNamed": "Good afternoon, {{name}}",
+      "evening": "Good evening",
+      "eveningNamed": "Good evening, {{name}}",
+      "night": "Good night",
+      "nightNamed": "Good night, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Say hello",
+      "hello": "Hello!"
     }
   },
   "workspaceMenu": {

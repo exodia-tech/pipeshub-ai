@@ -1589,6 +1589,20 @@
         "done": "완료",
         "error": "실패"
       }
+    },
+    "timeGreeting": {
+      "morning": "좋은 아침이에요",
+      "morningNamed": "{{name}}님, 좋은 아침이에요",
+      "afternoon": "좋은 오후예요",
+      "afternoonNamed": "{{name}}님, 좋은 오후예요",
+      "evening": "좋은 저녁이에요",
+      "eveningNamed": "{{name}}님, 좋은 저녁이에요",
+      "night": "편안한 밤이에요",
+      "nightNamed": "{{name}}님, 편안한 밤이에요"
+    },
+    "companion": {
+      "sayHello": "인사하기",
+      "hello": "안녕하세요!"
     }
   },
   "workspaceMenu": {

@@ -1659,6 +1659,20 @@
         "done": "Hotovo",
         "error": "Selhalo"
       }
+    },
+    "timeGreeting": {
+      "morning": "Dobré ráno",
+      "morningNamed": "Dobré ráno, {{name}}",
+      "afternoon": "Dobré odpoledne",
+      "afternoonNamed": "Dobré odpoledne, {{name}}",
+      "evening": "Dobrý večer",
+      "eveningNamed": "Dobrý večer, {{name}}",
+      "night": "Dobrou noc",
+      "nightNamed": "Dobrou noc, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Pozdravit",
+      "hello": "Ahoj!"
     }
   },
   "workspaceMenu": {
