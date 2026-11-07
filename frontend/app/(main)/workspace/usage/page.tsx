@@ -261,10 +261,8 @@ export default function UsagePage() {
       style={{ width: "100%", maxWidth: 1600, margin: "0 auto" }}
     >
       <Flex justify="between" align="start" wrap="wrap" gap="3" mb="4">
-        <Box>
-          <Heading size="6" pl={{ initial: "6", md: "0" }}>
-            {label("title")}
-          </Heading>
+        <Box pl={{ initial: "6", md: "0" }}>
+          <Heading size="6">{label("title")}</Heading>
           <Text as="p" color="gray" mt="2">
             {label("subtitle")}
           </Text>
