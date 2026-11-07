@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Avatar } from '@radix-ui/themes';
+import { useAvatarImage } from './avatar-image';
 
 // ─────────────────────────────────────────────
 // UserAvatar — standalone avatar circle
@@ -106,13 +107,14 @@ export function UserAvatar({
   size = 32,
   radius = 'full',
 }: UserAvatarProps) {
+  const image = useAvatarImage(src, size);
   return (
     <Avatar
       size={toRadixSize(size)}
       variant="soft"
       radius={radius}
       fallback={getInitials({ fullName, firstName, lastName, email })}
-      src={src || undefined}
+      src={image}
       style={{ width: size, height: size, flexShrink: 0 }}
     />
   );

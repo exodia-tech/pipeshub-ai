@@ -3,6 +3,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Flex, Avatar, IconButton, DropdownMenu } from '@radix-ui/themes';
+import { useAvatarImage } from '@/app/components/ui/avatar-image';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 
 export interface AvatarUploadWidgetProps {
@@ -39,6 +40,7 @@ export function AvatarUploadWidget({
   triggerAriaLabel,
 }: AvatarUploadWidgetProps) {
   const { t } = useTranslation();
+  const image = useAvatarImage(src, 32);
   const showDropdown = !!src && !!onDeleteClick;
 
   return (
@@ -46,7 +48,7 @@ export function AvatarUploadWidget({
       <Avatar
         size="2"
         variant="soft"
-        src={src ?? undefined}
+        src={image}
         fallback={uploading ? '…' : initial}
         style={{ flexShrink: 0, borderRadius: 'var(--radius-2)' }}
       />
