@@ -252,7 +252,7 @@ class UsageLedger:
     def _totals() -> str:
         return """COUNT(*) AS requests, COALESCE(SUM(input_tokens),0) AS input_tokens,
         COALESCE(SUM(output_tokens),0) AS output_tokens, COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens,
-        COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens, SUM(reasoning_tokens) AS reasoning_tokens,
+        COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens, CASE WHEN COUNT(reasoning_tokens)=COUNT(*) THEN SUM(reasoning_tokens) ELSE NULL END AS reasoning_tokens,
         COALESCE(SUM(cost_nano_usd),0)/1000000000.0 AS cost_usd,
         COALESCE(SUM(cost_nano_usd IS NULL),0) AS unpriced_requests,
         COALESCE(SUM(measurement='estimated'),0) AS estimated_requests,
