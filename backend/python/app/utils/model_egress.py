@@ -215,7 +215,7 @@ def _note_proxied(host: str) -> None:
     )
 
 
-def guard_httpx_client(client: httpx.Client | httpx.AsyncClient, endpoint: str | None) -> None:
+def guard_httpx_client(client: httpx.Client | httpx.AsyncClient, endpoint: str | None, *, allow_private_endpoint: bool = False) -> None:
     """Stop *client* following redirects and make its direct connections dial only checked addresses.
 
     Only the client's own transport is guarded. Proxy mounts are left alone so
@@ -234,7 +234,7 @@ def guard_httpx_client(client: httpx.Client | httpx.AsyncClient, endpoint: str |
         return
     client.follow_redirects = False
     pool = getattr(client._transport, "_pool", None)
-    allow_private = private_allowed_for(endpoint)
+    allow_private = allow_private_endpoint or private_allowed_for(endpoint)
     if isinstance(pool, httpcore.AsyncConnectionPool):
         if not isinstance(pool._network_backend, VettedAsyncBackend):
             pool._network_backend = VettedAsyncBackend(pool._network_backend, allow_private=allow_private)
@@ -252,8 +252,8 @@ def guard_httpx_client(client: httpx.Client | httpx.AsyncClient, endpoint: str |
             _note_proxied(url.host)
 
 
-def guarded_async_client(endpoint: str | None, *, timeout: float) -> httpx.AsyncClient:
+def guarded_async_client(endpoint: str | None, *, timeout: float, allow_private_endpoint: bool = False) -> httpx.AsyncClient:
     """An ``httpx.AsyncClient`` for calling *endpoint*, guarded by ``guard_httpx_client``."""
     client = httpx.AsyncClient(timeout=timeout)
-    guard_httpx_client(client, endpoint)
+    guard_httpx_client(client, endpoint, allow_private_endpoint=allow_private_endpoint)
     return client

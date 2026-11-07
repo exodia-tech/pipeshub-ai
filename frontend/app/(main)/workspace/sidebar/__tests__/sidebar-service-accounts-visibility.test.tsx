@@ -88,3 +88,16 @@ describe('WorkspaceSidebar — Service accounts', () => {
     expect(screen.queryByText(SERVICE_ACCOUNTS_LABEL)).toBeNull();
   });
 });
+
+
+describe('WorkspaceSidebar — usage navigation', () => {
+  it.each([true, false])('keeps usage in the Workspace section for admin=%s', (isAdmin) => {
+    userState = { profile: { isAdmin } };
+    flagsState = { flags: {} };
+    renderSidebar();
+    const workspace = screen.getByText(en.workspace.sidebar.sections.workspace);
+    const usage = screen.getByRole('link', { name: en.usage.title });
+    expect(workspace.compareDocumentPosition(usage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(usage.getAttribute('href')).toBe('/workspace/usage');
+  });
+});

@@ -1,6 +1,7 @@
 """Calls to the web services a provider speaks JSON with: hosted APIs and admin-run servers."""
 
 import hashlib
+import os
 from typing import Any
 
 import httpx
@@ -66,7 +67,9 @@ class Endpoint:
 
     def __init__(self, base_url: str, token: str, *, source: str, name: str) -> None:
         self.base_url = base_url.strip().rstrip("/")
-        self._token = token
+        trusted = os.getenv("CRAWL4AI_INTERNAL_URL", "").strip().rstrip("/")
+        internal = source == "crawl4ai" and bool(trusted) and self.base_url == trusted
+        self._token = os.getenv("CRAWL4AI_API_TOKEN", "") if internal else token
         self._source = source
         self._name = name
 
@@ -91,7 +94,10 @@ class Endpoint:
             raise NotConfigured(
                 f"{self._name} needs the http(s) address of its server", source=self._source, reason="base_url",
             )
-        async with guarded_async_client(self.base_url, timeout=max(deadline.remaining(), 0.001)) as client:
+        trusted = os.getenv("CRAWL4AI_INTERNAL_URL", "").strip().rstrip("/")
+        internal = self._source == "crawl4ai" and bool(trusted) and self.base_url == trusted
+        options = {"allow_private_endpoint": True} if internal else {}
+        async with guarded_async_client(self.base_url, timeout=max(deadline.remaining(), 0.001), **options) as client:
             return await request_json(
                 client, method, f"{self.base_url}{path}",
                 source=self._source, name=self._name, deadline=deadline,
