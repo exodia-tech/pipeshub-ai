@@ -140,7 +140,7 @@ export function ChatSidebarHeader() {
         aria-label={t('nav.home')}
         style={{ lineHeight: 0, display: 'inline-flex' }}
       >
-        <ChatCompanion size={HEADER_ELEMENT_SIZE} />
+        <ChatCompanion size={HEADER_ELEMENT_SIZE} followChat />
       </Link>
       <Flex align="center" gap="1">
         <Link href="/workspace/profile/" className="touch-hit" aria-label={t('common.openProfile')} style={{ textDecoration: 'none', lineHeight: 0, display: 'inline-flex' }}>

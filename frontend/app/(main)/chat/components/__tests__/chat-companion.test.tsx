@@ -10,13 +10,36 @@ import {
 import { Theme } from "@radix-ui/themes";
 import "@/lib/__tests__/test-i18n";
 import { ChatCompanion } from "../chat-companion";
+import { useChatStore } from '@/chat/store';
 
 afterEach(() => {
   cleanup();
+  useChatStore.setState({ slots: {}, activeSlotId: null, composerTypingSlotId: null });
   vi.useRealTimers();
 });
 
 describe("chat companion", () => {
+  it('follows only the active conversation, prioritizes thinking, and settles on stop', () => {
+    const store = useChatStore.getState();
+    const first = store.createSlot(null);
+    const second = store.createSlot(null);
+    store.setActiveSlot(first);
+    const { container } = render(<Theme><ChatCompanion followChat /><ChatCompanion /></Theme>);
+    act(() => useChatStore.setState({ composerTypingSlotId: first }));
+    expect(container.querySelectorAll('.chat-companion--typing').length).toBe(1);
+    expect(container.querySelector('.chat-companion__eyes ellipse')?.getAttribute('cy')).toBe('38');
+    act(() => store.updateSlot(first, { isStreaming: true }));
+    expect(container.querySelector('.chat-companion--thinking')).toBeTruthy();
+    expect(container.querySelector('.chat-companion--typing')).toBeNull();
+    act(() => { store.updateSlot(first, { isStreaming: false }); useChatStore.setState({ composerTypingSlotId: null }); });
+    expect(container.querySelector('.chat-companion--thinking')).toBeNull();
+    act(() => store.updateSlot(first, { remoteRunInProgress: true }));
+    expect(container.querySelector('.chat-companion--thinking')).toBeTruthy();
+    act(() => store.setActiveSlot(second));
+    expect(container.querySelector('.chat-companion--thinking')).toBeNull();
+    act(() => store.updateSlot(second, { isStreaming: true, stopping: true }));
+    expect(container.querySelector('.chat-companion--thinking')).toBeNull();
+  });
   it("responds to a hello without submitting the surrounding composer", () => {
     vi.useFakeTimers();
     const submit = vi.fn();
