@@ -13,6 +13,7 @@ import { HttpMethod } from './libs/enums/http-methods.enum';
 import { Container } from 'inversify';
 import { Logger } from './libs/services/logger.service';
 import { createHealthRouter } from './modules/tokens_manager/routes/health.routes';
+import { createUsageRouter } from './modules/tokens_manager/routes/usage.routes';
 import { ConfigService } from './modules/tokens_manager/services/cm.service';
 import { createCodeGraphRouter } from './modules/enterprise_search/routes/code-graph.routes';
 import { ErrorMiddleware } from './libs/middlewares/error.middleware';
@@ -635,6 +636,7 @@ export class Application {
   }
 
   private configureRoutes(): void {
+    this.app.use('/api/v1/usage', createUsageRouter(this.tokenManagerContainer));
     // Health check routes
     this.app.use(
       '/api/v1/health',

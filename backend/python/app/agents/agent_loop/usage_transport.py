@@ -112,9 +112,19 @@ def with_usage_reporting(
 ) -> Callable[[], LLMTransport]:
     """The registry factory `factory`, its transport wrapped to report usage
     to `sink`; `factory` unchanged when `sink` is None."""
-    if sink is None:
+    from app.services.usage.meter import enabled
+    from app.services.usage.transport import MeteredTransport
+
+    if sink is None and not enabled():
         return factory
-    return lambda: UsageReportingTransport(factory(), sink)
+
+    def build() -> LLMTransport:
+        transport = factory()
+        if sink is not None:
+            transport = UsageReportingTransport(transport, sink)
+        return MeteredTransport(transport) if enabled() else transport
+
+    return build
 
 
 __all__ = ["UsageReportingTransport", "with_usage_reporting"]

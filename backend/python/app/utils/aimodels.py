@@ -71,16 +71,28 @@ def _decorate_chat_model(model, provider, model_name, config):  # noqa: ANN001, 
     # every service using this module should not have to load.
     from app.edition_services import decorate_chat_model
     from app.services.model_identity.transport.instrument import instrument_model
+    from app.services.usage.meter import chat_callback, enabled
 
     # Before the edition decorators, so they wrap a model that already carries identity.
+    if enabled():
+        resolved_name = model_name or getattr(model, "model_name", None) or getattr(model, "model", None) or config.get("configuration", {}).get("model") or "unknown"
+        callback = chat_callback(provider, resolved_name)
+        if model.callbacks is None or isinstance(model.callbacks, list):
+            model.callbacks = [*(model.callbacks or []), callback]
+        else:
+            model.callbacks = model.callbacks.copy()
+            model.callbacks.add_handler(callback, inherit=True)
     return decorate_chat_model(instrument_model(model, provider, config), provider, model_name, config)
 
 
 def _decorate_embeddings(embeddings, provider, model_name, config):  # noqa: ANN001, ANN202
     from app.edition_services import decorate_embeddings
     from app.services.model_identity.transport.instrument import instrument_model
+    from app.services.usage.meter import metered_embeddings
 
-    return decorate_embeddings(instrument_model(embeddings, provider, config), provider, model_name, config)
+    instrumented = instrument_model(embeddings, provider, config)
+    name = model_name or getattr(embeddings, "model", None) or config.get("configuration", {}).get("model") or "unknown"
+    return decorate_embeddings(metered_embeddings(instrumented, provider, name), provider, model_name, config)
 
 def coerce_message_content_to_text(content: Any) -> str:
     """Normalize a LangChain message ``content`` value to plain text.
@@ -329,7 +341,9 @@ def _media_client_kwargs(base_url: str | None, identity_forwarding: Mapping[str,
     config = {"configuration": dict(identity_forwarding or {})}
     if base_url:
         return _endpoint_client_kwargs(base_url, config)
-    if settings_from_config(config).enabled:
+    from app.services.usage.meter import enabled as usage_enabled
+
+    if settings_from_config(config).enabled or usage_enabled():
         return {"http_client": model_http_client("", config)}
     return {}
 

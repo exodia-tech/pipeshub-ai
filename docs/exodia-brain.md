@@ -8,6 +8,8 @@ Open https://brain.exodia.ws and use your invited company account. Use **Forgot 
 
 ## Support and setup
 
+**Workspace → Usage & costs** shows model usage and cost estimates, with organization-wide analytics and monthly warning budgets for administrators. See [usage analytics](usage-analytics.md) for accounting coverage, pricing and persistence details.
+
 Contact [EXODIA support](mailto:mo@exodiatech.com) for account access, connector setup, AI provider configuration, and deployment help. Administrators manage these settings in Workspace. Access to source content depends on the permissions configured for your organization and connected services.
 
 Company website: https://exodiatech.com
