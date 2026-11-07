@@ -884,6 +884,19 @@ export default function UsagePage() {
               {label("noBudgets")}
             </Text>
           )}
+          {isAdmin && view === "personal" && (
+            <Button
+              className="touch-hit"
+              mt="3"
+              onClick={() => {
+                setView("organization");
+                setFilters({});
+                setOffset(0);
+              }}
+            >
+              {label("setBudget")}
+            </Button>
+          )}
           {isAdmin && view === "organization" && (
             <Card mt="4">
               <Heading size="3" mb="3">

@@ -22,7 +22,7 @@ from app.services.model_identity.principal import (
     warmup_principal,
 )
 from app.services.model_identity.workload import Workload
-from app.services.usage.ledger import UsageLedger
+from app.services.usage.ledger import UsageLedger, catalog_rates
 from app.services.usage.meter import (
     chat_callback,
     emit,
@@ -327,6 +327,37 @@ class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
                 "private",
                 str([tuple(row) for row in db.execute("SELECT * FROM usage_events")]),
             )
+
+    async def test_gemini_embedding_is_estimated_and_priced_in_ledger(self) -> None:
+        class FakeGemini(Embeddings):
+            def embed_documents(
+                self, texts: list[str], **kwargs: object
+            ) -> list[list[float]]:
+                return [[1.0] for _ in texts]
+
+            def embed_query(self, text: str, **kwargs: object) -> list[float]:
+                return [1.0]
+
+        prices = {
+            "gemini/gemini-embedding-2": {
+                "mode": "embedding",
+                "input_cost_per_token": 0.0000002,
+                "output_cost_per_token": 0,
+            }
+        }
+        with (
+            patch("app.services.usage.ledger.catalog", return_value=prices),
+            patch("app.services.usage.ledger.catalog_rates", new=catalog_rates),
+            bind_call_context(context()),
+        ):
+            metered_embeddings(
+                FakeGemini(), "gemini", "models/gemini-embedding-2"
+            ).embed_documents(["x" * 4000])
+        recorded = self.events()[0]
+        self.assertEqual(recorded["measurement"], "estimated")
+        self.assertEqual(recorded["input_tokens"], 1000)
+        self.assertEqual(recorded["cost_usd"], 0.0002)
+        self.assertEqual(recorded["pricing_source"], "catalog")
 
     async def test_missing_embedding_counters_are_estimated_instead_of_reported_zero(
         self,
