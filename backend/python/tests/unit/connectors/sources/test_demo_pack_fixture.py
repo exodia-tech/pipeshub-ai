@@ -1,4 +1,4 @@
-"""Guards on the Acme Corp demo stories behind the vertical Build Packs.
+"""Guards on the Mobart Ben synthetic project demo behind the vertical Build Packs.
 
 The packs (sales, support, marketing, finance, HR) each ask golden questions kept
 under `pack_questions`, apart from the chat landing's `questions`. These checks
@@ -104,72 +104,75 @@ def test_no_open_folder_holds_a_restricted_record(fx: dict) -> None:
 
 
 
-def test_s1_is_scored_on_the_call_notes_not_the_at_risk_thread(fx: dict) -> None:
-    q = next(q for q in _pack_questions(fx) if q["id"] == "s1")
-    assert "drive-sales-northwind-call-0416" in q["must_cite"]
-    assert "slack-deals-0410" not in q.get("must_cite_any_of", []) + q.get("must_cite", [])
-
-
-def test_u2_is_scored_on_finances_resolution(fx: dict) -> None:
-    q = next(q for q in _pack_questions(fx) if q["id"] == "u2")
-    required = set(q.get("must_cite", [])) | set(q.get("must_cite_any_of", []))
-    assert required and required <= {"jira-fin-37", "jira-fin-38"}, required
-
-
-@pytest.mark.parametrize(
-    ("summary", "later"),
-    [
-        # A record that states a story's current status must be dated after the
-        # records it summarises, or the demo answers with a stale status.
-        ("drive-sales-northwind-plan", "drive-sales-northwind-call-0416"),
-        ("jira-sup-121", "jira-fin-37"),
-        ("jira-sup-121", "jira-fin-38"),
-        ("drive-fin-q2-budget", "jira-fin-38"),
-    ],
-)
-def test_a_status_record_is_current_with_its_story(fx: dict, summary: str, later: str) -> None:
+def test_mobart_questions_follow_source_facts_and_project_boundaries(fx: dict) -> None:
     records = {r["id"]: r for r in fx["records"]}
+    questions = {q["id"]: q for q in fx["questions"]}
+    assert {"mobart-001-d01", "mobart-001-d08"} <= set(questions["q1"]["must_cite"])
+    assert "mobart-001-d02" in questions["q2"]["must_cite"]
+    assert "restricted" not in questions["q2"]
+    assert questions["q2"]["personas"] == {"alice": "cites", "bob": "cites"}
+    assert {"mobart-001-d03", "mobart-001-d04"} <= set(questions["q3"]["must_cite"])
+    assert {"mobart-001-d05", "mobart-001-d06", "mobart-001-d17"} <= set(questions["q4"]["must_cite"])
+    assert "mobart-002-d07" in questions["q5"]["must_cite"]
+    assert "MB-DEMO-002" in records["mobart-002-d07"]["body"]
+    assert "non riguarda Villa Aurora, MB-DEMO-001" in records["mobart-002-d07"]["body"]
+    assert "giulia non approva l'opzione" in records["mobart-001-d05"]["body"].lower()
+    assert "non disponibili" in records["mobart-001-d06"]["body"].lower()
 
-    def last(r: dict) -> str:
-        return str(r.get("updated") or r["created"])
 
-    assert last(records[summary]) >= last(records[later]), (summary, later)
-
-
-def test_closed_stories_say_so(fx: dict) -> None:
+def test_original_quote_is_public_and_restricted_question_uses_only_demo_tag(fx: dict) -> None:
     records = {r["id"]: r for r in fx["records"]}
-    assert "**On track.**" in records["drive-sales-northwind-plan"]["body"]
-    assert "**Status:** Done" in records["jira-sup-121"]["body"]
+    containers = {c["id"]: c for c in fx["containers"]}
+    quote = records["mobart-001-d02"]
+    assert quote.get("group", containers[quote["container"]]["group"]) == "engineering-readers"
+    assert "€18.000" in quote["body"]
+    q = next(q for q in fx["questions"] if q["id"] == "q6")
+    assert q["restricted"] == ["drive-pricing-2026"]
+    assert q["restricted_facts"] == ["VA-INT-7"]
+    assert q["personas"] == {"alice": "none", "bob": "cites"}
+    restricted = records["drive-pricing-2026"]
+    assert restricted["group"] == "pricing-committee"
+    assert "VA-INT-7" in restricted["body"]
+    assert "€" not in restricted["body"]
 
 
-
-def test_sup_121_points_to_finance_instead_of_answering_for_it(fx: dict) -> None:
-    # If the support ticket repeats finance's resolution, an answer stops there and
-    # never cites FIN-37 or FIN-38, which u2 requires.
-    body = next(r for r in fx["records"] if r["id"] == "jira-sup-121")["body"]
-    assert "FIN-37" in body and "FIN-38" in body
-    assert "22 April" not in body and "6 May" not in body
-
-
-def test_the_onboarding_checklist_is_named_for_the_first_week(fx: dict) -> None:
-    # h2 asks what a new engineer does "in their first week"; the record should say so.
-    rec = next(r for r in fx["records"] if r["id"] == "drive-people-onboarding-eng")
-    assert "first week" in rec["title"].lower()
-    assert "## First week" in rec["body"]
+def test_legacy_connector_slots_are_distinct_simulated_mobart_context(fx: dict) -> None:
+    legacy = [r for r in fx["records"] if not r["id"].startswith("mobart-") and r["id"] != "drive-pricing-2026"]
+    assert len({r["title"] for r in legacy}) == len(legacy)
+    assert len({r["body"] for r in legacy}) > len(legacy) * 0.9
+    assert all("simulat" in r["body"].lower() or "inventat" in r["body"].lower() for r in legacy)
+    assert all("Villa Aurora" in r["title"] for r in legacy)
 
 
-def test_team_records_do_not_retell_the_export_timeout_story(fx: dict) -> None:
-    # q2 ("which customers reported export timeouts, and what fixed it?") must find
-    # the support cases and the engineering fix. Team records that restate the
-    # symptom or the customer list pushed the fix out of search results.
-    teams = {"drive-sales", "slack-deals", "drive-marketing", "slack-launch", "drive-deal-desk", "drive-launch-core"}
-    assert teams <= {r["container"] for r in fx["records"]}
-    symptom = re.compile(r"timed out|timing out|timeout|CS00044", re.I)
-    customers = ("Northwind", "Contoso", "Fabrikam")
-    offenders = []
-    for r in fx["records"]:
-        if r["container"] not in teams:
-            continue
-        if symptom.search(r["body"]) or sum(c in r["body"] for c in customers) > 1:
-            offenders.append(r["id"])
-    assert offenders == [], offenders
+def test_simulated_threads_follow_document_chronology(fx: dict) -> None:
+    threads = {t["id"]: t for t in fx["threads"]}
+    for thread_id, thread in threads.items():
+        messages = sorted(
+            (r for r in fx["records"] if r.get("thread") == thread_id),
+            key=lambda r: str(r["created"]),
+        )
+        assert messages
+        dates = [r["created"] for r in messages]
+        assert dates == sorted(dates), thread_id
+        assert all("simulat" in r["title"].lower() for r in messages)
+        assert "Villa Aurora" in thread["title"]
+
+
+def test_fixture_has_no_old_customer_story_or_fake_revision_price(fx: dict) -> None:
+    visible_parts = []
+    for record in fx["records"]:
+        visible_parts.extend((record.get("title", ""), record.get("body", "")))
+    for container in fx["containers"]:
+        visible_parts.append(container.get("name", ""))
+    for thread in fx["threads"]:
+        visible_parts.append(thread.get("title", ""))
+    for question in fx["questions"] + [q for qs in fx["pack_questions"].values() for q in qs]:
+        visible_parts.append(question.get("ask", ""))
+        for key in ("answer_must_mention", "answer_must_state", "answer_must_not_state"):
+            visible_parts.extend(question.get(key, []))
+    visible = " ".join(visible_parts).lower()
+    for old_name in ("northwind", "contoso", "fabrikam", "stripe", "acme insights"):
+        assert old_name not in visible
+    q4 = next(q for q in fx["questions"] if q["id"] == "q4")
+    assert any("preventivo revisionato" in x.lower() for x in q4["answer_must_state"])
+    assert any("€18.000" in x for x in q4["answer_must_not_state"])

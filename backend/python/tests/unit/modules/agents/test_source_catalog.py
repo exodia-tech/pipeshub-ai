@@ -451,7 +451,7 @@ class TestDemoSourceNote:
 
     def test_only_demo_records_are_acme_corps(self) -> None:
         # Asked about Acme Corp, a model labelled the user's own uploaded policy as Acme's.
-        assert "Only records from the Demo source are Acme Corp's" in DEMO_SOURCE_NOTE
+        assert "Only records from the Demo source are Mobart Ben's" in DEMO_SOURCE_NOTE
         assert "never call a record from any other source" in DEMO_SOURCE_NOTE
 
     def test_the_note_sits_with_the_sources_not_in_place_of_them(self) -> None:
@@ -517,10 +517,10 @@ class TestDemoOnly:
             assert note.endswith("Leave the organization's name out of searches of the Demo source.")
 
     def test_the_mixed_note_keeps_3500s_rules(self) -> None:
-        assert "never present an Acme Corp fact as the user's organization's" in DEMO_SOURCE_NOTE
-        assert "name Acme Corp" in DEMO_SOURCE_NOTE
+        assert "never present a Mobart Ben fact as the user's organization's" in DEMO_SOURCE_NOTE
+        assert "name Mobart Ben" in DEMO_SOURCE_NOTE
 
     def test_the_demo_only_note_answers_our_questions_and_says_it_is_demo_data(self) -> None:
         assert "as from this workspace's own data" in DEMO_ONLY_SOURCE_NOTE
-        assert "In the Acme Corp demo data" in DEMO_ONLY_SOURCE_NOTE
+        assert "In the Mobart Ben demo data" in DEMO_ONLY_SOURCE_NOTE
         assert "never decline Demo records" in DEMO_ONLY_SOURCE_NOTE
