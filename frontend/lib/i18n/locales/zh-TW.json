@@ -1157,7 +1157,7 @@
         ]
       }
     },
-    "demoBanner": "您正在檢視 Acme Corp，這是以示範資料載入的虛構小公司。試試下列問題，或是",
+    "demoBanner": "您正在檢視 Mobart Ben，這是以示範資料載入的虛構小公司。試試下列問題，或是",
     "demoConnectYourOwn": "連接您自己的來源",
     "askMoreQuestionSets": [
       [
@@ -1396,38 +1396,28 @@
     "scrollAttachmentsRight": "向右捲動附件",
     "demoSuggestions": {
       "1": {
-        "text": "付款服務的架構為何變更，這項決定是如何做出的？",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "哪些客戶回報了匯出逾時的問題，最後是如何解決的？",
-        "icons": [
-          "jira",
-          "github"
-        ]
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
+        "icons": ["sheets"]
       },
       "3": {
-        "text": "關於國定假日值班，我們的政策是什麼？",
-        "icons": [
-          "sheets"
-        ]
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
       },
       "4": {
-        "text": "計費 worker 中的 PR #482 由誰審查並核准，合併前 Dana 提出了什麼要求？",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "2026 年的企業定價策略是什麼？",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -4279,8 +4269,8 @@
       },
       "demoData": {
         "title": "示範資料",
-        "description": "Acme Corp 是為了讓您體驗 EXODIA Brain 而載入的虛構公司。這只會改變您看到的內容，不會刪除任何資料。",
-        "label": "在我的回覆、搜尋與記錄中顯示 Acme Corp 示範資料",
+        "description": "Mobart Ben 是為了讓您體驗 EXODIA Brain 而載入的虛構公司。這只會改變您看到的內容，不會刪除任何資料。",
+        "label": "在我的回覆、搜尋與記錄中顯示 Mobart Ben 示範資料",
         "followingDefault": "遵循預設值：在您的組織擁有自己的資料之前會持續顯示，之後便隱藏。",
         "yourChoice": "您自己的選擇。",
         "useDefault": "使用預設值",
@@ -5698,17 +5688,17 @@
   "demoData": {
     "badge": {
       "label": "示範",
-      "tooltip": "來自 Acme Corp 示範的範例資料，並非貴公司的記錄"
+      "tooltip": "來自 Mobart Ben 示範的範例資料，並非貴公司的記錄"
     },
     "removalNotice": {
-      "title": "Acme Corp 示範資料仍在您的工作區中",
+      "title": "Mobart Ben 示範資料仍在您的工作區中",
       "description": "貴公司自己的資料現已在 EXODIA Brain 中。示範資料預設不會出現在回覆裡，但任何人都可以重新開啟，其範例帳戶也仍可登入。請為所有人關閉，或永久移除。",
       "remove": "永久移除",
       "keep": "暫時保留",
       "turnOff": "為所有人關閉"
     },
     "removeDialog": {
-      "title": "永久移除 Acme Corp 示範資料？",
+      "title": "永久移除 Mobart Ben 示範資料？",
       "description": "此操作會刪除 Demo 連接器及其所有記錄、群組與權限。若只想隱藏而不刪除任何內容，請改為為所有人關閉。之後您可以在連接器頁面重新新增。",
       "deleteAccounts": "同時刪除範例帳戶：{{names}}",
       "deleteAccountsHint": "它們建立時帶有初始密碼，因此任何知道密碼的人都能以這些帳戶登入。",
@@ -5724,7 +5714,7 @@
     "switch": {
       "errorTitle": "無法變更示範資料設定",
       "errorDescription": "沒有任何變更。請稍後重試。",
-      "hiddenTitle": "已隱藏 Acme Corp 示範資料",
+      "hiddenTitle": "已隱藏 Mobart Ben 示範資料",
       "hiddenDescription": "它已從您的回覆、搜尋與記錄中移除。您可以隨時在「個人資料 → 示範資料」中重新開啟。",
       "undo": "復原"
     },

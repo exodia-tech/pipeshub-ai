@@ -1203,42 +1203,32 @@
         ]
       }
     },
-    "demoBanner": "Díváte se na Acme Corp, malou fiktivní firmu načtenou jako ukázková data. Vyzkoušejte některý z těchto dotazů, nebo",
+    "demoBanner": "Díváte se na Mobart Ben, malou fiktivní firmu načtenou jako ukázková data. Vyzkoušejte některý z těchto dotazů, nebo",
     "demoConnectYourOwn": "připojte vlastní zdroje",
     "demoSuggestions": {
       "1": {
-        "text": "Proč se změnila architektura platební služby a jak se o tom rozhodlo?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "Kteří zákazníci nahlásili vypršení časového limitu exportu a co to vyřešilo?",
-        "icons": [
-          "jira",
-          "github"
-        ]
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
+        "icons": ["sheets"]
       },
       "3": {
-        "text": "Jaká jsou naše pravidla pro pohotovost během státního svátku?",
-        "icons": [
-          "sheets"
-        ]
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
       },
       "4": {
-        "text": "Kdo zkontroloval a schválil PR #482 v billing workeru a co Dana požadovala před jeho sloučením?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "Jaká je strategie podnikových cen pro rok 2026?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -4415,11 +4405,11 @@
       "moreAgents": "Další agenti",
       "moreChats": "Další chaty",
       "demoData": {
-        "description": "Acme Corp je fiktivní společnost načtená proto, abyste si mohli EXODIA Brain vyzkoušet. Nastavení mění pouze to, co vidíte; nic se nemaže.",
+        "description": "Mobart Ben je fiktivní společnost načtená proto, abyste si mohli EXODIA Brain vyzkoušet. Nastavení mění pouze to, co vidíte; nic se nemaže.",
         "everyoneDescription": "Vypnutím skryjete ukázku z odpovědí, vyhledávání a záznamů všech uživatelů a ukázkové účty se nebudou moci přihlásit. Nic se nemaže.",
         "everyoneLabel": "Nabízet ukázku všem",
         "followingDefault": "Podle výchozího nastavení: zobrazuje se, dokud vaše organizace nemá vlastní data, poté se skryje.",
-        "label": "Zobrazovat ukázková data Acme Corp v mých odpovědích, vyhledávání a záznamech",
+        "label": "Zobrazovat ukázková data Mobart Ben v mých odpovědích, vyhledávání a záznamech",
         "offForEveryone": "Správce ukázku vypnul pro všechny.",
         "title": "Ukázková data",
         "useDefault": "Použít výchozí nastavení",
@@ -5878,17 +5868,17 @@
   "demoData": {
     "badge": {
       "label": "Ukázka",
-      "tooltip": "Ukázková data z dema Acme Corp, nikoli záznam vaší společnosti"
+      "tooltip": "Ukázková data z dema Mobart Ben, nikoli záznam vaší společnosti"
     },
     "removalNotice": {
-      "title": "Ukázková data Acme Corp jsou stále ve vašem pracovním prostoru",
+      "title": "Ukázková data Mobart Ben jsou stále ve vašem pracovním prostoru",
       "description": "Vlastní data vaší společnosti jsou nyní v EXODIA Brain. Ukázka je ve výchozím nastavení z odpovědí skryta, ale kdokoli ji může znovu zapnout a její ukázkové účty se stále mohou přihlásit. Vypněte ji pro všechny, nebo ji trvale odstraňte.",
       "remove": "Odstranit trvale",
       "keep": "Zatím ponechat",
       "turnOff": "Vypnout pro všechny"
     },
     "removeDialog": {
-      "title": "Trvale odstranit ukázková data Acme Corp?",
+      "title": "Trvale odstranit ukázková data Mobart Ben?",
       "description": "Tím se smaže konektor Demo se všemi jeho záznamy, skupinami a oprávněními. Pokud jej chcete skrýt bez mazání, místo toho jej vypněte pro všechny. Později jej můžete znovu přidat na stránce Konektory.",
       "deleteAccounts": "Smazat také ukázkové účty: {{names}}",
       "deleteAccountsHint": "Byly vytvořeny s počátečním heslem, takže kdokoli, kdo ho zná, se za ně může přihlásit.",
@@ -5904,7 +5894,7 @@
     "switch": {
       "errorTitle": "Nastavení ukázkových dat se nepodařilo změnit",
       "errorDescription": "Nic se nezměnilo. Zkuste to za chvíli znovu.",
-      "hiddenTitle": "Ukázková data Acme Corp skryta",
+      "hiddenTitle": "Ukázková data Mobart Ben skryta",
       "hiddenDescription": "Nejsou ve vašich odpovědích, vyhledávání ani záznamech. Kdykoli je můžete znovu zapnout v části Profil → Ukázková data.",
       "undo": "Vrátit zpět"
     },

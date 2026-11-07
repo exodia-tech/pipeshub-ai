@@ -1045,7 +1045,7 @@
         ]
       }
     },
-    "demoBanner": "Está viendo Acme Corp, una pequeña empresa ficticia cargada como datos de demostración. Pruebe una de estas opciones o",
+    "demoBanner": "Está viendo Mobart Ben, una pequeña empresa ficticia cargada como datos de demostración. Pruebe una de estas opciones o",
     "demoConnectYourOwn": "conecte sus propias fuentes",
     "askMoreQuestionSets": [
       [
@@ -1326,38 +1326,28 @@
     "scrollAttachmentsRight": "Desplazar los adjuntos hacia la derecha",
     "demoSuggestions": {
       "1": {
-        "text": "¿Por qué se cambió la arquitectura del servicio de pagos y cómo se tomó la decisión?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "¿Qué clientes informaron de tiempos de espera agotados en las exportaciones y cómo se solucionó?",
-        "icons": [
-          "jira",
-          "github"
-        ]
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
+        "icons": ["sheets"]
       },
       "3": {
-        "text": "¿Cuál es nuestra política sobre las guardias durante un día festivo?",
-        "icons": [
-          "sheets"
-        ]
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
       },
       "4": {
-        "text": "¿Quién revisó y aprobó la PR n.º 482 del worker de facturación, y qué pidió Dana antes de fusionarla?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "¿Cuál es la estrategia de precios para empresas en 2026?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -4027,8 +4017,8 @@
       },
       "demoData": {
         "title": "Datos de demostración",
-        "description": "Acme Corp es una empresa ficticia que se ha cargado para que pueda probar EXODIA Brain. Esto solo cambia lo que usted ve; no se elimina nada.",
-        "label": "Mostrar los datos de demostración de Acme Corp en mis respuestas, búsquedas y registros",
+        "description": "Mobart Ben es una empresa ficticia que se ha cargado para que pueda probar EXODIA Brain. Esto solo cambia lo que usted ve; no se elimina nada.",
+        "label": "Mostrar los datos de demostración de Mobart Ben en mis respuestas, búsquedas y registros",
         "followingDefault": "Siguiendo el valor predeterminado: se muestran hasta que su organización tenga datos propios y después se ocultan.",
         "yourChoice": "Su propia elección.",
         "useDefault": "Usar el valor predeterminado",
@@ -5805,17 +5795,17 @@
   "demoData": {
     "badge": {
       "label": "Demo",
-      "tooltip": "Datos de ejemplo de la demostración de Acme Corp, no un registro de su empresa"
+      "tooltip": "Datos de ejemplo de la demostración de Mobart Ben, no un registro de su empresa"
     },
     "removalNotice": {
-      "title": "Los datos de demostración de Acme Corp siguen en su espacio de trabajo",
+      "title": "Los datos de demostración de Mobart Ben siguen en su espacio de trabajo",
       "description": "Los datos propios de su empresa ya están en EXODIA Brain. La demostración está oculta en las respuestas de forma predeterminada, pero cualquiera puede volver a activarla y sus cuentas de ejemplo todavía pueden iniciar sesión. Desactívela para todos o quítela permanentemente.",
       "remove": "Quitar permanentemente",
       "keep": "Mantener por ahora",
       "turnOff": "Desactivar para todos"
     },
     "removeDialog": {
-      "title": "¿Quitar permanentemente los datos de demostración de Acme Corp?",
+      "title": "¿Quitar permanentemente los datos de demostración de Mobart Ben?",
       "description": "Esto elimina el conector Demo con todos sus registros, grupos y permisos. Para ocultarlo sin eliminar nada, desactívelo para todos. Puede volver a añadirlo más adelante desde la página de Conectores.",
       "deleteAccounts": "Eliminar también las cuentas de ejemplo: {{names}}",
       "deleteAccountsHint": "Se crearon con una contraseña inicial, así que cualquiera que la conozca puede iniciar sesión como ellas.",
@@ -5831,7 +5821,7 @@
     "switch": {
       "errorTitle": "No se ha podido cambiar el ajuste de los datos de demostración",
       "errorDescription": "No se ha cambiado nada. Vuelva a intentarlo en un momento.",
-      "hiddenTitle": "Datos de demostración de Acme Corp ocultos",
+      "hiddenTitle": "Datos de demostración de Mobart Ben ocultos",
       "hiddenDescription": "Han desaparecido de sus respuestas, búsquedas y registros. Puede volver a activarlos cuando quiera en Perfil → Datos de demostración.",
       "undo": "Deshacer"
     },

@@ -1157,7 +1157,7 @@
         ]
       }
     },
-    "demoBanner": "데모 데이터로 불러온 가상의 소규모 회사 Acme Corp를 보고 계십니다. 아래 예시를 사용해 보거나,",
+    "demoBanner": "데모 데이터로 불러온 가상의 소규모 회사 Mobart Ben를 보고 계십니다. 아래 예시를 사용해 보거나,",
     "demoConnectYourOwn": "직접 소스를 연결하세요",
     "askMoreQuestionSets": [
       [
@@ -1396,38 +1396,28 @@
     "scrollAttachmentsRight": "첨부 파일 오른쪽으로 스크롤",
     "demoSuggestions": {
       "1": {
-        "text": "결제 서비스 아키텍처는 왜 변경되었고, 그 결정은 어떻게 이루어졌나요?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "내보내기 시간 초과를 보고한 고객은 누구이며, 무엇으로 해결되었나요?",
-        "icons": [
-          "jira",
-          "github"
-        ]
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
+        "icons": ["sheets"]
       },
       "3": {
-        "text": "공휴일 온콜 근무에 대한 우리 정책은 무엇인가요?",
-        "icons": [
-          "sheets"
-        ]
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
       },
       "4": {
-        "text": "빌링 워커의 PR #482는 누가 검토하고 승인했으며, 병합 전에 Dana는 무엇을 요청했나요?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "2026년 엔터프라이즈 가격 전략은 무엇인가요?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -4279,8 +4269,8 @@
       },
       "demoData": {
         "title": "데모 데이터",
-        "description": "Acme Corp는 EXODIA Brain를 체험해 볼 수 있도록 불러온 가상의 회사입니다. 보이는 내용만 바뀌며 삭제되는 것은 없습니다.",
-        "label": "내 답변, 검색, 레코드에 Acme Corp 데모 데이터 표시",
+        "description": "Mobart Ben는 EXODIA Brain를 체험해 볼 수 있도록 불러온 가상의 회사입니다. 보이는 내용만 바뀌며 삭제되는 것은 없습니다.",
+        "label": "내 답변, 검색, 레코드에 Mobart Ben 데모 데이터 표시",
         "followingDefault": "기본값을 따릅니다. 조직에 자체 데이터가 생길 때까지 표시되고 이후에는 숨겨집니다.",
         "yourChoice": "직접 선택한 설정입니다.",
         "useDefault": "기본값 사용",
@@ -5698,17 +5688,17 @@
   "demoData": {
     "badge": {
       "label": "데모",
-      "tooltip": "Acme Corp 데모의 샘플 데이터이며, 회사의 실제 레코드가 아닙니다"
+      "tooltip": "Mobart Ben 데모의 샘플 데이터이며, 회사의 실제 레코드가 아닙니다"
     },
     "removalNotice": {
-      "title": "Acme Corp 데모 데이터가 아직 워크스페이스에 있습니다",
+      "title": "Mobart Ben 데모 데이터가 아직 워크스페이스에 있습니다",
       "description": "이제 회사의 실제 데이터가 EXODIA Brain에 있습니다. 데모는 기본적으로 답변에서 숨겨지지만 누구나 다시 켤 수 있고 샘플 계정도 계속 로그인할 수 있습니다. 모두에 대해 끄거나 영구적으로 제거하세요.",
       "remove": "영구 제거",
       "keep": "일단 유지",
       "turnOff": "모두에 대해 끄기"
     },
     "removeDialog": {
-      "title": "Acme Corp 데모 데이터를 영구적으로 제거할까요?",
+      "title": "Mobart Ben 데모 데이터를 영구적으로 제거할까요?",
       "description": "Demo 커넥터와 그 모든 레코드, 그룹, 권한이 삭제됩니다. 아무것도 삭제하지 않고 숨기려면 대신 모두에 대해 끄세요. 나중에 커넥터 페이지에서 다시 추가할 수 있습니다.",
       "deleteAccounts": "샘플 계정도 삭제: {{names}}",
       "deleteAccountsHint": "초기 비밀번호로 만들어졌으므로 비밀번호를 아는 사람은 누구나 해당 계정으로 로그인할 수 있습니다.",
@@ -5724,7 +5714,7 @@
     "switch": {
       "errorTitle": "데모 데이터 설정을 변경하지 못했습니다",
       "errorDescription": "변경된 내용이 없습니다. 잠시 후 다시 시도하세요.",
-      "hiddenTitle": "Acme Corp 데모 데이터를 숨겼습니다",
+      "hiddenTitle": "Mobart Ben 데모 데이터를 숨겼습니다",
       "hiddenDescription": "답변, 검색, 레코드에서 제외되었습니다. 프로필 → 데모 데이터에서 언제든 다시 켤 수 있습니다.",
       "undo": "실행 취소"
     },
