@@ -103,7 +103,10 @@ def catalog() -> dict:
 
 
 def catalog_rates(provider: str, model: str) -> dict[str, str] | None:
-    info = catalog().get(model) or catalog().get(f"{provider.lower()}/{model}")
+    provider = provider.lower()
+    if provider == "gemini" and model.startswith("models/"):
+        model = model.removeprefix("models/")
+    info = catalog().get(f"{provider}/{model}") or catalog().get(model)
     if not isinstance(info, dict):
         return None
     if "input_cost_per_token" not in info:

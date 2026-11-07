@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
-from app.services.usage.ledger import UsageLedger, price_nanos
+from app.services.usage.ledger import UsageLedger, catalog_rates, price_nanos
 
 
 def event(**changes: object) -> dict:
@@ -35,6 +35,47 @@ def event(**changes: object) -> dict:
         "units": 1,
         **changes,
     }
+
+
+class TestCatalogPricing(unittest.TestCase):
+    @patch(
+        "app.services.usage.ledger.catalog",
+        return_value={
+            "gemini/gemini-embedding-2": {
+                "input_cost_per_token": 0.0000002,
+                "output_cost_per_token": 0,
+                "mode": "embedding",
+            }
+        },
+    )
+    def test_google_model_resource_name_resolves_catalog_price(
+        self, mock_catalog: object
+    ) -> None:
+        rates = catalog_rates("gemini", "models/gemini-embedding-2")
+        self.assertIsNotNone(rates)
+        self.assertEqual(rates["input"], "0.2000000")
+
+    @patch(
+        "app.services.usage.ledger.catalog",
+        return_value={
+            "gemini/gemini-embedding-2": {
+                "input_cost_per_token": 0.0000002,
+                "mode": "embedding",
+            },
+            "gemini-embedding-2": {
+                "input_cost_per_token": 0.0000009,
+                "mode": "embedding",
+            },
+        },
+    )
+    def test_uses_provider_price_and_does_not_guess_unknown_models(
+        self, mock_catalog: object
+    ) -> None:
+        self.assertEqual(
+            catalog_rates("gemini", "models/gemini-embedding-2")["input"], "0.2000000"
+        )
+        self.assertIsNone(catalog_rates("gemini", "models/not-a-real-model"))
+        self.assertIsNone(catalog_rates("other", "models/gemini-embedding-2"))
 
 
 class TestUsageLedger(unittest.TestCase):

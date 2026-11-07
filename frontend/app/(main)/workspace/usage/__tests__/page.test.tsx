@@ -1,10 +1,16 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import locale from "@/lib/i18n/locales/en-US.json";
 import UsagePage from "../page";
-import type { UsageReport } from "../api";
+import { usageApi, type UsageReport } from "../api";
 
 const fixture: { admin: boolean; report: UsageReport | null } = vi.hoisted(
   () => ({ admin: false, report: null }),
@@ -165,6 +171,45 @@ describe("usage dashboard", () => {
     expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
     expect(screen.getByRole("table", { name: "Usage over time" })).toBeTruthy();
     expect(screen.queryByText("View chart data")).toBeNull();
+  });
+  it("lets an administrator create an organization budget from the default view", async () => {
+    fixture.admin = true;
+    vi.mocked(usageApi.saveBudget).mockResolvedValue({} as never);
+    show();
+    fireEvent.keyDown(screen.getByRole("tab", { name: /^Budgets/ }), {
+      key: "Enter",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /set monthly budget/i }),
+    );
+    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(usageApi.saveBudget).toHaveBeenCalledWith({
+        scope: "organization",
+        subject: "",
+        amount_usd: "20",
+        warning_percent: 80,
+      }),
+    );
+  });
+  it("shows an error when saving a budget fails", async () => {
+    fixture.admin = true;
+    vi.mocked(usageApi.saveBudget).mockRejectedValueOnce(new Error("offline"));
+    show();
+    fireEvent.keyDown(screen.getByRole("tab", { name: /^Budgets/ }), {
+      key: "Enter",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /set monthly budget/i }),
+    );
+    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Could not save changes.")).toBeTruthy();
   });
   it("shows no-data charts when there was no activity", () => {
     fixture.report!.summary.requests = 0;
