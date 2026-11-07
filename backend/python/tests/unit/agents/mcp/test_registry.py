@@ -66,6 +66,26 @@ class TestMcpServerDecorator:
 
 
 class TestMCPRegistry:
+    def test_wispr_flow_is_discoverable_with_personal_oauth_defaults(self) -> None:
+        registry = MCPRegistry()
+        registry.auto_discover_templates()
+        template = registry.get_template("Wispr Flow")
+        assert template is not None
+        assert template in search_templates(registry.list_templates(), "transcripts")
+        wire = template.model_dump(by_alias=True)
+        assert wire["typeId"] == "wispr_flow"
+        assert wire["transport"] == MCPTransport.STREAMABLE_HTTP
+        assert wire["defaultUrl"] == "https://api.wisprflow.ai/connect/mcp"
+        assert wire["defaultAuthMode"] == MCPAuthMode.OAUTH
+        assert wire["supportedAuthModes"] == [MCPAuthMode.OAUTH]
+        assert wire["supportsDcr"] is True
+        assert wire["requireOauthClient"] is False
+        assert wire["urlEditable"] is False
+        assert wire["defaultScopes"] == ["openid", "offline_access"]
+        assert wire["authorizationUrl"] == "https://mcp-auth.wisprflow.com/oauth2/authorize"
+        assert wire["tokenUrl"] == "https://mcp-auth.wisprflow.com/oauth2/token"
+        assert wire["requiredEnv"] == []
+
     def test_auto_discover_templates_loads_builtin_servers(self) -> None:
         registry = MCPRegistry()
         registry.auto_discover_templates()
