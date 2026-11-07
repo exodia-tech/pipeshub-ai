@@ -28,7 +28,7 @@ from app.edition_config import (
     ensure_org_context,
     search_router,
 )
-from app.services.model_identity.principal import service_principal
+from app.services.model_identity.principal import warmup_principal
 from app.services.model_identity.runtime import call_scope
 from app.services.model_identity.workload import Workload
 from app.utils.log_redaction import log_safe_validation_errors
@@ -278,7 +278,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             try:
                 logger.info("🔥 Warming up embedding model in background")
                 async with call_scope(
-                    service_principal("warmup"),
+                    warmup_principal(orgs),
                     Workload.SYSTEM,
                     config_service=container.config_service(),
                     container=container,
@@ -337,9 +337,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         app.state.knn_warmup_task = spawn_detached(_warmup_knn_index())
 
-        app.state.entity_store_warmup_task = spawn_detached(
-            warm_up_entity_vector_store(app_container, logger)
-        )
+        async def _warmup_entity_store() -> None:
+            async with call_scope(
+                warmup_principal(orgs),
+                Workload.SYSTEM,
+                config_service=app_container.config_service(),
+                container=app_container,
+            ):
+                await warm_up_entity_vector_store(app_container, logger)
+
+        app.state.entity_store_warmup_task = spawn_detached(_warmup_entity_store())
 
         # Collections created before keyword scoring was fixed (Qdrant IDF,
         # OpenSearch stemming) are updated in place. A deployment that only

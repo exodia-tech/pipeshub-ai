@@ -136,6 +136,14 @@ class TestUsageLedger(unittest.TestCase):
         self.assertEqual(budget["state"], "warning")
         self.assertIsNone(self.report()["summary"]["reasoning_tokens"])
 
+    def test_missing_reasoning_breakdown_is_unknown_in_mixed_totals(self) -> None:
+        self.db.record(event(reasoning_tokens=None))
+        self.db.record(
+            event(id="embedding", kind="embedding", output_tokens=0, reasoning_tokens=0)
+        )
+        self.assertIsNone(self.report()["summary"]["reasoning_tokens"])
+        self.assertEqual(self.report()["summary"]["output_tokens"], 50)
+
     def test_concurrent_writers_share_persistent_ledger(self) -> None:
         with ThreadPoolExecutor(max_workers=8) as pool:
             list(pool.map(lambda i: self.db.record(event(id=f"worker-{i}")), range(40)))
