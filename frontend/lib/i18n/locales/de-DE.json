@@ -5802,6 +5802,7 @@
     "metric": "Diagrammkennzahl",
     "overTime": "Nutzung im Zeitverlauf",
     "chartData": "Diagrammdaten anzeigen",
+    "filters": "Filter",
     "topModels": "Meistgenutzte Modelle",
     "byWorkload": "Nutzung nach Aufgabe",
     "byMember": "Nutzung nach Mitglied",

@@ -5802,6 +5802,7 @@
     "metric": "Chart metric",
     "overTime": "Usage over time",
     "chartData": "View chart data",
+    "filters": "Filters",
     "topModels": "Most used models",
     "byWorkload": "Usage by workload",
     "byMember": "Usage by member",

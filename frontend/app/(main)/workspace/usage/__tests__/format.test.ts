@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { exclusiveEnd, metricValue, money, seriesSegments } from "../format";
+import {
+  chartMaximum,
+  exclusiveEnd,
+  metricValue,
+  money,
+  seriesSegments,
+} from "../format";
 import type { Totals } from "../api";
 
 describe("usage presentation", () => {
@@ -11,6 +17,7 @@ describe("usage presentation", () => {
     expect(money(null, "en-US")).toBe("—");
     expect(money(0, "en-US")).toBe("$0.00");
     expect(money(0.000469, "en-US")).toBe("$0.000469");
+    expect(money(0.000000001, "en-US")).toBe("$0.000000001");
   });
   it("does not add cache or reasoning tokens to the provider totals again", () => {
     const row: Totals = {
@@ -30,6 +37,7 @@ describe("usage presentation", () => {
     };
     expect(metricValue(row, "tokens")).toBe(150);
     expect(metricValue(row, "cost")).toBe(0.000469);
+    expect(chartMaximum([row], "cost")).toBe(0.000469);
   });
   it("keeps unpriced chart values unknown and leaves gaps in the timeline", () => {
     const row = {
@@ -39,6 +47,15 @@ describe("usage presentation", () => {
       cost_usd: 0,
     } as Totals;
     const unknown = { ...row, unpriced_requests: 1 };
+    const partial = {
+      ...row,
+      requests: 2,
+      unpriced_requests: 1,
+      cost_usd: 0.0003,
+    };
+    expect(metricValue(partial, "cost")).toBe(0.0003);
+    expect(chartMaximum([unknown, partial], "cost")).toBe(0.0003);
+    expect(chartMaximum([], "cost")).toBe(0);
     expect(metricValue(unknown, "cost")).toBeNull();
     expect(metricValue(row, "cost")).toBe(0);
     expect(seriesSegments([row, unknown, row], "cost")).toEqual([

@@ -5875,6 +5875,7 @@
     "metric": "Métrica del gráfico",
     "overTime": "Uso a lo largo del tiempo",
     "chartData": "Ver datos del gráfico",
+    "filters": "Filtros",
     "topModels": "Modelos más utilizados",
     "byWorkload": "Uso por actividad",
     "byMember": "Uso por miembro",

@@ -5768,6 +5768,7 @@
     "metric": "차트 지표",
     "overTime": "시간에 따른 사용량",
     "chartData": "차트 데이터 보기",
+    "filters": "필터",
     "topModels": "가장 많이 사용한 모델",
     "byWorkload": "작업별 사용량",
     "byMember": "구성원별 사용량",
