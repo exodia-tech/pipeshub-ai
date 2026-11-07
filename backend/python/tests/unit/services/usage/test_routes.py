@@ -70,6 +70,39 @@ class TestUsageRoutes(unittest.TestCase):
         self.assertEqual(response.json()["summary"]["requests"], 1)
         self.assertEqual(response.json()["events"][0]["user_id"], "user-a")
 
+    def test_observability_requires_admin_and_is_org_scoped(self) -> None:
+        self.assertEqual(
+            self.client.put(
+                "/api/v1/usage/observability", json={"enabled": True}
+            ).status_code,
+            403,
+        )
+        self.user["role"] = "admin"
+        self.assertEqual(
+            self.client.put(
+                "/api/v1/usage/observability", json={"enabled": "true"}
+            ).status_code,
+            422,
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/usage/observability").json(), {"enabled": False}
+        )
+        self.assertEqual(
+            self.client.put(
+                "/api/v1/usage/observability", json={"enabled": True}
+            ).json(),
+            {"enabled": True},
+        )
+        self.assertTrue(self.db.observability_enabled("org-a"))
+        self.assertFalse(self.db.observability_enabled("org-b"))
+        self.assertEqual(
+            self.client.put(
+                "/api/v1/usage/observability", json={"enabled": False}
+            ).status_code,
+            200,
+        )
+        self.assertFalse(self.db.observability_enabled("org-a"))
+
     def test_member_cannot_read_org_or_write_budget_or_price(self) -> None:
         self.assertEqual(self.get(view="organization").status_code, 403)
         self.assertEqual(self.client.get("/api/v1/usage/rates").status_code, 403)

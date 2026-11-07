@@ -24859,6 +24859,40 @@ paths:
         '403': { description: Insufficient scope or organization administrator required }
         '422': { description: Invalid filters, date range or pagination }
         '503': { description: Persistent tracking storage is not configured }
+  /usage/observability:
+    get:
+      tags: [Usage Analytics]
+      summary: Read the organization's observability export setting
+      description: Requires an organization administrator and config:read. Disabled by default; server-side collector configuration is also required.
+      responses:
+        '200':
+          description: Organization setting
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled]
+                properties:
+                  enabled: { type: boolean }
+        '403': { description: Administrator or config:read scope required }
+    put:
+      tags: [Usage Analytics]
+      summary: Enable or disable usage export for the organization
+      description: Requires an organization administrator and config:write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { description: Organization setting saved }
+        '403': { description: Administrator or config:write scope required }
+        '422': { description: Invalid setting }
   /usage/rates:
     get:
       tags: [Usage Analytics]

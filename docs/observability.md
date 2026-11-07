@@ -2,7 +2,7 @@
 
 EXODIA Brain can optionally send the usage ledger's model events to Langfuse or an OTLP/HTTP trace collector. This is disabled by default. It exports model, provider, token counts, recorded cost and timing; it does not export prompts, responses, documents, user identifiers or conversation traces. Each model event is an independent trace. Only calls already covered by the usage ledger are included, and events without a verified organization are excluded. This does not replace the ledger or the existing Opik integration.
 
-To enable it, first enable the usage ledger with `PIPESHUB_USAGE_DB` and provision its persistent storage. Set these variables on each Python service that records usage, then restart those services:
+To enable it, first enable the usage ledger with `PIPESHUB_USAGE_DB` and provision its persistent storage. An organization administrator must enable **Export usage to an observability provider** in Workspace → Labs. This is off by default and applies only to that organization. Set these variables on each Python service that records usage, then restart those services:
 
 | Variable | Value |
 | --- | --- |

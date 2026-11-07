@@ -33,12 +33,17 @@ _HEADER = re.compile(r"^[a-zA-Z0-9-]{1,80}$")
 
 
 class _Exporter(SpanExporter):
-    def __init__(self, endpoint: str, headers: dict[str, str]) -> None:
+    def __init__(self, endpoint: str, headers: dict[str, str], org: str) -> None:
         self.endpoint = endpoint
         self.headers = {**headers, "Content-Type": "application/x-protobuf"}
+        self.org = org
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         try:
+            from app.services.usage.ledger import UsageLedger
+
+            if not UsageLedger().observability_enabled(self.org):
+                return SpanExportResult.FAILURE
             response = httpx.post(
                 self.endpoint,
                 content=encode_spans(spans).SerializeToString(),
@@ -112,7 +117,7 @@ def _provider() -> tuple[TracerProvider, str] | None:
         )
         provider.add_span_processor(
             BatchSpanProcessor(
-                _Exporter(endpoint, headers),
+                _Exporter(endpoint, headers, org),
                 max_queue_size=512,
                 max_export_batch_size=64,
                 schedule_delay_millis=1000,
@@ -135,6 +140,10 @@ def export_usage(event: dict) -> None:
     try:
         configured = _provider()
         if not configured or event.get("org_id") != configured[1]:
+            return
+        from app.services.usage.ledger import UsageLedger
+
+        if not UsageLedger().observability_enabled(configured[1]):
             return
         provider, _ = configured
         kind = event.get("kind")

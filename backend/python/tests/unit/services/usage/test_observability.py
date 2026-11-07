@@ -14,7 +14,8 @@ from test_ledger import event
 from app.services.usage import observability
 
 
-def test_org_filter_and_metadata_only() -> None:
+@patch("app.services.usage.ledger.UsageLedger.observability_enabled", return_value=True)
+def test_org_filter_and_metadata_only(_enabled) -> None:
     memory = InMemorySpanExporter()
     provider = TracerProvider(shutdown_on_exit=False)
     provider.add_span_processor(SimpleSpanProcessor(memory))
@@ -36,7 +37,8 @@ def test_org_filter_and_metadata_only() -> None:
     provider.shutdown()
 
 
-def test_unknown_usage_and_unpriced_are_not_zeroes() -> None:
+@patch("app.services.usage.ledger.UsageLedger.observability_enabled", return_value=True)
+def test_unknown_usage_and_unpriced_are_not_zeroes(_enabled) -> None:
     memory = InMemorySpanExporter()
     provider = TracerProvider(shutdown_on_exit=False)
     provider.add_span_processor(SimpleSpanProcessor(memory))
@@ -75,14 +77,38 @@ def test_export_is_disabled_by_default(monkeypatch) -> None:
 
 
 def test_collector_failure_does_not_raise() -> None:
-    exporter = observability._Exporter("https://collector.invalid/v1/traces", {})
-    with patch(
-        "app.services.usage.observability.httpx.post", side_effect=OSError("secret")
+    exporter = observability._Exporter(
+        "https://collector.invalid/v1/traces", {}, "org-a"
+    )
+    with (
+        patch(
+            "app.services.usage.ledger.UsageLedger.observability_enabled",
+            return_value=True,
+        ),
+        patch(
+            "app.services.usage.observability.httpx.post", side_effect=OSError("secret")
+        ),
     ):
         assert exporter.export(()) == observability.SpanExportResult.FAILURE
 
 
-def test_otlp_http_export_to_local_collector(monkeypatch) -> None:
+def test_disabling_stops_queued_export() -> None:
+    exporter = observability._Exporter(
+        "https://collector.invalid/v1/traces", {}, "org-a"
+    )
+    with (
+        patch(
+            "app.services.usage.ledger.UsageLedger.observability_enabled",
+            return_value=False,
+        ),
+        patch("app.services.usage.observability.httpx.post") as send,
+    ):
+        assert exporter.export(()) == observability.SpanExportResult.FAILURE
+        send.assert_not_called()
+
+
+@patch("app.services.usage.ledger.UsageLedger.observability_enabled", return_value=True)
+def test_otlp_http_export_to_local_collector(_enabled, monkeypatch) -> None:
     received = []
 
     class Collector(BaseHTTPRequestHandler):
