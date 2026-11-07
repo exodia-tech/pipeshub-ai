@@ -16,6 +16,8 @@ FROM ${PYTHON_DEPS_IMAGE} AS python-deps
 # (it is built FROM build-base in Dockerfile.base), so native wheels can still
 # compile here when a new dependency needs it.
 WORKDIR /app/python
+# Slow CDN transfers must not fail the entire application build after 30 seconds.
+ENV PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=180000
 COPY backend/python/pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     uv pip install --system -e . && \
