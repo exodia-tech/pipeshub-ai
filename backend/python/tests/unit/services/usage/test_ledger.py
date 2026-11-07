@@ -125,6 +125,17 @@ class TestUsageLedger(unittest.TestCase):
             "exceeded",
         )
 
+    def test_unpriced_budget_warns_and_sub_nanodollar_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.db.set_budget("org-a", "organization", "", Decimal("0.0000000001"), 80)
+        self.db.set_budget("org-a", "organization", "", Decimal("100"), 80)
+        self.db.record(event(reasoning_tokens=None))
+        budget = self.db.budgets(
+            "org-a", now=datetime(2026, 11, 8, tzinfo=timezone.utc)
+        )[0]
+        self.assertEqual(budget["state"], "warning")
+        self.assertIsNone(self.report()["summary"]["reasoning_tokens"])
+
     def test_concurrent_writers_share_persistent_ledger(self) -> None:
         with ThreadPoolExecutor(max_workers=8) as pool:
             list(pool.map(lambda i: self.db.record(event(id=f"worker-{i}")), range(40)))

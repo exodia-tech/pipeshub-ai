@@ -84,7 +84,9 @@ def call_identity() -> tuple[ModelCallContext, str]:
     return current_call_context(), current_llm_purpose()
 
 
-def normalize_usage(raw: dict | None, *, normalized: bool = False) -> tuple[dict, str]:
+def normalize_usage(
+    raw: dict | None, *, normalized: bool = False, kind: str = "completion"
+) -> tuple[dict, str]:
     raw = raw if isinstance(raw, dict) else {}
 
     def count(value: object) -> int:
@@ -125,37 +127,49 @@ def normalize_usage(raw: dict | None, *, normalized: bool = False) -> tuple[dict
             raw.get("cache_creation_input_tokens", in_details.get("cache_creation")),
         )
     )
-    reasoning = count(
-        raw.get(
-            "reasoning_tokens",
-            out_details.get(
-                "reasoning",
-                out_details.get("reasoning_tokens", raw.get("thoughtsTokenCount")),
-            ),
-        )
+    reasoning_value = raw.get(
+        "reasoning_tokens",
+        out_details.get(
+            "reasoning",
+            out_details.get("reasoning_tokens", raw.get("thoughtsTokenCount")),
+        ),
     )
+    reasoning = (
+        count(reasoning_value)
+        if reasoning_value is not None
+        else 0
+        if kind in ("embedding", "image_embedding")
+        else None
+    )
+
     if not normalized and "cache_read_input_tokens" in raw:
         inp += (
             read + write
         )  # Anthropic's raw input excludes the cache; LangChain's normalized input includes it.
     if not normalized and "thoughtsTokenCount" in raw:
-        out += reasoning
-    inp, out = max(inp, read + write), max(out, reasoning)
-    base_counts = [
-        raw[key]
-        for key in (
-            "input_tokens",
-            "prompt_tokens",
-            "promptTokenCount",
-            "output_tokens",
-            "completion_tokens",
-            "candidatesTokenCount",
-        )
-        if key in raw
+        out += reasoning or 0
+    inp, out = max(inp, read + write), max(out, reasoning or 0)
+    input_values = [
+        raw[k]
+        for k in ("input_tokens", "prompt_tokens", "promptTokenCount")
+        if k in raw
     ]
-    known = bool(base_counts) and all(
-        type(value) is int and 0 <= value <= 100_000_000 for value in base_counts
+    output_values = [
+        raw[k]
+        for k in ("output_tokens", "completion_tokens", "candidatesTokenCount")
+        if k in raw
+    ]
+    needed = (
+        input_values
+        if kind in ("embedding", "image_embedding")
+        else input_values + output_values
     )
+    known = (
+        bool(input_values)
+        and (bool(output_values) or kind in ("embedding", "image_embedding"))
+        and all(type(v) is int and 0 <= v <= 100_000_000 for v in needed)
+    )
+
     return {
         "input_tokens": inp,
         "output_tokens": out,
@@ -186,7 +200,7 @@ def emit(
         with _health_lock:
             _health["missing_identity"] += 1
         return
-    counts, detected = normalize_usage(raw, normalized=normalized)
+    counts, detected = normalize_usage(raw, normalized=normalized, kind=kind)
     try:
         UsageLedger().record(
             {
@@ -225,8 +239,12 @@ def emit(
 
 
 async def emit_async(
-    provider: str, model: str, raw: dict | None, started: float, **metadata: Any
-) -> None:  # noqa: ANN401 - forwards accounting metadata to the sync writer
+    provider: str,
+    model: str,
+    raw: dict | None,
+    started: float,
+    **metadata: Any,  # noqa: ANN401 - forwards event metadata
+) -> None:
     if enabled():
         await asyncio.to_thread(emit, provider, model, raw, started, **metadata)
 
@@ -342,7 +360,7 @@ def _install_embedding_usage(model: object) -> None:
                     for key in ("input_tokens", "prompt_tokens", "promptTokenCount")
                 ):
                     usage = {**usage, "input_tokens": usage["total_tokens"]}
-                if normalize_usage(usage)[1] == "reported":
+                if normalize_usage(usage, kind="embedding")[1] == "reported":
                     target.append(usage)
         except (ValueError, AttributeError):
             return
@@ -395,10 +413,10 @@ def metered_embeddings(inner: Embeddings, provider: str, model: str) -> Embeddin
         ) -> None:
             if suppressed():
                 return
-            total, measurement = normalize_usage(None)
+            total, measurement = normalize_usage(None, kind="embedding")
             if readings:
                 for reading in readings:
-                    counts, _ = normalize_usage(reading)
+                    counts, _ = normalize_usage(reading, kind="embedding")
                     for key, value in counts.items():
                         total[key] += value
                 measurement = "reported"
@@ -531,9 +549,11 @@ def metered_image_embeddings(
                 return result
             finally:
                 _embedding_usage.reset(token)
-                counts, measurement = normalize_usage(None)
+                counts, measurement = normalize_usage(None, kind="image_embedding")
                 for reading in readings:
-                    usage, measurement = normalize_usage(reading)
+                    usage, measurement = normalize_usage(
+                        reading, kind="image_embedding"
+                    )
                     for key, value in usage.items():
                         counts[key] += value
                 await emit_async(

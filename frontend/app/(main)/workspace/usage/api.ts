@@ -6,7 +6,7 @@ export interface Totals {
   output_tokens: number;
   cache_read_tokens: number;
   cache_write_tokens: number;
-  reasoning_tokens: number;
+  reasoning_tokens: number | null;
   cost_usd: number;
   unpriced_requests: number;
   estimated_requests: number;
@@ -35,7 +35,7 @@ export interface UsageEvent {
   output_tokens: number;
   cache_read_tokens: number;
   cache_write_tokens: number;
-  reasoning_tokens: number;
+  reasoning_tokens: number | null;
   measurement: string;
   cost_usd: number | null;
   pricing_source: string;

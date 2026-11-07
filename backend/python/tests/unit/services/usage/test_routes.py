@@ -135,6 +135,20 @@ class TestUsageRoutes(unittest.TestCase):
             422,
         )
 
+    def test_budget_below_accounting_precision_is_rejected(self) -> None:
+        self.user["role"] = "admin"
+        self.assertEqual(
+            self.client.put(
+                "/api/v1/usage/budgets",
+                json={
+                    "scope": "organization",
+                    "subject": "",
+                    "amount_usd": "0.0000000001",
+                },
+            ).status_code,
+            422,
+        )
+
     def test_rate_reset_is_tenant_scoped_and_preserves_historical_costs(self) -> None:
         self.user["role"] = "admin"
         rate = {

@@ -91,6 +91,16 @@ class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(usage["input_tokens"], 17)
         self.assertEqual(normalize_usage(None)[1], "unknown")
 
+    def test_partial_completion_is_unknown_but_embedding_input_is_complete(
+        self,
+    ) -> None:
+        usage, measurement = normalize_usage({"input_tokens": 10})
+        self.assertEqual(measurement, "unknown")
+        self.assertIsNone(usage["reasoning_tokens"])
+        self.assertEqual(
+            normalize_usage({"input_tokens": 10}, kind="embedding")[1], "reported"
+        )
+
     async def test_shared_chat_callback_keeps_parallel_tenants_separate(self) -> None:
         model = GenericFakeChatModel(
             messages=iter(

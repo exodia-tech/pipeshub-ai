@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS usage_events (
  kind TEXT NOT NULL, purpose TEXT NOT NULL, status TEXT NOT NULL,
  input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
  cache_read_tokens INTEGER NOT NULL, cache_write_tokens INTEGER NOT NULL,
- reasoning_tokens INTEGER NOT NULL, measurement TEXT NOT NULL,
+ reasoning_tokens INTEGER, measurement TEXT NOT NULL,
  duration_ms INTEGER NOT NULL, units INTEGER NOT NULL,
  cost_nano_usd INTEGER, pricing_source TEXT NOT NULL, pricing_snapshot TEXT
 );
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS usage_rates (
 );
 CREATE TABLE IF NOT EXISTS usage_budgets (
  id TEXT PRIMARY KEY, org_id TEXT NOT NULL, scope TEXT NOT NULL,
- subject TEXT NOT NULL, amount_nano_usd INTEGER NOT NULL, warning_percent INTEGER NOT NULL,
+ subject TEXT NOT NULL, amount_nano_usd INTEGER NOT NULL CHECK(amount_nano_usd>0), warning_percent INTEGER NOT NULL,
  updated_at TEXT NOT NULL, UNIQUE(org_id,scope,subject)
 );
 """
@@ -193,6 +193,7 @@ class UsageLedger:
         if any(
             type(event.get(k)) is not int or not 0 <= event[k] <= 100_000_000
             for k in counts
+            if k != "reasoning_tokens" or event.get(k) is not None
         ):
             raise ValueError("Invalid token counts")
         if (
@@ -200,7 +201,7 @@ class UsageLedger:
             > event["input_tokens"]
         ):
             raise ValueError("Cache tokens are a subset of input tokens")
-        if event["reasoning_tokens"] > event["output_tokens"]:
+        if (event["reasoning_tokens"] or 0) > event["output_tokens"]:
             raise ValueError("Reasoning tokens are a subset of output tokens")
         e = {**event}
         e.setdefault("id", str(uuid.uuid4()))
@@ -250,7 +251,7 @@ class UsageLedger:
     def _totals() -> str:
         return """COUNT(*) AS requests, COALESCE(SUM(input_tokens),0) AS input_tokens,
         COALESCE(SUM(output_tokens),0) AS output_tokens, COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens,
-        COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens, COALESCE(SUM(reasoning_tokens),0) AS reasoning_tokens,
+        COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens, SUM(reasoning_tokens) AS reasoning_tokens,
         COALESCE(SUM(cost_nano_usd),0)/1000000000.0 AS cost_usd,
         COALESCE(SUM(cost_nano_usd IS NULL),0) AS unpriced_requests,
         COALESCE(SUM(measurement='estimated'),0) AS estimated_requests,
@@ -406,7 +407,7 @@ class UsageLedger:
             raise ValueError("A budget requires a valid scope and subject")
         if (
             not amount.is_finite()
-            or not 0 < amount <= 1_000_000_000
+            or not Decimal("0.000000001") <= amount <= 1_000_000_000
             or not 1 <= warning <= 100
         ):
             raise ValueError("Invalid budget")
@@ -468,6 +469,7 @@ class UsageLedger:
                         if percent >= 100
                         else "warning"
                         if percent >= r["warning_percent"]
+                        or totals["unpriced_requests"] > 0
                         else "within_budget",
                         "enforced": False,
                     }

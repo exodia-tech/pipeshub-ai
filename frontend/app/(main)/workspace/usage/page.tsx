@@ -22,7 +22,13 @@ import { useUserStore, selectIsAdmin } from "@/lib/store/user-store";
 import { onSessionEnd } from "@/lib/api/session-cache";
 import { ConnectorsApi } from "../connectors/api";
 import { usageApi, type Breakdown, type Rate } from "./api";
-import { exclusiveEnd, metricValue, money, type UsageMetric } from "./format";
+import {
+  exclusiveEnd,
+  metricValue,
+  money,
+  seriesSegments,
+  type UsageMetric,
+} from "./format";
 
 const FIELDS = [
   "provider",
@@ -137,11 +143,13 @@ export default function UsagePage() {
   const connectorLabel = (id: string) =>
     connectorNames?.connectors.find((connector) => connector._key === id)
       ?.name ?? id;
-  const number = (v: number) =>
-    new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(
-      v,
-    );
-  const display = (v: number) =>
+  const number = (v: number | null) =>
+    v === null
+      ? "—"
+      : new Intl.NumberFormat(i18n.language, {
+          maximumFractionDigits: 1,
+        }).format(v);
+  const display = (v: number | null) =>
     metric === "cost" ? money(v, i18n.language) : number(v);
   const updateFilter = (field: string, value: string) => {
     setFilters((previous) => ({
@@ -181,7 +189,10 @@ export default function UsagePage() {
   };
   const bars = (items: Breakdown[], title: string) => {
     const top = [...items]
-      .sort((a, b) => metricValue(b, metric) - metricValue(a, metric))
+      .sort(
+        (a, b) =>
+          (metricValue(b, metric) ?? -1) - (metricValue(a, metric) ?? -1),
+      )
       .slice(0, 8)
       .map((row) => ({
         ...row,
@@ -194,7 +205,7 @@ export default function UsagePage() {
               )
             : row.label,
       }));
-    const max = Math.max(1, ...top.map((row) => metricValue(row, metric)));
+    const max = Math.max(1, ...top.map((row) => metricValue(row, metric) ?? 0));
     return (
       <Card>
         <Heading size="3" mb="4">
@@ -223,7 +234,7 @@ export default function UsagePage() {
                 <Box
                   style={{
                     height: "100%",
-                    width: `${(Math.max(0, metricValue(row, metric)) / max) * 100}%`,
+                    width: `${(Math.max(0, metricValue(row, metric) ?? 0) / max) * 100}%`,
                     background: "var(--accent-9)",
                     borderRadius: "inherit",
                   }}
@@ -238,14 +249,11 @@ export default function UsagePage() {
   const timeline = data?.timeline ?? [];
   const maxTimeline = Math.max(
     1,
-    ...timeline.map((row) => metricValue(row, metric)),
+    ...timeline.map((row) => metricValue(row, metric) ?? 0),
   );
-  const points = timeline
-    .map(
-      (row, index) =>
-        `${40 + (index / Math.max(1, timeline.length - 1)) * 700},${170 - (metricValue(row, metric) / maxTimeline) * 140}`,
-    )
-    .join(" ");
+  const segments = seriesSegments(timeline, metric);
+  const point = (index: number, value: number) =>
+    `${40 + (index / Math.max(1, timeline.length - 1)) * 700},${170 - (value / maxTimeline) * 140}`;
 
   return (
     <Box
@@ -530,22 +538,27 @@ export default function UsagePage() {
                   <text x="40" y="20" fill="var(--gray-11)" fontSize="12">
                     {display(maxTimeline)}
                   </text>
-                  <polyline
-                    points={points}
-                    fill="none"
-                    stroke="var(--accent-9)"
-                    strokeWidth="3"
-                  />
-                  {timeline.map((row, i) => (
+                  {segments.map((segment, i) => (
+                    <polyline
+                      key={i}
+                      points={segment
+                        .map(({ index, value }) => point(index, value))
+                        .join(" ")}
+                      fill="none"
+                      stroke="var(--accent-9)"
+                      strokeWidth="3"
+                    />
+                  ))}
+                  {segments.flat().map(({ index, value }) => (
                     <circle
-                      key={row.label}
-                      cx={40 + (i / Math.max(1, timeline.length - 1)) * 700}
-                      cy={170 - (metricValue(row, metric) / maxTimeline) * 140}
+                      key={timeline[index].label}
+                      cx={40 + (index / Math.max(1, timeline.length - 1)) * 700}
+                      cy={170 - (value / maxTimeline) * 140}
                       r="4"
                       fill="var(--accent-9)"
                     >
                       <title>
-                        {row.label}: {display(metricValue(row, metric))}
+                        {timeline[index].label}: {display(value)}
                       </title>
                     </circle>
                   ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exclusiveEnd, metricValue, money } from "../format";
+import { exclusiveEnd, metricValue, money, seriesSegments } from "../format";
 import type { Totals } from "../api";
 
 describe("usage presentation", () => {
@@ -30,5 +30,20 @@ describe("usage presentation", () => {
     };
     expect(metricValue(row, "tokens")).toBe(150);
     expect(metricValue(row, "cost")).toBe(0.000469);
+  });
+  it("keeps unpriced chart values unknown and leaves gaps in the timeline", () => {
+    const row = {
+      requests: 1,
+      unpriced_requests: 0,
+      unknown_requests: 0,
+      cost_usd: 0,
+    } as Totals;
+    const unknown = { ...row, unpriced_requests: 1 };
+    expect(metricValue(unknown, "cost")).toBeNull();
+    expect(metricValue(row, "cost")).toBe(0);
+    expect(seriesSegments([row, unknown, row], "cost")).toEqual([
+      [{ index: 0, value: 0 }],
+      [{ index: 2, value: 0 }],
+    ]);
   });
 });

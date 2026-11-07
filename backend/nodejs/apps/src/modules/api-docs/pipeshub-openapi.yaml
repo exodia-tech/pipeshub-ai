@@ -813,7 +813,7 @@ components:
         output_tokens: { type: integer }
         cache_read_tokens: { type: integer }
         cache_write_tokens: { type: integer }
-        reasoning_tokens: { type: integer }
+        reasoning_tokens: { type: integer, nullable: true }
         cost_usd: { type: number }
         unpriced_requests: { type: integer }
         estimated_requests: { type: integer }
@@ -849,7 +849,7 @@ components:
         output_tokens: { type: integer }
         cache_read_tokens: { type: integer }
         cache_write_tokens: { type: integer }
-        reasoning_tokens: { type: integer }
+        reasoning_tokens: { type: integer, nullable: true }
         measurement: { type: string, enum: [reported, estimated, unknown] }
         duration_ms: { type: integer }
         units: { type: integer }
@@ -907,7 +907,7 @@ components:
       properties:
         scope: { type: string, enum: [organization, user_id, connector_id, model] }
         subject: { type: string, maxLength: 200, description: Required except for organization scope. Model scope includes all providers with this model ID. }
-        amount_usd: { type: number, minimum: 0, exclusiveMinimum: true, maximum: 1000000000 }
+        amount_usd: { type: number, minimum: 0.000000001, maximum: 1000000000 }
         warning_percent: { type: integer, minimum: 1, maximum: 100, default: 80 }
     UsageBudget:
       allOf:

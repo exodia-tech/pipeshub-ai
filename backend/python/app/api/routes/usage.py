@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal  # noqa: TC003 - FastAPI resolves request model annotations at runtime
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -173,7 +173,9 @@ class BudgetUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     scope: Literal["organization", "user_id", "connector_id", "model"]
     subject: str = Field("", max_length=200)
-    amount_usd: Decimal = Field(gt=0, le=1_000_000_000, allow_inf_nan=False)
+    amount_usd: Decimal = Field(
+        ge=Decimal("0.000000001"), le=1_000_000_000, allow_inf_nan=False
+    )
     warning_percent: int = Field(80, ge=1, le=100)
 
 

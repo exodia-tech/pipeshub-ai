@@ -1,12 +1,30 @@
 import type { Totals } from "./api";
 
 export type UsageMetric = "tokens" | "cost" | "requests";
-export const metricValue = (row: Totals, metric: UsageMetric): number =>
-  metric === "cost"
-    ? row.cost_usd
-    : metric === "requests"
-      ? row.requests
-      : row.input_tokens + row.output_tokens;
+export function metricValue(row: Totals, metric: UsageMetric): number | null {
+  if (metric === "cost")
+    return row.requests > 0 && row.unpriced_requests === row.requests
+      ? null
+      : row.cost_usd;
+  if (metric === "requests") return row.requests;
+  return row.requests > 0 && row.unknown_requests === row.requests
+    ? null
+    : row.input_tokens + row.output_tokens;
+}
+
+export function seriesSegments(rows: Totals[], metric: UsageMetric) {
+  const segments: { index: number; value: number }[][] = [];
+  let current: { index: number; value: number }[] = [];
+  rows.forEach((row, index) => {
+    const value = metricValue(row, metric);
+    if (value === null) current = [];
+    else {
+      if (!current.length) segments.push(current);
+      current.push({ index, value });
+    }
+  });
+  return segments;
+}
 
 export function exclusiveEnd(date: string): string {
   const timestamp = Date.parse(`${date}T00:00:00Z`);
