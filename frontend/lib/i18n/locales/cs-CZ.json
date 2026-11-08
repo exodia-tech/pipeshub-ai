@@ -1212,7 +1212,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5993,5 +5995,33 @@
     "averageLatency": "Průměrná latence",
     "noConnector": "Bez konektoru",
     "useCatalog": "Použít ceník"
+  },
+  "agentSchedule": {
+    "title": "Plán agenta",
+    "description": "Pouze veřejný průzkum. Každý přehled je označen jako koncept.",
+    "loading": "Načítání…",
+    "enabled": "Spouštět automaticky",
+    "days": "Dny",
+    "time": "Čas",
+    "timezone": "Časové pásmo",
+    "prompt": "Pokyny pro přehled",
+    "next": "Další spuštění",
+    "slackEnabled": "Doručování do Slacku je zapnuté.",
+    "brainOnly": "Koncepty se ukládají do Brain.",
+    "runs": "Nedávná spuštění",
+    "empty": "Zatím žádná spuštění.",
+    "open": "Otevřít koncept",
+    "close": "Zavřít",
+    "working": "Probíhá…",
+    "run": "Spustit nyní",
+    "save": "Uložit",
+    "failed": "Plán se nepodařilo aktualizovat.",
+    "invalid": "Vyberte dny, čas a pokyny.",
+    "status": {
+      "running": "Probíhá",
+      "draft": "Koncept připraven",
+      "needs_review": "Ke kontrole",
+      "needs_reconciliation": "Zkontrolovat přerušené spuštění"
+    }
   }
 }

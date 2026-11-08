@@ -1401,7 +1401,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5813,5 +5815,33 @@
     "averageLatency": "평균 지연 시간",
     "noConnector": "커넥터 없음",
     "useCatalog": "카탈로그 사용"
+  },
+  "agentSchedule": {
+    "title": "에이전트 일정",
+    "description": "공개 정보만 조사합니다. 모든 브리핑은 초안으로 표시됩니다.",
+    "loading": "불러오는 중…",
+    "enabled": "자동 실행",
+    "days": "요일",
+    "time": "시간",
+    "timezone": "시간대",
+    "prompt": "브리핑 지침",
+    "next": "다음 실행",
+    "slackEnabled": "Slack 전송이 활성화되었습니다.",
+    "brainOnly": "초안은 Brain에 저장됩니다.",
+    "runs": "최근 실행",
+    "empty": "아직 실행 기록이 없습니다.",
+    "open": "초안 열기",
+    "close": "닫기",
+    "working": "처리 중…",
+    "run": "지금 실행",
+    "save": "저장",
+    "failed": "일정을 업데이트하지 못했습니다.",
+    "invalid": "요일, 시간, 브리핑 지침을 입력하세요.",
+    "status": {
+      "running": "실행 중",
+      "draft": "초안 준비됨",
+      "needs_review": "초안 검토",
+      "needs_reconciliation": "중단된 실행 확인"
+    }
   }
 }

@@ -1401,7 +1401,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5813,5 +5815,33 @@
     "averageLatency": "平均延迟",
     "noConnector": "无连接器",
     "useCatalog": "使用目录价格"
+  },
+  "agentSchedule": {
+    "title": "智能体计划",
+    "description": "仅研究公开信息。每份简报都会标记为草稿。",
+    "loading": "加载中…",
+    "enabled": "自动运行",
+    "days": "日期",
+    "time": "时间",
+    "timezone": "时区",
+    "prompt": "简报指令",
+    "next": "下次运行",
+    "slackEnabled": "已启用 Slack 发送。",
+    "brainOnly": "草稿保存在 Brain 中。",
+    "runs": "最近运行",
+    "empty": "暂无运行记录。",
+    "open": "打开草稿",
+    "close": "关闭",
+    "working": "处理中…",
+    "run": "立即运行",
+    "save": "保存",
+    "failed": "无法更新计划。",
+    "invalid": "请选择日期、时间并填写简报指令。",
+    "status": {
+      "running": "运行中",
+      "draft": "草稿已就绪",
+      "needs_review": "审核草稿",
+      "needs_reconciliation": "检查中断的运行"
+    }
   }
 }

@@ -7,6 +7,7 @@ import { DemoSuggestions, MessageList, ChatInputWrapper, SearchResultsView } fro
 import { useDemoDataActive, useDemoDataStatus } from '@/app/(main)/workspace/connectors/demo-data/use-demo-data';
 import { DemoDataRemovalNotice } from '@/app/(main)/workspace/connectors/demo-data/components';
 import { AgentChatHeader } from '@/config';
+import { AgentPortrait, isAgentPortrait } from '@/app/(main)/agents/agent-portrait';
 import { getAgentSidebarRowMenuAccess } from './sidebar/agent-sidebar-row-access';
 import { ConversationHeaderOverlay } from '@/config';
 import { useChatStore, ctxKeyFromAgent } from '@/chat/store';
@@ -1244,6 +1245,7 @@ function ChatContent() {
         <AgentChatHeader
           agentId={historyAndShareAgentId}
           displayName={agentContextDisplayName}
+          avatarUrl={agentDetail?.agent?.avatarUrl}
           isMobile={isMobile}
           hasExpandButton={!isMobile && isNavCollapsed}
           readOnly={activeSlotIsOwner === false}
@@ -1375,7 +1377,9 @@ function ChatContent() {
                 ) : (
                   <>
                     <Box style={{ marginBottom: 'var(--space-4)' }}>
-                      <ChatCompanion size={isMobile ? 72 : 88} interactive followChat />
+                      {isAgentPortrait(agentDetail?.agent?.avatarUrl)
+                        ? <AgentPortrait src={agentDetail.agent.avatarUrl} name={agentDetail.agent.name} size={isMobile ? 88 : 112} />
+                        : <ChatCompanion size={isMobile ? 72 : 88} interactive followChat />}
                     </Box>
                     <Box
                       style={{
@@ -1389,10 +1393,10 @@ function ChatContent() {
                         weight="medium"
                         style={{ color: 'var(--slate-12)', display: 'block', marginBottom: 'var(--space-1)' }}
                       >
-                        <WelcomeGreeting name={greetingName} />
+                        {isAgentPortrait(agentDetail?.agent?.avatarUrl) ? agentDetail.agent.name : <WelcomeGreeting name={greetingName} />}
                       </Text>
                       <Text size="4" weight="medium" style={{ color: 'var(--slate-12)' }}>
-                        {t('chat.greeting')}
+                        {isAgentPortrait(agentDetail?.agent?.avatarUrl) ? agentDetail.agent.startMessage : t('chat.greeting')}
                       </Text>
                     </Box>
                   </>

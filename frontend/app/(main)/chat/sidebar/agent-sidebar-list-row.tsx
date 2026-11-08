@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { AgentPortrait, isAgentPortrait } from '@/app/(main)/agents/agent-portrait';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { AgentsApi } from '@/app/(main)/agents/api';
@@ -81,7 +82,7 @@ export function AgentSidebarListRow({
   return (
     <>
       <SidebarItem
-        icon={icon}
+        icon={isAgentPortrait(agent.avatarUrl) ? <AgentPortrait src={agent.avatarUrl} name={label} size={24} /> : icon}
         label={label}
         isActive={isActive}
         href={href}

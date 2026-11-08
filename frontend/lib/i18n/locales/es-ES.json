@@ -1331,7 +1331,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5920,5 +5922,33 @@
     "averageLatency": "Latencia media",
     "noConnector": "Sin conector",
     "useCatalog": "Usar catálogo"
+  },
+  "agentSchedule": {
+    "title": "Programación del agente",
+    "description": "Solo investigación pública. Cada informe se marca como borrador.",
+    "loading": "Cargando…",
+    "enabled": "Ejecutar automáticamente",
+    "days": "Días",
+    "time": "Hora",
+    "timezone": "Zona horaria",
+    "prompt": "Instrucciones del informe",
+    "next": "Próxima ejecución",
+    "slackEnabled": "El envío a Slack está activado.",
+    "brainOnly": "Los borradores se guardan en Brain.",
+    "runs": "Ejecuciones recientes",
+    "empty": "Todavía no hay ejecuciones.",
+    "open": "Abrir borrador",
+    "close": "Cerrar",
+    "working": "Procesando…",
+    "run": "Ejecutar ahora",
+    "save": "Guardar",
+    "failed": "No se pudo actualizar la programación.",
+    "invalid": "Elige días, una hora e instrucciones.",
+    "status": {
+      "running": "En ejecución",
+      "draft": "Borrador listo",
+      "needs_review": "Revisar borrador",
+      "needs_reconciliation": "Revisar ejecución interrumpida"
+    }
   }
 }

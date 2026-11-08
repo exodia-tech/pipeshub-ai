@@ -1385,7 +1385,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5847,5 +5849,33 @@
     "averageLatency": "Durchschnittliche Latenz",
     "noConnector": "Kein Konnektor",
     "useCatalog": "Katalog verwenden"
+  },
+  "agentSchedule": {
+    "title": "Agentenzeitplan",
+    "description": "Nur öffentliche Recherche. Jeder Bericht wird als Entwurf markiert.",
+    "loading": "Wird geladen…",
+    "enabled": "Automatisch ausführen",
+    "days": "Tage",
+    "time": "Uhrzeit",
+    "timezone": "Zeitzone",
+    "prompt": "Anweisungen für den Bericht",
+    "next": "Nächste Ausführung",
+    "slackEnabled": "Slack-Zustellung ist aktiviert.",
+    "brainOnly": "Entwürfe werden in Brain gespeichert.",
+    "runs": "Letzte Ausführungen",
+    "empty": "Noch keine Ausführungen.",
+    "open": "Entwurf öffnen",
+    "close": "Schließen",
+    "working": "Wird ausgeführt…",
+    "run": "Jetzt ausführen",
+    "save": "Speichern",
+    "failed": "Der Zeitplan konnte nicht aktualisiert werden.",
+    "invalid": "Tage, Uhrzeit und Anweisungen auswählen.",
+    "status": {
+      "running": "Läuft",
+      "draft": "Entwurf bereit",
+      "needs_review": "Entwurf prüfen",
+      "needs_reconciliation": "Unterbrochene Ausführung prüfen"
+    }
   }
 }

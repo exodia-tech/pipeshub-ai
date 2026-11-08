@@ -1188,7 +1188,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5920,5 +5922,33 @@
     "averageLatency": "Latenza media",
     "noConnector": "Nessun connettore",
     "useCatalog": "Usa catalogo"
+  },
+  "agentSchedule": {
+    "title": "Programmazione agente",
+    "description": "Solo ricerca pubblica. Ogni riepilogo è contrassegnato come bozza.",
+    "loading": "Caricamento…",
+    "enabled": "Esegui automaticamente",
+    "days": "Giorni",
+    "time": "Ora",
+    "timezone": "Fuso orario",
+    "prompt": "Istruzioni per il riepilogo",
+    "next": "Prossima esecuzione",
+    "slackEnabled": "Invio su Slack attivo.",
+    "brainOnly": "Le bozze vengono salvate in Brain.",
+    "runs": "Esecuzioni recenti",
+    "empty": "Nessuna esecuzione.",
+    "open": "Apri bozza",
+    "close": "Chiudi",
+    "working": "In corso…",
+    "run": "Esegui ora",
+    "save": "Salva",
+    "failed": "Impossibile aggiornare la programmazione.",
+    "invalid": "Scegli i giorni, un orario e le istruzioni.",
+    "status": {
+      "running": "In esecuzione",
+      "draft": "Bozza pronta",
+      "needs_review": "Da rivedere",
+      "needs_reconciliation": "Verifica esecuzione interrotta"
+    }
   }
 }

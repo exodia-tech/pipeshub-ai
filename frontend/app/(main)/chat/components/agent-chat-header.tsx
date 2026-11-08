@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { AgentPortrait } from '@/app/(main)/agents/agent-portrait';
+import { AgentScheduleDialog } from '@/app/(main)/agents/agent-schedule-dialog';
 import { useRouter } from 'next/navigation';
 import { Box, DropdownMenu, Flex, Text, Tooltip } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +12,7 @@ import { useMobileSidebarStore } from '@/lib/store/mobile-sidebar-store';
 import { openFreshAgentChat } from '@/chat/build-chat-url';
 
 interface AgentChatHeaderProps {
+  avatarUrl?: string | null;
   agentId: string;
   displayName: string | null;
   isMobile: boolean;
@@ -30,6 +33,7 @@ const MOBILE_SHARE_GROUP_PX = 200;
  * Top-left chat title for agent threads — name + chevron menu (ChatGPT-style).
  */
 export function AgentChatHeader({
+  avatarUrl,
   agentId,
   displayName,
   isMobile,
@@ -39,6 +43,7 @@ export function AgentChatHeader({
   readOnly,
 }: AgentChatHeaderProps) {
   const router = useRouter();
+  const [scheduleOpen, setScheduleOpen] = React.useState(false);
   const { t } = useTranslation();
   const toggleAgentsSidebar = useChatStore((s) => s.toggleAgentsSidebar);
   const closeAgentsSidebar = useChatStore((s) => s.closeAgentsSidebar);
@@ -80,6 +85,7 @@ export function AgentChatHeader({
   };
 
   return (
+    <>
     <Box
       style={{
         position: 'absolute',
@@ -116,6 +122,7 @@ export function AgentChatHeader({
             }}
             aria-label={t('chat.agentHeaderMenuAria')}
           >
+            <AgentPortrait src={avatarUrl} name={title} size={28} />
             <span
               style={{
                 fontSize: 15,
@@ -151,6 +158,11 @@ export function AgentChatHeader({
           </DropdownMenu.Item>
           {(canEdit || showViewAgent) && <DropdownMenu.Separator />}
           {canEdit && (
+            <DropdownMenu.Item onSelect={() => setScheduleOpen(true)}>
+              {t('agentSchedule.title')}
+            </DropdownMenu.Item>
+          )}
+          {canEdit && (
             <DropdownMenu.Item onSelect={handleOpenBuilder}>
               <Flex align="center" gap="2">
                 <MaterialIcon name="edit" size={16} color="var(--slate-11)" />
@@ -172,5 +184,7 @@ export function AgentChatHeader({
       </DropdownMenu.Root>
       )}
     </Box>
+    {scheduleOpen && <AgentScheduleDialog agentId={agentId} open onOpenChange={setScheduleOpen} />}
+    </>
   );
 }

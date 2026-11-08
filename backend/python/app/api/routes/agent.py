@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from app.agents.avatar import parse_avatar_url
 from app.agents.agent_loop.cancellation.registry import RunOwner
 from app.agents.agent_loop.cancellation.validation import validate_run_id
 from app.agents.agent_loop.error_classification import classify_exception
@@ -2828,6 +2829,7 @@ async def create_agent(request: Request) -> JSONResponse:
             "isServiceAccount": is_service_account,
             "serviceAccountUserId": service_account_binding,
             "sendUserContext": bool(body.get("sendUserContext", True)),
+            "avatarUrl": parse_avatar_url(body.get("avatarUrl")),
             "createdBy": user_key,
             "updatedBy": None,
             "createdAtTimestamp": time,
@@ -3437,6 +3439,8 @@ async def update_agent(request: Request, agent_id: str) -> JSONResponse:
                     "When models are specified, at least one reasoning model is required."
                 )
 
+        if "avatarUrl" in body:
+            body["avatarUrl"] = parse_avatar_url(body["avatarUrl"])
         if "defaultReasoningEffort" in body:
             body["defaultReasoningEffort"] = _parse_default_reasoning_effort(
                 body.get("defaultReasoningEffort")

@@ -985,6 +985,7 @@ const agentModelsOptionalSchema = z
   });
 
 const createAgentBodySchema = z.object({
+  avatarUrl: z.string().max(200).regex(/^\/assets\/agents\/[a-z0-9][a-z0-9._-]*\.(?:png|webp|jpg)$/).nullable().optional(),
   name: z
     .string(messageWhenMissing('Name is required'))
     .trim()

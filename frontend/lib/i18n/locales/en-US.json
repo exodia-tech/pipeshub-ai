@@ -1166,7 +1166,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5847,5 +5849,33 @@
     "averageLatency": "Average latency",
     "noConnector": "No connector",
     "useCatalog": "Use catalog"
+  },
+  "agentSchedule": {
+    "title": "Agent schedule",
+    "description": "Public research only. Every briefing is marked as a draft.",
+    "loading": "Loading…",
+    "enabled": "Run automatically",
+    "days": "Days",
+    "time": "Time",
+    "timezone": "Time zone",
+    "prompt": "Briefing instructions",
+    "next": "Next run",
+    "slackEnabled": "Slack delivery is enabled.",
+    "brainOnly": "Drafts are saved in Brain.",
+    "runs": "Recent runs",
+    "empty": "No runs yet.",
+    "open": "Open draft",
+    "close": "Close",
+    "working": "Working…",
+    "run": "Run now",
+    "save": "Save",
+    "failed": "Could not update the schedule.",
+    "invalid": "Choose days, a time and briefing instructions.",
+    "status": {
+      "running": "Running",
+      "draft": "Draft ready",
+      "needs_review": "Review draft",
+      "needs_reconciliation": "Check interrupted run"
+    }
   }
 }

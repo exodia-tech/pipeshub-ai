@@ -804,6 +804,69 @@ components:
             mcp:write: Add, configure and authenticate MCP servers
             mcp:delete: Remove MCP servers and their credentials
   schemas:
+    AgentScheduleInput:
+      type: object
+      additionalProperties: false
+      required: [enabled, days, hour, minute, timezone, prompt]
+      properties:
+        enabled: { type: boolean }
+        days:
+          type: array
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items: { type: integer, minimum: 0, maximum: 6 }
+          description: Weekdays; Sunday is 0. Uses the named IANA timezone.
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minute: { type: integer, minimum: 0, maximum: 59 }
+        timezone: { type: string, minLength: 1, maxLength: 100, example: Europe/Rome }
+        prompt: { type: string, minLength: 1, maxLength: 8000 }
+        revision: { type: integer, minimum: 0 }
+        slackBotId: { type: string, format: uuid, nullable: true }
+        slackChannelId:
+          type: string
+          nullable: true
+          pattern: '^[CG][A-Z0-9]{8,20}$'
+          description: Approved channel. Delivery requires a current admin and a bot bound to this agent.
+    AgentSchedule:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        days: { type: array, items: { type: integer } }
+        hour: { type: integer }
+        minute: { type: integer }
+        timezone: { type: string }
+        prompt: { type: string }
+        revision: { type: integer }
+        slackBotId: { type: string, nullable: true }
+        slackChannelId: { type: string, nullable: true }
+        orgId: { type: string }
+        userId: { type: string }
+        agentId: { type: string, format: uuid }
+        nextRunAt: { type: number, nullable: true, description: Unix milliseconds; null when paused. }
+        lastSuccessfulEnd: { type: number }
+        coveredLinks: { type: array, maxItems: 100, items: { type: string } }
+        runs:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              status: { type: string, enum: [running, draft, needs_review, needs_reconciliation] }
+              startedAt: { type: number }
+              finishedAt: { type: number }
+              periodStart: { type: number }
+              periodEnd: { type: number }
+              conversationId: { type: string }
+              slackTs: { type: string }
+    AgentScheduleResponse:
+      type: object
+      properties:
+        schedule:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/AgentSchedule'
     UsageTotals:
       type: object
       description: Token subsets are not added twice. Spend excludes unpriced calls and is an estimate, not an invoice.
@@ -14217,6 +14280,12 @@ components:
         forwarded by the Node gateway. It is not the full detail projection
         used by `GET /agents/{agentKey}`.
       properties:
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 200
+          pattern: '^/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)$'
+          description: Deployment-owned portrait asset. External and data URLs are refused.
         _id:
           type: string
           description: Full document id in the backing graph store.
@@ -14665,6 +14734,12 @@ components:
       required:
         - name
       properties:
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 200
+          pattern: '^/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)$'
+          description: Deployment-owned portrait asset. External and data URLs are refused.
         name:
           type: string
           minLength: 1
@@ -15040,6 +15115,12 @@ components:
         Fields the gateway validator does not know are dropped before the
         request reaches the AI backend; they are not refused.
       properties:
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 200
+          pattern: '^/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)$'
+          description: Deployment-owned portrait asset. External and data URLs are refused.
         name:
           type: string
           minLength: 1
@@ -24825,6 +24906,70 @@ security:
   - bearerAuth: []
   - oauth2: []
 paths:
+  /agents/{agentKey}/schedule:
+    parameters:
+      - in: path
+        name: agentKey
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Agents]
+      summary: Read the creator's native agent schedule and recent runs
+      description: Requires agent:read and agent ownership. Returns null before a schedule is saved.
+      responses:
+        '200':
+          description: Owner-scoped schedule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
+        '403': { description: Caller is not the agent creator or lacks scope. }
+    put:
+      tags: [Agents]
+      summary: Save or pause a native public-research schedule
+      description: |
+        Requires agent:read, agent:write and agent:execute and agent ownership. Runs have
+        no company knowledge, action tools, service-account delegation or personal
+        user-context injection. Every run revalidates the active owner and agent.
+        Slack delivery additionally requires current organization-admin permission
+        and a stored Slack bot mapped to this agent. No secrets are accepted here.
+        Revision prevents lost updates. Interrupted/uncertain runs pause the schedule
+        for reconciliation; they are not automatically repeated. Missed ticks are
+        coalesced into one run, whose reporting window covers the gap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AgentScheduleInput' }
+      responses:
+        '200':
+          description: Saved schedule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
+        '400': { description: Invalid settings or timezone. }
+        '403': { description: Ownership, scopes, public-research or delivery policy denied. }
+        '409': { description: Stale revision; reload before saving. }
+  /agents/{agentKey}/schedule/run:
+    parameters:
+      - in: path
+        name: agentKey
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Agents]
+      summary: Run the saved native schedule now
+      description: |
+        Requires agent:read, agent:execute and ownership. Works while automatic runs are paused.
+        Returns after execution; on a transport timeout read the ledger before taking
+        further action. Never blindly retry. A saved draft does not prove source coverage.
+      responses:
+        '200':
+          description: Updated run ledger; inspect run status and conversation before publication.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
+        '403': { description: Owner, agent policy or delivery authorization denied. }
+        '409': { description: No saved schedule, or another run is active. }
   /usage:
     get:
       tags: [Usage Analytics]
