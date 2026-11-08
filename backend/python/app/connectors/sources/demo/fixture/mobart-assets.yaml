@@ -1,0 +1,36 @@
+{
+  "files": {
+    "mobart-001-d01": "MB-DEMO-001_D01_brief-iniziale_v1_2026-02-02.pdf",
+    "mobart-001-d02": "MB-DEMO-001_D02_preventivo-originale_v1_2026-02-05.pdf",
+    "mobart-001-d03": "MB-DEMO-001_D03_richiesta-variante_v1_2026-02-09.pdf",
+    "mobart-001-d04": "MB-DEMO-001_D04_approvazione-finitura_v1_2026-02-11.pdf",
+    "mobart-001-d05": "MB-DEMO-001_D05_verbale-riunione_v1_2026-02-16.pdf",
+    "mobart-001-d06": "MB-DEMO-001_D06_checklist-progetto_v1_2026-02-18.pdf",
+    "mobart-001-d08": "MB-DEMO-001_D08_scheda-ambiente_v1_2026-02-03.pdf",
+    "mobart-001-d09": "MB-DEMO-001_D09_rilievo-preliminare_v1_2026-02-04.pdf",
+    "mobart-001-d10": "MB-DEMO-001_D10_concept-cucina_v1_2026-02-04.pdf",
+    "mobart-001-d11": "MB-DEMO-001_D11_scheda-materiali-iniziale_v1_2026-02-05.pdf",
+    "mobart-001-d12": "MB-DEMO-001_D12_promemoria-campioni_v1_2026-02-08.pdf",
+    "mobart-001-d13": "MB-DEMO-001_D13_nota-coordinamento-living_v1_2026-02-10.pdf",
+    "mobart-001-d14": "MB-DEMO-001_D14_riscontro-interno-variante_v1_2026-02-12.pdf",
+    "mobart-001-d15": "MB-DEMO-001_D15_scheda-illuminazione_v1_2026-02-13.pdf",
+    "mobart-001-d16": "MB-DEMO-001_D16_appunti-impianti_v1_2026-02-14.pdf",
+    "mobart-001-d17": "MB-DEMO-001_D17_scheda-confronto-piano_v1_2026-02-16.pdf",
+    "mobart-001-d18": "MB-DEMO-001_D18_promemoria-ufficio-tecnico_v1_2026-02-17.pdf",
+    "mobart-001-d19": "MB-DEMO-001_D19_pianificazione-preliminare_v1_2026-02-18.pdf",
+    "mobart-001-d20": "MB-DEMO-001_D20_scheda-manutenzione-indicativa_v1_2026-02-19.pdf",
+    "mobart-001-preventivo-xlsx": "MB-DEMO-001_calcolo-preventivo.xlsx",
+    "mobart-002-d07": "MB-DEMO-002_D07_approvazione-piano-altro-progetto_v1_2026-02-19.pdf"
+  },
+  "records": [
+    {
+      "id": "mobart-001-preventivo-xlsx",
+      "container": "drive-villa-aurora",
+      "type": "FILE",
+      "title": "Calcolo preventivo e confronto varianti - Villa Aurora.xlsx",
+      "author": "bob",
+      "created": "2026-02-19T12:00:00Z",
+      "body": "Foglio di calcolo dimostrativo: preventivo iniziale D02, confronto della variante e proposta revisionata non approvata. Le ipotesi prive di fonte sono dichiarate come sintetiche. Non costituisce un ordine."
+    }
+  ]
+}

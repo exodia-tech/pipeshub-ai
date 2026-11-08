@@ -27,7 +27,7 @@ from app.connectors.sources.demo.harness.kb_harness import mentions, score
 
 FIXTURE = Path(demo_connector.__file__).resolve().parent / "fixture" / "acme-corp.yaml"
 RESERVED_DOMAIN = "acme-demo.example"
-CHAT_LOCALES = ("en-US", "en-IN")
+CHAT_LOCALES = ("en-US", "en-IN", "it-IT")
 
 
 def _on_reserved_domain(url: str) -> bool:
@@ -180,9 +180,9 @@ def test_the_link_guard_accepts_only_the_reserved_domain(url: str, ok: bool) -> 
 @pytest.mark.parametrize(
     ("answer", "cited", "ok"),
     [
-        ("I couldn't find a 2026 enterprise pricing strategy you can see.", set(), True),
+        ("Non ho trovato la nota interna a cui puoi accedere.", set(), True),
         # Nothing restricted is cited, but the answer repeats what only the committee knows.
-        ("The plan is a platform fee of $48k for 250 seats.", set(), False),
+        ("Il codice interno è VA-INT-7.", set(), False),
         ("Here it is.", {"drive-pricing-2026"}, False),
         # A run that failed says nothing about what Alice can see.
         ("ERROR: upstream timeout", set(), False),

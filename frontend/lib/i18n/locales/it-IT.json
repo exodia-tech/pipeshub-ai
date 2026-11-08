@@ -1179,42 +1179,32 @@
         ]
       }
     },
-    "demoBanner": "Stai guardando Acme Corp, una piccola azienda immaginaria caricata come dati demo. Prova uno di questi, o",
+    "demoBanner": "Stai guardando Mobart Ben, una piccola azienda immaginaria caricata come dati demo. Prova uno di questi, o",
     "demoConnectYourOwn": "collega le tue fonti",
     "demoSuggestions": {
       "1": {
-        "text": "Perché è stata modificata l'architettura del servizio di pagamento e come è stata presa la decisione?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "Quali clienti hanno segnalato timeout di esportazione e cosa li hanno risolti?",
-        "icons": [
-          "jira",
-          "github"
-        ]
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
+        "icons": ["sheets"]
       },
       "3": {
-        "text": "Qual è la nostra politica in merito ai servizi di guardia durante i giorni festivi?",
-        "icons": [
-          "sheets"
-        ]
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
       },
       "4": {
-        "text": "Chi ha rivisto e approvato il PR n. 482 nell'addetto alla fatturazione e cosa ha chiesto Dana prima della fusione?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "Qual è la strategia dei prezzi aziendali per il 2026?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -1636,7 +1626,21 @@
         "error": "Non riuscito"
       }
     },
-    "showMoreCitations_many": "Mostra altre {{count}} citazioni"
+    "showMoreCitations_many": "Mostra altre {{count}} citazioni",
+    "timeGreeting": {
+      "morning": "Buongiorno",
+      "morningNamed": "Buongiorno, {{name}}",
+      "afternoon": "Buon pomeriggio",
+      "afternoonNamed": "Buon pomeriggio, {{name}}",
+      "evening": "Buonasera",
+      "eveningNamed": "Buonasera, {{name}}",
+      "night": "Buonanotte",
+      "nightNamed": "Buonanotte, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Saluta",
+      "hello": "Ciao!"
+    }
   },
   "workspaceMenu": {
     "appearance": "Aspetto",
@@ -4343,11 +4347,11 @@
       "moreAgents": "Altri agenti",
       "moreChats": "Altre chat",
       "demoData": {
-        "description": "Acme Corp è una società fittizia caricata, quindi puoi provare EXODIA Brain. Questo cambia solo ciò che vedi; nulla viene cancellato.",
+        "description": "Mobart Ben è una società fittizia caricata, quindi puoi provare EXODIA Brain. Questo cambia solo ciò che vedi; nulla viene cancellato.",
         "everyoneDescription": "La disattivazione nasconde la demo dalle risposte, dalle ricerche e dai record di tutti e interrompe l'accesso degli account di esempio. Niente viene eliminato.",
         "everyoneLabel": "Offri la demo a tutti",
         "followingDefault": "Segue l'impostazione predefinita: mostrato finché l'organizzazione non dispone di dati propri, quindi nascosto.",
-        "label": "Mostra i dati dimostrativi di Acme Corp nelle mie risposte, ricerche e record",
+        "label": "Mostra i dati dimostrativi di Mobart Ben nelle mie risposte, ricerche e record",
         "offForEveryone": "Disattivato per tutti da un amministratore.",
         "title": "Dati dimostrativi",
         "useDefault": "Utilizza l'impostazione predefinita",
@@ -5791,17 +5795,17 @@
   "demoData": {
     "badge": {
       "label": "Dimostrazione",
-      "tooltip": "Dati di esempio dalla demo di Acme Corp, non uno dei record della tua azienda"
+      "tooltip": "Dati di esempio dalla demo di Mobart Ben, non uno dei record della tua azienda"
     },
     "removalNotice": {
-      "title": "I dati dimostrativi di Acme Corp sono ancora nel tuo spazio di lavoro",
+      "title": "I dati dimostrativi di Mobart Ben sono ancora nel tuo spazio di lavoro",
       "description": "I dati della tua azienda sono ora in EXODIA Brain. La demo è nascosta dalle risposte per impostazione predefinita, ma chiunque può riattivarla e i suoi account di esempio possono comunque accedere. Disattivala per tutti o rimuovila definitivamente.",
       "remove": "Rimuovi permanentemente",
       "keep": "Conserva per ora",
       "turnOff": "Disattiva per tutti"
     },
     "removeDialog": {
-      "title": "Rimuovere permanentemente i dati dimostrativi di Acme Corp?",
+      "title": "Rimuovere permanentemente i dati dimostrativi di Mobart Ben?",
       "description": "Ciò elimina il connettore Demo con tutti i suoi record, gruppi e autorizzazioni. Per nasconderlo senza eliminare nulla, disattivalo invece per tutti. Puoi aggiungerlo di nuovo in seguito dalla pagina Connettori.",
       "deleteAccounts": "Elimina anche gli account di esempio: {{names}}",
       "deleteAccountsHint": "Sono stati creati con una password iniziale, quindi chiunque la conosca può accedere come loro.",
@@ -5817,7 +5821,7 @@
     "switch": {
       "errorTitle": "Impossibile modificare l'impostazione dei dati dimostrativi",
       "errorDescription": "Non è cambiato nulla. Riprova tra un attimo.",
-      "hiddenTitle": "Dati dimostrativi di Acme Corp nascosti",
+      "hiddenTitle": "Dati dimostrativi di Mobart Ben nascosti",
       "hiddenDescription": "È fuori dalle tue risposte, ricerche e registrazioni. Riattivalo in qualsiasi momento in Profilo → Dati demo.",
       "undo": "Annulla"
     },
@@ -5875,6 +5879,7 @@
     "metric": "Metrica del grafico",
     "overTime": "Utilizzo nel tempo",
     "chartData": "Visualizza dati del grafico",
+    "filters": "Filtri",
     "topModels": "Modelli più utilizzati",
     "byWorkload": "Utilizzo per attività",
     "byMember": "Utilizzo per membro",

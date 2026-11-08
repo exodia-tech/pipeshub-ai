@@ -1751,3 +1751,25 @@ th code {
   --radius-5: 20px;
   --radius-6: 24px;
 }
+
+/* The chat companion stays quiet: occasional blinks and a greeting on request. */
+@keyframes chat-companion-blink {
+  0%, 88%, 94%, 100% { transform: scaleY(1); }
+  91% { transform: scaleY(0.12); }
+}
+.chat-companion__eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chat-companion-blink 6.5s ease-in-out infinite;
+}
+.chat-companion--thinking .chat-companion__eyes { animation-duration: 3.8s; }
+.chat-companion__head { transform-origin: 40px 40px; transition: transform 180ms ease; }
+.chat-companion-button:is(:hover, :active) { background: transparent; }
+.chat-companion-button:hover .chat-companion__head { transform: translateY(-1px); }
+.chat-companion--greeting .chat-companion__head { transform: rotate(-6deg); }
+@media (prefers-reduced-motion: reduce) {
+  .chat-companion__eyes { animation: none; }
+  .chat-companion__head { transition: none; }
+  .chat-companion-button:hover .chat-companion__head,
+  .chat-companion--greeting .chat-companion__head { transform: none; }
+}

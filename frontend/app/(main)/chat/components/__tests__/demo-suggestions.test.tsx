@@ -32,7 +32,7 @@ vi.mock('@/app/(main)/workspace/connectors/demo-data/use-demo-switch', () => ({
 
 const access = vi.mocked(useRestrictedQuestionAccess);
 const questions = Object.values(en.chat.demoSuggestions).map((q) => q.text);
-const pricing = en.chat.demoSuggestions['5'].text;
+const restrictedQuestion = en.chat.demoSuggestions['6'].text;
 
 function renderSuggestions(onPick = vi.fn(), isAdmin = true) {
   render(
@@ -65,9 +65,9 @@ describe('DemoSuggestions', () => {
     const caption = screen.getByText('bob@acme-demo.example').parentElement;
     expect(caption?.textContent).toBe(hint);
     expect(screen.getByText('bob@acme-demo.example').style.whiteSpace).toBe('nowrap');
-    // One lock, on the pricing question's chip.
+    // One lock, on the restricted question's chip.
     expect(Array.from(document.querySelectorAll('[data-icon="lock"]'))).toHaveLength(1);
-    expect(screen.getByText(pricing).closest('button')?.querySelector('[data-icon="lock"]')).not.toBeNull();
+    expect(screen.getByText(restrictedQuestion).closest('button')?.querySelector('[data-icon="lock"]')).not.toBeNull();
   });
 
   it('does not send a member to an account whose password only the admin knows', () => {
@@ -101,9 +101,9 @@ describe('DemoSuggestions', () => {
     access.mockReturnValue({ canSee: false, readerEmail: null });
     const onPick = renderSuggestions();
 
-    fireEvent.click(screen.getByText(pricing));
+    fireEvent.click(screen.getByText(restrictedQuestion));
 
-    expect(onPick).toHaveBeenCalledWith({ id: '5', text: pricing, icons: en.chat.demoSuggestions['5'].icons });
+    expect(onPick).toHaveBeenCalledWith({ id: '6', text: restrictedQuestion, icons: en.chat.demoSuggestions['6'].icons });
   });
 
   it('lets the person hide the demo from the landing itself', () => {

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Flex, Card, Text, Avatar } from '@radix-ui/themes';
+import { ChatCompanion } from '../chat-companion';
 import { MessageSources } from './message-sources';
 import type { ChatSource } from '../../types';
 
@@ -26,15 +27,7 @@ export function MessageBubble({ role, content, sources }: MessageBubbleProps) {
       }}
     >
       {!isUser && (
-        <Avatar
-          size="2"
-          fallback="AI"
-          style={{
-            backgroundColor: 'var(--accent-9)',
-            color: 'white',
-            flexShrink: 0,
-          }}
-        />
+        <ChatCompanion size={32} />
       )}
 
       <Flex direction="column" gap="2" style={{ flex: 1, minWidth: 0 }}>

@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from collections.abc import Awaitable, Callable
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,7 +12,7 @@ from starlette.responses import Response
 from test_ledger import event
 
 from app.api.routes import usage
-from app.services.usage.ledger import UsageLedger
+from app.services.usage.ledger import UsageLedger, catalog_rates
 
 
 class TestUsageRoutes(unittest.TestCase):
@@ -130,6 +131,70 @@ class TestUsageRoutes(unittest.TestCase):
         self.user["orgId"] = "org-b"
         self.assertEqual(
             self.client.delete(f"/api/v1/usage/budgets/{budget['id']}").status_code, 404
+        )
+
+    def test_budget_lifecycle_and_gemini_embedding_spend(self) -> None:
+        self.user["role"] = "admin"
+        payload = {
+            "scope": "organization",
+            "subject": "",
+            "amount_usd": "0.0001",
+            "warning_percent": 80,
+        }
+        self.assertEqual(
+            self.client.put("/api/v1/usage/budgets", json=payload).status_code, 200
+        )
+        catalog = {
+            "gemini/gemini-embedding-2": {
+                "input_cost_per_token": 0.0000002,
+                "output_cost_per_token": 0,
+                "mode": "embedding",
+            }
+        }
+        with (
+            patch("app.services.usage.ledger.catalog", return_value=catalog),
+            patch("app.services.usage.ledger.catalog_rates", new=catalog_rates),
+        ):
+            self.db.record(
+                event(
+                    id="gemini",
+                    occurred_at=datetime.now(timezone.utc).isoformat(
+                        timespec="milliseconds"
+                    ),
+                    provider="gemini",
+                    model="models/gemini-embedding-2",
+                    kind="embedding",
+                    input_tokens=1000,
+                    output_tokens=0,
+                    cache_read_tokens=0,
+                    cache_write_tokens=0,
+                    reasoning_tokens=0,
+                )
+            )
+        budgets = self.client.get("/api/v1/usage/budgets?view=organization").json()[
+            "budgets"
+        ]
+        budget = budgets[0]
+        self.assertEqual(budget["spent_usd"], 0.0002)
+        self.assertEqual(budget["state"], "exceeded")
+        payload["amount_usd"] = "1"
+        self.assertEqual(
+            self.client.put("/api/v1/usage/budgets", json=payload).status_code, 200
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/usage/budgets?view=organization").json()[
+                "budgets"
+            ][0]["state"],
+            "warning",
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/v1/usage/budgets/{budget['id']}").status_code, 200
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/usage/budgets?view=organization").json()[
+                "budgets"
+            ],
+            [],
         )
 
     def test_scoped_services_and_under_scoped_oauth_are_refused(self) -> None:

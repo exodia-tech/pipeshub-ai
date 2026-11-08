@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Flex, Box, Text, IconButton } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import { ChatStarIcon } from '@/app/components/ui/chat-star-icon';
 
 interface AskMoreProps {
@@ -39,7 +39,7 @@ export function AskMore({ questions, onQuestionClick }: AskMoreProps) {
           animation: 'askMoreItemIn 200ms ease-out 0ms forwards'
         }}
       >
-       <LottieLoader variant="thinking" size={24} />
+       <ChatCompanion variant="thinking" size={24} />
         <Text size="3" weight="medium" style={{ color: 'var(--slate-12)' }}>
           {t('chat.askMore')}
         </Text>
