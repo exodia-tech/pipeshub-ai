@@ -1313,7 +1313,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5847,5 +5849,33 @@
     "averageLatency": "औसत विलंब",
     "noConnector": "कोई कनेक्टर नहीं",
     "useCatalog": "कैटलॉग इस्तेमाल करें"
+  },
+  "agentSchedule": {
+    "title": "एजेंट शेड्यूल",
+    "description": "केवल सार्वजनिक शोध। हर रिपोर्ट को ड्राफ्ट के रूप में चिह्नित किया जाता है।",
+    "loading": "लोड हो रहा है…",
+    "enabled": "अपने आप चलाएँ",
+    "days": "दिन",
+    "time": "समय",
+    "timezone": "समय क्षेत्र",
+    "prompt": "रिपोर्ट के निर्देश",
+    "next": "अगला रन",
+    "slackEnabled": "Slack पर भेजना चालू है।",
+    "brainOnly": "ड्राफ्ट Brain में सहेजे जाते हैं।",
+    "runs": "हाल के रन",
+    "empty": "अभी कोई रन नहीं।",
+    "open": "ड्राफ्ट खोलें",
+    "close": "बंद करें",
+    "working": "काम जारी है…",
+    "run": "अभी चलाएँ",
+    "save": "सहेजें",
+    "failed": "शेड्यूल अपडेट नहीं हो सका।",
+    "invalid": "दिन, समय और रिपोर्ट के निर्देश चुनें।",
+    "status": {
+      "running": "चल रहा है",
+      "draft": "ड्राफ्ट तैयार",
+      "needs_review": "ड्राफ्ट की समीक्षा करें",
+      "needs_reconciliation": "रुके हुए रन की जाँच करें"
+    }
   }
 }

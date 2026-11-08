@@ -1401,7 +1401,9 @@
       },
       "2": {
         "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
-        "icons": ["sheets"]
+        "icons": [
+          "sheets"
+        ]
       },
       "3": {
         "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
@@ -5813,5 +5815,33 @@
     "averageLatency": "平均延遲",
     "noConnector": "無連接器",
     "useCatalog": "使用目錄價格"
+  },
+  "agentSchedule": {
+    "title": "代理程式排程",
+    "description": "僅研究公開資訊。每份簡報都會標記為草稿。",
+    "loading": "載入中…",
+    "enabled": "自動執行",
+    "days": "日期",
+    "time": "時間",
+    "timezone": "時區",
+    "prompt": "簡報指示",
+    "next": "下次執行",
+    "slackEnabled": "已啟用 Slack 傳送。",
+    "brainOnly": "草稿儲存在 Brain 中。",
+    "runs": "最近執行",
+    "empty": "尚無執行紀錄。",
+    "open": "開啟草稿",
+    "close": "關閉",
+    "working": "處理中…",
+    "run": "立即執行",
+    "save": "儲存",
+    "failed": "無法更新排程。",
+    "invalid": "請選擇日期、時間並填寫簡報指示。",
+    "status": {
+      "running": "執行中",
+      "draft": "草稿已就緒",
+      "needs_review": "審閱草稿",
+      "needs_reconciliation": "檢查中斷的執行"
+    }
   }
 }
