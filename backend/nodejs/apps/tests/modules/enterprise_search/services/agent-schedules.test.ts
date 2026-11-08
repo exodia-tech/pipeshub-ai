@@ -104,7 +104,8 @@ describe('Native agent schedules', () => {
   });
   it('renders source links while preventing model content from pinging Slack users or channels', () => {
     const safe = withoutSlackMentions('Hello <@U12345678> <!here> <!channel> <#C12345678> <https://example.com|Source>');
-    assert.equal(safe, 'Hello @U12345678 !here !channel #C12345678 <https://example.com|Source>');
+    assert.equal(withoutSlackMentions('<<!here>>'), '&lt;&lt;!here>>');
+    assert.equal(safe, 'Hello &lt;@U12345678> &lt;!here> &lt;!channel> &lt;#C12345678> <https://example.com|Source>');
   });
 
 });

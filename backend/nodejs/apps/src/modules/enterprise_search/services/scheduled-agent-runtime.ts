@@ -17,7 +17,7 @@ import { isUserOrgAdmin } from '../../user_management/services/user-admin.servic
 import { markdownToSlackMrkdwn } from '../../../integrations/slack-bot/src/utils/md_to_mrkdwn';
 
 export function withoutSlackMentions(text: string): string {
-  return text.replace(/<([@#!][^>]*)>/g, '$1');
+  return text.replace(/<(?=[@#!<])/g, '&lt;');
 }
 
 export function requirePublicResearchAgent(agent: Record<string, unknown>): void {
