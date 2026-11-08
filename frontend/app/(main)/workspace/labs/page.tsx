@@ -27,6 +27,7 @@ import { useUserStore, selectIsAdmin, selectIsProfileInitialized } from '@/lib/s
 import { useFeatureFlagsStore } from '@/lib/store/feature-flags-store';
 import { VectorStoreActions } from '../connectors/components/vector-store-actions';
 import { SettingsPageContainer } from '@/app/(main)/workspace/components/settings-page-container';
+import { ObservabilitySetting } from './observability-setting';
 
 // ========================================
 // Local Sub-components
@@ -519,6 +520,7 @@ export default function LabsPage() {
         )}
 
         {/* ── Platform Configuration note ── */}
+        {isAdmin && <Box style={{ marginBottom: 'var(--space-5)' }}><ObservabilitySetting /></Box>}
         <PlatformConfigNote />
       </SettingsPageContainer>
 

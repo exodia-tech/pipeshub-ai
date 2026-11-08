@@ -36,6 +36,8 @@ export function createUsageRouter(container: Container): Router {
   };
   router.get('/', requireScopes(OAuthScopeNames.ORG_READ), forward);
   router.get('/budgets', requireScopes(OAuthScopeNames.ORG_READ), forward);
+  router.get('/observability', requireScopes(OAuthScopeNames.CONFIG_READ), forward);
+  router.put('/observability', requireScopes(OAuthScopeNames.CONFIG_WRITE), forward);
   router.get('/rates', requireScopes(OAuthScopeNames.CONFIG_READ), forward);
   router.put('/rates', requireScopes(OAuthScopeNames.CONFIG_WRITE), forward);
   router.delete('/rates', requireScopes(OAuthScopeNames.CONFIG_WRITE), forward);

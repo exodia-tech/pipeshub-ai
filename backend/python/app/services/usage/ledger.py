@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS usage_budgets (
  subject TEXT NOT NULL, amount_nano_usd INTEGER NOT NULL CHECK(amount_nano_usd>0), warning_percent INTEGER NOT NULL,
  updated_at TEXT NOT NULL, UNIQUE(org_id,scope,subject)
 );
+CREATE TABLE IF NOT EXISTS usage_observability_settings (
+ org_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL CHECK(enabled IN (0, 1))
+);
 """
 _initialized: set[str] = set()
 _initialize_lock = threading.Lock()
@@ -163,6 +166,21 @@ class UsageLedger:
     def __init__(self, path: str | None = None) -> None:
         self.path = path or os.getenv("PIPESHUB_USAGE_DB", "")
 
+    def observability_enabled(self, org_id: str) -> bool:
+        with self.connection() as db:
+            row = db.execute(
+                "SELECT enabled FROM usage_observability_settings WHERE org_id=?",
+                (org_id,),
+            ).fetchone()
+            return bool(row and row[0])
+
+    def set_observability_enabled(self, org_id: str, *, enabled: bool) -> None:
+        with self.connection() as db:
+            db.execute(
+                "INSERT INTO usage_observability_settings (org_id, enabled) VALUES (?, ?) ON CONFLICT(org_id) DO UPDATE SET enabled=excluded.enabled",
+                (org_id, int(enabled)),
+            )
+
     @contextmanager
     def connection(self) -> Iterator[sqlite3.Connection]:
         if not self.path:
@@ -183,7 +201,7 @@ class UsageLedger:
         finally:
             db.close()
 
-    def record(self, event: dict[str, Any]) -> None:
+    def record(self, event: dict[str, Any]) -> dict[str, Any] | None:
         if not event.get("org_id"):
             raise ValueError("Usage must belong to a verified organization")
         counts = (
@@ -228,10 +246,11 @@ class UsageLedger:
             e["pricing_snapshot"] = json.dumps(rates, sort_keys=True) if rates else None
             allowed = [r[1] for r in db.execute("PRAGMA table_info(usage_events)")]
             values = {k: e.get(k) for k in allowed}
-            db.execute(
+            inserted = db.execute(
                 f"INSERT OR IGNORE INTO usage_events ({','.join(allowed)}) VALUES ({','.join('?' for _ in allowed)})",
                 list(values.values()),
-            )
+            ).rowcount
+        return e if inserted else None
 
     @staticmethod
     def _where(

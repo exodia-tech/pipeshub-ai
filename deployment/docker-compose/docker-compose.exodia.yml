@@ -57,6 +57,10 @@ services:
         compress: 'true'
     environment:
     - PIPESHUB_USAGE_DB=/data/pipeshub/usage.sqlite3
+    - EXODIA_OTLP_ENABLED=${EXODIA_OTLP_ENABLED:-false}
+    - EXODIA_OTLP_ENDPOINT=${EXODIA_OTLP_ENDPOINT:-}
+    - EXODIA_OTLP_HEADERS=${EXODIA_OTLP_HEADERS:-}
+    - EXODIA_OTLP_ORG_ID=${EXODIA_OTLP_ORG_ID:-}
     - NODE_ENV=${NODE_ENV:-production}
     - GIT_COMMIT=${SOURCE_COMMIT:-}
     - APP_VERSION=${APP_VERSION:-exodia-main}

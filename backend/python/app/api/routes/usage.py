@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from app.api.middlewares.admin_gate import require_admin_caller
 from app.api.middlewares.auth import deny_service_tokens, require_scopes
@@ -36,6 +36,40 @@ async def visibility(request: Request, view: str) -> tuple[str, str | None]:
         await require_admin_caller(request)
         return org, None
     return org, user
+
+
+class ObservabilitySetting(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: StrictBool
+
+
+@router.get(
+    "/observability",
+    dependencies=[
+        Depends(require_scopes(OAuthScopes.CONFIG_READ)),
+        Depends(require_admin_caller),
+    ],
+)
+async def get_observability(request: Request) -> dict:
+    org, _ = caller(request)
+    return {
+        "enabled": await asyncio.to_thread(UsageLedger().observability_enabled, org)
+    }
+
+
+@router.put(
+    "/observability",
+    dependencies=[
+        Depends(require_scopes(OAuthScopes.CONFIG_WRITE)),
+        Depends(require_admin_caller),
+    ],
+)
+async def set_observability(request: Request, body: ObservabilitySetting) -> dict:
+    org, _ = caller(request)
+    await asyncio.to_thread(
+        UsageLedger().set_observability_enabled, org, enabled=body.enabled
+    )
+    return {"enabled": body.enabled}
 
 
 @router.get("", dependencies=[Depends(require_scopes(OAuthScopes.ORG_READ))])
