@@ -984,8 +984,10 @@ const agentModelsOptionalSchema = z
     }
   });
 
+const agentAvatarUrlSchema = z.string().max(200).regex(/^\/assets\/agents\/[a-z0-9][a-z0-9._-]*\.(?:png|webp|jpg)$/).nullable().optional();
+
 const createAgentBodySchema = z.object({
-  avatarUrl: z.string().max(200).regex(/^\/assets\/agents\/[a-z0-9][a-z0-9._-]*\.(?:png|webp|jpg)$/).nullable().optional(),
+  avatarUrl: agentAvatarUrlSchema,
   name: z
     .string(messageWhenMissing('Name is required'))
     .trim()
@@ -1050,6 +1052,7 @@ export const createAgentSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const updateAgentBodySchema = z.object({
+  avatarUrl: agentAvatarUrlSchema,
   name: z
     .string()
     .trim()
