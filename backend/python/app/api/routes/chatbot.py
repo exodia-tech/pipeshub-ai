@@ -845,7 +845,10 @@ async def _upload_chat_attachments(
                         ocr_image_pages_used += page_count
                         parse_mode = "image_direct"
                     else:
-                        parsed_data = await pdf_processor.parse_document(item.fileName, file_binary)
+                        # Interactive uploads share a 50s budget; indexing keeps learned layout detection.
+                        parsed_data = await pdf_processor.parse_document(
+                            item.fileName, file_binary, use_layout_model=False,
+                        )
                         block_containers = await pdf_processor.create_blocks(parsed_data, skip_llm_enrichment=True)
                         parse_mode = "pdfplumber"
                 parsed_blocks_by_record[record_id] = block_containers

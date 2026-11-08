@@ -88,7 +88,8 @@ def _drop_unmapped_glyphs(regions: list[LayoutRegion]) -> list[LayoutRegion]:
     return kept
 
 
-def parse_pdf_layout(pdf_bytes: bytes) -> list[ParsedPageData]:
+# Parse-pool worker arguments are positional.
+def parse_pdf_layout(pdf_bytes: bytes, use_layout_model: bool = True) -> list[ParsedPageData]:  # noqa: FBT001, FBT002
     _cap_cv2_threads()
     # The rasteriser reads the file by path.
     tmp_path: str | None = None
@@ -106,7 +107,8 @@ def parse_pdf_layout(pdf_bytes: bytes) -> list[ParsedPageData]:
             for page_index, page in enumerate(pdf.pages):
                 regions = _drop_unmapped_glyphs(
                     extract_layout_regions(
-                        page, pdf_path=tmp_path, raster_cache=raster_cache, model_raster_cache=model_rasters
+                        page, pdf_path=tmp_path, raster_cache=raster_cache, model_raster_cache=model_rasters,
+                        use_layout_model=use_layout_model,
                     )
                 )
                 # pdf.pages keeps every Page, and each caches its parsed chars and

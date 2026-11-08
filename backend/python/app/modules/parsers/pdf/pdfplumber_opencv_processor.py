@@ -214,7 +214,7 @@ class PDFPlumberOpenCVProcessor:
         self.config = config
 
     async def parse_document(
-        self, doc_name: str, content: bytes | BytesIO
+        self, doc_name: str, content: bytes | BytesIO, *, use_layout_model: bool = True,
     ) -> List[ParsedPageData]:
         stream = content if isinstance(content, BytesIO) else BytesIO(content)
         stream.seek(0)
@@ -224,6 +224,7 @@ class PDFPlumberOpenCVProcessor:
         pages_data = await parse_pool.submit(
             parse_pdf_layout,
             pdf_bytes,
+            use_layout_model,
             label=doc_name,
             size=len(pdf_bytes),
             timeout=messaging_env.pdf_record_processing_timeout,

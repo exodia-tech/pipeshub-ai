@@ -69,6 +69,13 @@ class TestParsePdfLayout:
 
 
 class TestProcessorParse:
+    async def test_interactive_layout_choice_reaches_the_worker(self) -> None:
+        content = text_pdf()
+        with patch.object(parse_pool, "submit", new=AsyncMock(return_value=[])) as submit:
+            await _processor().parse_document("chat.pdf", content, use_layout_model=False)
+
+        assert submit.await_args.args == (parse_pdf_layout, content, False)
+
     async def test_the_pages_are_parsed_through_the_parse_pool(self) -> None:
         content = text_pdf()
         with patch.object(parse_pool, "submit", new=AsyncMock(return_value=[])) as submit:
@@ -77,6 +84,7 @@ class TestProcessorParse:
         submit.assert_awaited_once_with(
             parse_pdf_layout,
             content,
+            True,
             label="report.pdf",
             size=len(content),
             timeout=messaging_env.pdf_record_processing_timeout,

@@ -1521,6 +1521,8 @@ def extract_layout_regions(
     pdf_path: Optional[str] = None,
     raster_cache: Optional[DocumentRasterCache] = None,
     model_raster_cache: Optional[DocumentRasterCache] = None,
+    *,
+    use_layout_model: bool = True,
 ) -> List[LayoutRegion]:
     page_w = float(page.width)
     page_h = float(page.height)
@@ -1573,7 +1575,7 @@ def extract_layout_regions(
         page, page_w, page_h, all_words,
         stripe_frames=stripe_frames,
     )
-    model_boxes = _detect_model_boxes(page, pdf_path, model_raster_cache) if all_words else None
+    model_boxes = _detect_model_boxes(page, pdf_path, model_raster_cache) if all_words and use_layout_model else None
     if model_boxes:
         table_regions = _prefer_model_tables(
             page, page_w, page_h, table_regions, all_words, model_boxes["table"],
