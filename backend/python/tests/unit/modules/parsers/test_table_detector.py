@@ -1,8 +1,10 @@
 """Gate settings for the pdfplumber layout model (app.modules.parsers.pdf.table_detector)."""
 import importlib
 import os
+import sys
 from collections.abc import Callable, Iterator
 from types import ModuleType
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -24,6 +26,39 @@ def fresh_td(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[], ModuleTyp
 def test_bundled_gate_model_ships_with_the_code() -> None:
     assert td._GATE_MODEL_BUNDLED.is_file()
     assert td._GATE_MODEL_BUNDLED.stat().st_size > 1_000_000
+
+
+@pytest.mark.parametrize("cached", [True, False])
+def test_heron_load_never_waits_for_the_network(
+    monkeypatch: pytest.MonkeyPatch, fresh_td: Callable[[], ModuleType], cached: bool,
+) -> None:
+    mod = fresh_td()
+    ort = MagicMock()
+    hub = MagicMock()
+
+    def cached_model(*args: object, **kwargs: object) -> str:
+        if not kwargs.get("local_files_only"):
+            raise TimeoutError("An online cache check exhausted the upload deadline")
+        if not cached:
+            raise FileNotFoundError("Model absent from the local cache")
+        return "cached-model.onnx"
+
+    hub.hf_hub_download.side_effect = cached_model
+    monkeypatch.setitem(sys.modules, "onnxruntime", ort)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+
+    result = mod._session("heron")
+    if cached:
+        assert result is ort.InferenceSession.return_value
+        assert ort.InferenceSession.call_args.args[0] == "cached-model.onnx"
+    else:
+        assert result is None
+        ort.InferenceSession.assert_not_called()
+    assert mod._session("heron") is result
+    hub.hf_hub_download.assert_called_once_with(
+        mod._HERON_REPO, "model.onnx", revision=mod._HERON_REVISION,
+        local_files_only=True,
+    )
 
 
 def test_gate_thresholds_come_from_env(monkeypatch: pytest.MonkeyPatch, fresh_td: Callable[[], ModuleType]) -> None:
