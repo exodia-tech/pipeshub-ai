@@ -166,6 +166,7 @@ COPY backend/python/app/ /app/python/app/
 
 # Copy the process monitor script
 COPY deployment/process_monitor.sh /app/process_monitor.sh
+COPY deployment/exodia-admin-bootstrap.py /app/exodia-admin-bootstrap.py
 
 RUN chmod +x /app/process_monitor.sh && \
     install -d -o 1000 -g 1000 /app/python/logs /data/pipeshub && \
