@@ -9,7 +9,6 @@ import {
   Grid,
   Text,
   Heading,
-  Card,
   Button,
   IconButton,
   Tooltip,
@@ -24,6 +23,7 @@ import { MaterialIcon } from "@/app/components/ui/MaterialIcon";
 import { useUserStore, selectIsAdmin } from "@/lib/store/user-store";
 import { onSessionEnd } from "@/lib/api/session-cache";
 import { ConnectorsApi } from "../connectors/api";
+import { SettingsPageContainer, SettingsSection } from "../components";
 import { usageApi, type Breakdown, type Rate } from "./api";
 import {
   exclusiveEnd,
@@ -252,7 +252,7 @@ export default function UsagePage() {
       }));
     const max = chartMaximum(top, metric) || 1;
     return (
-      <Card>
+      <SettingsSection>
         <Heading size="3" mb="4">
           {title}
         </Heading>
@@ -288,7 +288,7 @@ export default function UsagePage() {
             </Box>
           ))}
         </Flex>
-      </Card>
+      </SettingsSection>
     );
   };
   const timeline = data?.timeline ?? [];
@@ -302,13 +302,10 @@ export default function UsagePage() {
     `${(index / Math.max(1, timeline.length - 1)) * 700},${140 - (value / chartScale) * 125}`;
 
   return (
-    <Box
-      p={{ initial: "4", md: "6" }}
-      style={{ width: "100%", maxWidth: 1600, margin: "0 auto" }}
-    >
-      <Flex justify="between" align="start" gap="3" mb="4">
-        <Box pl={{ initial: "6", md: "0" }} style={{ flex: 1, minWidth: 0 }}>
-          <Heading size="6">{label("title")}</Heading>
+    <SettingsPageContainer>
+      <Flex justify="between" align="start" gap="3" mb="5">
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Heading size="5" weight="medium" style={{ color: "var(--slate-12)" }}>{label("title")}</Heading>
           <Text as="p" color="gray" mt="2">
             {label("subtitle")}
           </Text>
@@ -328,8 +325,9 @@ export default function UsagePage() {
           </IconButton>
         </Tooltip>
       </Flex>
-      <Card mb="4">
-        <Grid columns={{ initial: "2", md: "3", lg: "6" }} gap="3">
+      <Box mb="4">
+        <SettingsSection>
+        <Grid columns={{ initial: "2", md: "3" }} gap="3">
           <Flex direction="column" gap="1">
             <Text as="label" htmlFor="usage-from" size="2">
               {label("from")}
@@ -461,7 +459,8 @@ export default function UsagePage() {
             ))}
           </Grid>
         )}
-      </Card>
+      </SettingsSection>
+      </Box>
       {!validDates && (
         <Callout.Root color="amber" mb="4">
           <Callout.Text>{label("invalidRange")}</Callout.Text>
@@ -500,14 +499,11 @@ export default function UsagePage() {
               ["requests", number(data.summary.requests)],
               ["unpriced", number(data.summary.unpriced_requests)],
             ].map(([key, value]) => (
-              <Card key={key}>
-                <Text color="gray" size="2">
-                  {label(key)}
-                </Text>
-                <Heading size="5" mt="2" style={{ overflowWrap: "anywhere" }}>
-                  {value}
-                </Heading>
-              </Card>
+              <Box key={key}><SettingsSection><Box>
+                <Text color="gray" size="2">{label(key)}</Text>
+                <Heading size="5" mt="2" style={{ overflowWrap: "anywhere" }}>{value}</Heading>
+              </Box></SettingsSection>
+              </Box>
             ))}
           </Grid>
           <Text as="p" size="1" color="gray" mb="3">
@@ -565,7 +561,8 @@ export default function UsagePage() {
         </Tabs.List>
         <Tabs.Content value="overview">
           {data && (
-            <Card mt="4" mb="4">
+            <Box mt="4" mb="4">
+              <SettingsSection>
               <Flex justify="between" align="center" wrap="wrap" gap="3" mb="3">
                 <Heading size="3">{label("overTime")}</Heading>
                 <Select.Root
@@ -685,7 +682,8 @@ export default function UsagePage() {
                     : label("noData")}
                 </Text>
               )}
-            </Card>
+            </SettingsSection>
+            </Box>
           )}
           {data && (
             <Grid columns={{ initial: "1", md: "2" }} gap="4">
@@ -812,7 +810,8 @@ export default function UsagePage() {
           {budgetError && <Text color="red">{label("loadFailed")}</Text>}
           <Grid columns={{ initial: "1", md: "2" }} gap="3">
             {budgetData?.budgets.map((budget) => (
-              <Card key={budget.id}>
+              <Box key={budget.id}>
+                <SettingsSection><Box>
                 <Flex justify="between" gap="2">
                   <Heading size="3">
                     {targetLabel(budget.scope, budget.subject)}
@@ -871,7 +870,8 @@ export default function UsagePage() {
                   {label(budget.state)} · {label("unpriced")}:{" "}
                   {number(budget.unpriced_requests)}
                 </Text>
-              </Card>
+              </Box></SettingsSection>
+              </Box>
             ))}
           </Grid>
           {budgetsLoading && (
@@ -898,7 +898,8 @@ export default function UsagePage() {
             </Button>
           )}
           {isAdmin && view === "organization" && (
-            <Card mt="4">
+            <Box mt="4">
+              <SettingsSection><Box>
               <Heading size="3" mb="3">
                 {label("setBudget")}
               </Heading>
@@ -996,7 +997,8 @@ export default function UsagePage() {
                   {label("save")}
                 </Button>
               </form>
-            </Card>
+            </Box></SettingsSection>
+            </Box>
           )}
         </Tabs.Content>
         {isAdmin && (
@@ -1005,7 +1007,7 @@ export default function UsagePage() {
               <Callout.Text>{label("pricingNote")}</Callout.Text>
             </Callout.Root>
             {rateError && <Text color="red">{label("loadFailed")}</Text>}
-            <Card>
+            <SettingsSection>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1073,7 +1075,7 @@ export default function UsagePage() {
                   {label("save")}
                 </Button>
               </form>
-            </Card>
+            </SettingsSection>
             <Box mt="4" style={{ overflowX: "auto" }}>
               <Table.Root>
                 <Table.Header>
@@ -1120,6 +1122,6 @@ export default function UsagePage() {
           </Tabs.Content>
         )}
       </Tabs.Root>
-    </Box>
+    </SettingsPageContainer>
   );
 }
