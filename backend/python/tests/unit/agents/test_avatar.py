@@ -1,4 +1,8 @@
+import ast
+from pathlib import Path
 import unittest
+
+from jsonschema import ValidationError, validate
 
 from app.agents.avatar import parse_avatar_url
 
@@ -10,6 +14,19 @@ class PortraitValidationTest(unittest.TestCase):
         for value in ['https://example.com/a.png', '//example.com/a.png', '/assets/agents/../../a.png', '/assets/agents/a.svg', '/assets/agents/a.png?key=secret', 42]:
             with self.assertRaises(ValueError):
                 parse_avatar_url(value)
+
+    def test_graph_schema_accepts_portraits_on_creation_and_partial_updates(self):
+        path = Path(__file__).resolve().parents[3] / 'app/schema/arango/documents.py'
+        tree = ast.parse(path.read_text(encoding='utf-8'))
+        schema = next(ast.literal_eval(node.value)['rule'] for node in tree.body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == 'agent_schema' for target in node.targets))
+        agent = dict(name='Elio', description='AI scout', startMessage='Ciao', systemPrompt='Public research', models=[], createdBy='owner', createdAtTimestamp=1)
+        for avatar in [None, '/assets/agents/elio-v1.png']:
+            validate({**agent, 'avatarUrl': avatar}, schema)
+            partial = {**schema, 'required': []}
+            validate({'avatarUrl': avatar}, partial)
+        for avatar in ['https://example.com/a.png', '/assets/agents/../../a.png', 'data:image/png;base64,eA==']:
+            with self.assertRaises(ValidationError):
+                validate({'avatarUrl': avatar}, partial)
 
 
 if __name__ == '__main__':
