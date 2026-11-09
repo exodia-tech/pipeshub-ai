@@ -17,6 +17,45 @@ from langchain_google_genai._common import GoogleGenerativeAIError
 
 from app.utils import embedding_retry
 from app.utils.embedding_retry import await_with_retry, is_retriable_embedding_error
+from app.services.messaging.backpressure import BackpressureCoordinator
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_gemini_throttle_pauses_queue_until_provider_retry_time(wrapped: bool) -> None:
+    error = genai_errors.ClientError(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+        "details": [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "60.5s"}]}})
+    if wrapped:
+        outer = GoogleGenerativeAIError("embedding failed")
+        outer.__cause__ = error
+        error = outer
+    now = [0.0]
+    coordinator = BackpressureCoordinator(clock=lambda: now[0])
+    embedding_retry.signal_backpressure_if_rate_limited(error, service_name="gemini", coordinator=coordinator)
+    assert coordinator.pause_remaining() == 60.5
+    assert coordinator.is_paused()
+    now[0] = 61
+    assert not coordinator.is_paused()
+
+
+def test_gemini_headerless_throttle_still_slows_queue() -> None:
+    coordinator = BackpressureCoordinator(clock=lambda: 0)
+    embedding_retry.signal_backpressure_if_rate_limited(_google_error(429, "RESOURCE_EXHAUSTED"), service_name="gemini", coordinator=coordinator)
+    assert coordinator.pause_remaining() == 30
+
+
+@pytest.mark.parametrize("delay", ["invalid", "NaNs", "infs", "-1s", "0s"])
+def test_invalid_retry_info_cannot_disable_or_permanently_pause_queue(delay: str) -> None:
+    error = genai_errors.ClientError(429, {"error": {"details": [
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": delay}]}})
+    coordinator = BackpressureCoordinator(clock=lambda: 0)
+    embedding_retry.signal_backpressure_if_rate_limited(error, service_name="gemini", coordinator=coordinator)
+    assert coordinator.pause_remaining() == 30
+
+
+def test_non_throttle_errors_do_not_pause_queue() -> None:
+    coordinator = BackpressureCoordinator(clock=lambda: 0)
+    embedding_retry.signal_backpressure_if_rate_limited(_google_error(403, "PERMISSION_DENIED"), service_name="gemini", coordinator=coordinator)
+    assert not coordinator.is_paused()
 
 
 def _google_error(code: int, status: str) -> genai_errors.APIError:
@@ -95,6 +134,7 @@ async def test_query_embedding_recovers_from_a_gemini_429() -> None:
     """The search path: one throttled query embedding must not fail the search."""
     fake = _FakeGemini(failures=1)
     runner, base_url = await _serve(fake)
+    coordinator = BackpressureCoordinator(clock=lambda: 0)
     try:
         embedder = GoogleGenerativeAIEmbeddings(
             model="models/gemini-embedding-2", google_api_key="test-key", base_url=base_url
@@ -105,11 +145,13 @@ async def test_query_embedding_recovers_from_a_gemini_429() -> None:
                 max_retries=3,
                 operation="aembed_query",
                 service_name="retrieval",
+                backpressure_coordinator=coordinator,
             ),
             timeout=10,
         )
         assert vector == [0.1, 0.2, 0.3]
         assert fake.requests == 2
+        assert coordinator.is_paused()
     finally:
         await runner.cleanup()
 

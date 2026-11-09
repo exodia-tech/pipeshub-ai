@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from typing import TYPE_CHECKING, TypeVar
 
@@ -57,14 +58,14 @@ def is_retriable_embedding_error(exc: BaseException) -> bool:
         return True
     if isinstance(exc, openai.APIStatusError):
         return exc.status_code in _RETRIABLE_HTTP_STATUS_CODES
-    google_code = _google_api_error_code(exc)
-    if google_code is not None:
-        return google_code in _RETRIABLE_HTTP_STATUS_CODES
+    google_error = _google_api_error(exc)
+    if google_error is not None:
+        return google_error.code in _RETRIABLE_HTTP_STATUS_CODES
     return False
 
 
-def _google_api_error_code(exc: BaseException) -> int | None:
-    """HTTP code of the google-genai APIError at or under ``exc``, if any.
+def _google_api_error(exc: BaseException) -> genai_errors.APIError | None:
+    """The google-genai APIError at or under ``exc``, if any.
 
     The Gemini embedder (langchain_google_genai) re-raises Google errors as
     GoogleGenerativeAIError ``from`` the original, so the code sits on the
@@ -75,7 +76,7 @@ def _google_api_error_code(exc: BaseException) -> int | None:
     current: BaseException | None = exc
     while current is not None and id(current) not in seen:
         if isinstance(current, genai_errors.APIError):
-            return current.code
+            return current
         seen.add(id(current))
         current = current.__cause__
     return None
@@ -97,9 +98,29 @@ def signal_backpressure_if_rate_limited(
     of the outcome of) this call's own retry budget — mirrors
     BaseServiceClient._request_with_retry's signal-on-every-occurrence for
     ParsingClient/DoclingClient."""
-    if coordinator is None or not isinstance(exc, openai.RateLimitError):
+    if coordinator is None:
         return
-    retry_after = parse_retry_after(exc.response.headers.get("Retry-After"))
+    google_error = _google_api_error(exc)
+    if isinstance(exc, openai.RateLimitError):
+        retry_after = parse_retry_after(exc.response.headers.get("Retry-After"))
+    elif google_error is not None and google_error.code == 429:
+        response = google_error.response
+        retry_after = parse_retry_after(response.headers.get("Retry-After")) if response is not None else None
+        body = google_error.details
+        error = body.get("error", body) if isinstance(body, dict) else {}
+        details = error.get("details", []) if isinstance(error, dict) else []
+        for detail in details if isinstance(details, list) else []:
+            if not isinstance(detail, dict) or detail.get("@type") != "type.googleapis.com/google.rpc.RetryInfo":
+                continue
+            delay = detail.get("retryDelay")
+            seconds = parse_retry_after(delay[:-1]) if isinstance(delay, str) and delay.endswith("s") else None
+            if seconds is not None and math.isfinite(seconds):
+                retry_after = max(retry_after or 0, seconds)
+        # Gemini may omit RetryInfo when quota is exhausted; still stop admitting a burst.
+        if retry_after is None or not math.isfinite(retry_after) or retry_after <= 0:
+            retry_after = _MAX_RETRY_DELAY_SECONDS
+    else:
+        return
     if retry_after is not None:
         coordinator.signal(service_name, retry_after)
 
