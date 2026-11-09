@@ -122,7 +122,7 @@ export class ScheduledAgentRuntime {
           query, tools: isProject ? [] : ['web_search.search'], chatMode: 'quick', timezone: schedule.timezone,
           currentTime: new Date(run.startedAt).toISOString(),
           agentCapabilities: { internalSearch: isProject, webSearch: !isProject, deepSearch: false },
-          ...(isProject ? { runId: run.id } : {}),
+          ...(isProject ? { runId: run.id, modelKey: approved!.model.modelKey, modelName: approved!.model.modelName, modelProvider: approved!.model.provider } : {}),
         };
         const conversation = await openConversation({
           orgId: schedule.orgId, userId: schedule.userId, initiator: schedule.userId,

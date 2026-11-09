@@ -18,7 +18,7 @@ describe('Project schedule runtime', () => {
     sinon.stub(users, 'getUserRepository').returns({ getLive });
     sinon.stub(AuthTokenService.prototype, 'generateToken').returns('fake-local-test-token');
     const grants = Object.create(AgentProjectGrants.prototype) as AgentProjectGrants;
-    const validate = sinon.stub(grants, 'validate').resolves({ project, model: { modelKey: 'key', modelName: 'model' }, modelFingerprint: 'digest' });
+    const validate = sinon.stub(grants, 'validate').resolves({ project, model: { modelKey: 'key', modelName: 'model', provider: 'provider' }, modelFingerprint: 'digest' });
     const runtime = new ScheduledAgentRuntime(() => ({ jwtSecret: 'test', scopedJwtSecret: 'test', aiBackend: 'http://test.invalid' }), {}, grants);
     sinon.stub(runtime, 'checkOwner').resolves(agent);
     const delivery = sinon.stub(runtime, 'checkDelivery');
@@ -32,6 +32,9 @@ describe('Project schedule runtime', () => {
     assert.equal(validate.callCount, 2); assert.equal(delivery.callCount, 0);
     assert.equal(open.firstCall.args[0].projectId, 'project-a');
     assert.equal(open.firstCall.args[0].projectVisibility, 'private');
+    assert.equal(open.firstCall.args[0].modelInfo?.modelKey, 'key');
+    assert.equal(open.firstCall.args[0].modelInfo?.modelProvider, 'provider');
+    assert.equal(complete.firstCall.args[0].modelInfo.modelName, 'model');
     const payload = complete.firstCall.args[0].request.payload;
     assert.deepEqual(payload.tools, []); assert.equal(payload.safeRetrievalOnly, true);
     assert.equal(payload.strictScope, true); assert.deepEqual(payload.filters, { apps: ['approved-source'], kb: [] });
