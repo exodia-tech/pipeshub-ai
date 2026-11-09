@@ -5975,5 +5975,11 @@
     "invalid": "Scegli un’immagine PNG, JPEG o WebP inferiore a 5 MB.",
     "failed": "Impossibile salvare l’immagine dell’agente. Riprova.",
     "saving": "Salvataggio…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "Ragionamento predefinito del modello",
+    "inheritPlatform": "Usa il valore della piattaforma (Basso)",
+    "inheritModel": "Eredita dal modello",
+    "priority": "Priorità: scelta del messaggio → agente → modello → Basso."
   }
 }

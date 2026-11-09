@@ -5868,5 +5868,11 @@
     "invalid": "請選擇小於 5 MB 的 PNG、JPEG 或 WebP 圖片。",
     "failed": "無法儲存代理圖片，請重試。",
     "saving": "儲存中…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "模型預設推理強度",
+    "inheritPlatform": "使用平台預設值（低）",
+    "inheritModel": "繼承模型預設值",
+    "priority": "優先順序：訊息選擇 → 代理 → 模型 → 低。"
   }
 }

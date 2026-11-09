@@ -6048,5 +6048,11 @@
     "invalid": "Vyberte obrázek PNG, JPEG nebo WebP menší než 5 MB.",
     "failed": "Obrázek agenta se nepodařilo uložit. Zkuste to znovu.",
     "saving": "Ukládání…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "Výchozí úroveň uvažování modelu",
+    "inheritPlatform": "Použít výchozí hodnotu platformy (Nízká)",
+    "inheritModel": "Převzít výchozí hodnotu modelu",
+    "priority": "Priorita: volba zprávy → agent → model → Nízká."
   }
 }

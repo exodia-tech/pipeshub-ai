@@ -5868,5 +5868,11 @@
     "invalid": "请选择小于 5 MB 的 PNG、JPEG 或 WebP 图片。",
     "failed": "无法保存智能体图片，请重试。",
     "saving": "正在保存…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "模型默认推理强度",
+    "inheritPlatform": "使用平台默认值（低）",
+    "inheritModel": "继承模型默认值",
+    "priority": "优先级：消息选择 → 智能体 → 模型 → 低。"
   }
 }

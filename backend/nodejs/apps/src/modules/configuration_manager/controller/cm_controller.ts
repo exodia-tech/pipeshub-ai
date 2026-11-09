@@ -3018,13 +3018,10 @@ export const getModelsByType =
 // `configuration` first, then a top-level key. Blank or unknown values aren't returned.
 function storedDefaultReasoningEffort(config: Record<string, unknown>): string | undefined {
   const configuration = config.configuration as Record<string, unknown> | undefined;
-  for (const raw of [configuration?.defaultReasoningEffort, config.defaultReasoningEffort]) {
-    const value = typeof raw === 'string' ? raw.trim() : '';
-    if (value) {
-      return (REASONING_EFFORT_VALUES as readonly string[]).includes(value) ? value : undefined;
-    }
-  }
-  return undefined;
+  const raw = configuration && Object.prototype.hasOwnProperty.call(configuration, 'defaultReasoningEffort')
+    ? configuration.defaultReasoningEffort : config.defaultReasoningEffort;
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  return (REASONING_EFFORT_VALUES as readonly string[]).includes(value) ? value : undefined;
 }
 
 export const getAvailableModelsByType =

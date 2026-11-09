@@ -2,6 +2,8 @@
 // Registry types (from Python backend)
 // ========================================
 
+import { normalizeReasoningEffort, type ReasoningEffort } from '@/chat/types';
+
 export interface AIModelProviderField {
   name: string;
   displayName: string;
@@ -85,10 +87,17 @@ export interface ConfiguredModel {
   isDefault: boolean;
   contextLength?: number | null;
   modelFriendlyName?: string;
+  defaultReasoningEffort?: ReasoningEffort | null;
   /** Stored configuration key names that have a value. Never the values. */
   configuredFields?: string[];
   /** Shared by models added together, so one credential write can update them all. */
   connectionId?: string;
+}
+
+export function configuredModelReasoningDefault(model: Pick<ConfiguredModel, 'configuration' | 'defaultReasoningEffort'>): ReasoningEffort | null {
+  const raw = Object.prototype.hasOwnProperty.call(model.configuration, 'defaultReasoningEffort')
+    ? model.configuration.defaultReasoningEffort : model.defaultReasoningEffort;
+  return normalizeReasoningEffort(raw);
 }
 
 export interface DiscoveredModel {

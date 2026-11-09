@@ -3454,10 +3454,17 @@ describe('ConfigurationManager Controller', () => {
 
       it('falls back to a top-level value when configuration has none', async () => {
         const models = await availableLlms([
-          reasoningEntry({ defaultReasoningEffort: 'medium' }, { defaultReasoningEffort: '  ' }),
+          reasoningEntry({ defaultReasoningEffort: 'medium' }, {}),
         ])
 
         expect(models[0]).to.have.property('defaultReasoningEffort', 'medium')
+      })
+
+      it('does not resurrect a legacy default after the nested choice is cleared', async () => {
+        const models = await availableLlms([
+          reasoningEntry({ defaultReasoningEffort: 'high' }, { defaultReasoningEffort: '' }),
+        ])
+        expect(models[0]).not.to.have.property('defaultReasoningEffort')
       })
 
       it('is left out when no default is stored', async () => {

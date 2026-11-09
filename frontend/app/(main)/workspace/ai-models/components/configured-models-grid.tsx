@@ -4,6 +4,8 @@ import type { TFunction } from 'i18next';
 import React, { useMemo, useState } from 'react';
 import { Flex, Popover, Text } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
+import { DEFAULT_REASONING_EFFORT } from '@/chat/types';
+import { getReasoningEffortLabel } from '@/chat/components/chat-panel/expansion-panels/model-selector/model-selector-panel';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { Spinner } from '@/app/components/ui/spinner';
 import { ThemeableAssetIcon } from '@/app/components/ui/themeable-asset-icon';
@@ -14,6 +16,7 @@ import {
   modelTypesForSection,
   registryCapabilityForModelType,
   supportsIdentityForwarding,
+  configuredModelReasoningDefault,
 } from '../types';
 import { MODEL_ROW_ICON_CONTAINER_STYLE, modelRowCardStyle } from './model-row-layout';
 
@@ -221,6 +224,7 @@ function ConfiguredModelRow({
           <Text size="3" weight="medium" style={{ color: 'var(--gray-12)' }} truncate>
             {modelName}
           </Text>
+          {model.isReasoning && <Text size="1" color="gray">{t('reasoningDefaults.modelLabel')}: {getReasoningEffortLabel(t, configuredModelReasoningDefault(model) ?? DEFAULT_REASONING_EFFORT)}</Text>}
           <Flex align="center" gap="2" wrap="wrap">
             <Text size="1" style={{ color: 'var(--gray-10)' }}>
               {provider?.name ?? model.provider}

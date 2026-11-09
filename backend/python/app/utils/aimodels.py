@@ -1345,12 +1345,12 @@ def model_default_reasoning_effort(config: dict[str, Any]) -> str | None:
 
     The AI models settings API saves it inside ``configuration``, the only
     part of a model entry that keeps fields it does not list. A top-level
-    key is read only when ``configuration`` has none.
+    key is read only when the nested key is absent; an explicit blank clears it.
     """
     configuration = config.get("configuration")
-    raw = configuration.get(MODEL_DEFAULT_REASONING_EFFORT_KEY) if isinstance(configuration, dict) else None
-    if raw is None or not str(raw).strip():
-        raw = config.get(MODEL_DEFAULT_REASONING_EFFORT_KEY)
+    raw = (configuration.get(MODEL_DEFAULT_REASONING_EFFORT_KEY)
+           if isinstance(configuration, dict) and MODEL_DEFAULT_REASONING_EFFORT_KEY in configuration
+           else config.get(MODEL_DEFAULT_REASONING_EFFORT_KEY))
     if raw is None or not str(raw).strip():
         return None
     value = str(raw).strip()
@@ -1383,10 +1383,8 @@ def _reasoning_effort_kwargs(
     When ``reasoning_effort`` is absent (no explicit user choice and no agent
     default), a reasoning-capable model uses the default set on the model
     itself (``model_default_reasoning_effort``), else ``DEFAULT_REASONING_EFFORT``
-    ("high") rather than silently omitting the parameter and letting each
-    provider fall back to its own default — those vary per provider/model and
-    are often a lower, cheaper tier than a user picking a "reasoning" model
-    would expect.
+    ("low") to keep ordinary turns responsive. Explicit request, agent and
+    model choices still take precedence.
 
     An explicit ``"none"`` is silently floored to ``REASONING_MANDATORY_FALLBACK_EFFORT``
     ("low") rather than actually disabling reasoning. Fully disabling reasoning

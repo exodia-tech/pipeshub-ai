@@ -2,6 +2,12 @@
 
 How an organization configures chat, embedding, image, speech-to-text, and text-to-speech models, and how those models are discovered and listed.
 
+## Default reasoning effort
+
+In **Workspace → AI models**, edit a model and choose **Model default reasoning** below its model ID. In an agent's builder, choose **Default reasoning effort** in the **Model** section, including when the agent uses the organization's default model.
+
+The effective effort is the first configured value in this order: explicit message choice → agent default → model default → platform **Low**. Choosing **Inherit model default** on an agent or **Use platform default (Low)** on a model clears that override. Existing explicit High/Max choices stay in place. Non-reasoning models ignore this setting; providers map the normalized effort to their supported levels.
+
 ## High level
 
 ```mermaid

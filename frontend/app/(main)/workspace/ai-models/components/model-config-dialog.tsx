@@ -19,7 +19,7 @@ import { aiModelFormOptions } from '@/config';
 import { aiModelsCapabilityLabel } from '../capability-i18n';
 import { resolveModelConfigSaveError } from '../resolve-model-config-save-error';
 import type { AIModelProvider, AIModelProviderField, ConfiguredModel, PickedModel } from '../types';
-import { CAPABILITY_TO_MODEL_TYPE, IDENTITY_FORWARDING_FIELD_PREFIX } from '../types';
+import { CAPABILITY_TO_MODEL_TYPE, IDENTITY_FORWARDING_FIELD_PREFIX, configuredModelReasoningDefault } from '../types';
 import { AIModelsApi } from '../api';
 import { canFetchModels, useModelDiscovery } from '../hooks/use-model-discovery';
 import { useBatchAddModels } from '../hooks/use-batch-add-models';
@@ -355,6 +355,17 @@ export function ModelConfigDialog({
     const capFields = (provider.fields[capability] ?? []).filter(
       (f) => !f.name.startsWith(IDENTITY_FORWARDING_FIELD_PREFIX),
     );
+    if (['text_generation', 'reasoning', 'decision'].includes(capability) && !capFields.some(f => f.name === 'defaultReasoningEffort')) {
+      capFields.splice(Math.max(0, capFields.findIndex(f => f.name === 'model') + 1), 0, {
+        name: 'defaultReasoningEffort', displayName: t('reasoningDefaults.modelLabel'),
+        fieldType: 'SELECT', required: false, defaultValue: '',
+        placeholder: t('reasoningDefaults.inheritPlatform'), description: t('reasoningDefaults.priority'),
+        options: [
+          { value: '__inherit__', label: t('reasoningDefaults.inheritPlatform') },
+          ...(['low', 'medium', 'high', 'max'] as const).map(value => ({ value, label: t(`chat.reasoningEffort.${value}`) })),
+        ],
+      });
+    }
     setFields(capFields as AIModelProviderField[]);
     setPicked([]);
     setDefaultModelId(null);
@@ -368,7 +379,9 @@ export function ModelConfigDialog({
       const initial: Record<string, unknown> = {};
       for (const f of capFields) {
         const field = f as AIModelProviderField;
-        if (field.name in (editModel.configuration ?? {})) {
+        if (field.name === 'defaultReasoningEffort') {
+          initial[field.name] = configuredModelReasoningDefault(editModel) ?? '';
+        } else if (field.name in (editModel.configuration ?? {})) {
           let cfgVal = (editModel.configuration as Record<string, unknown>)[field.name];
           if (
             provider.providerId === 'azureOpenAI' &&
@@ -410,7 +423,7 @@ export function ModelConfigDialog({
       }
       setValues(defaults);
     }
-  }, [open, provider, capability, mode, editModel, resetDiscoveryState, resetBatch]);
+  }, [open, provider, capability, mode, editModel, resetDiscoveryState, resetBatch, t]);
 
   const hiddenCredentials = useMemo(
     () => findHiddenCredentialFields(mode, editModel, fields),
@@ -419,6 +432,7 @@ export function ModelConfigDialog({
 
   const handleFieldChange = useCallback(
     (name: string, value: unknown) => {
+      if (name === 'defaultReasoningEffort' && value === '__inherit__') value = '';
       const next =
         provider?.providerId === 'azureOpenAI' &&
         (name === 'model' || name === 'deploymentName')
