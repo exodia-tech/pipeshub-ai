@@ -323,7 +323,10 @@ export class SlackActivityBuilder {
       }
     }
 
-    if (this.statusMessage.trim()) {
+    const running = [...this.timeline].reverse().find((entry) => entry.kind === 'tool' && !entry.row.done);
+    const repeatsRunningTool = running?.kind === 'tool' &&
+      [running.row.label, toolDisplayLabel(running.row)].some((label) => this.statusMessage === `${label}...`);
+    if (this.statusMessage.trim() && !repeatsRunningTool) {
       sections.push(`_${this.statusMessage}_`);
     }
 

@@ -40,7 +40,9 @@ import {
 import { parseArtifactMarkers } from "./utils/parse-artifact-markers";
 import {
   rewriteCitationsForSlack,
-  stripFragmentDirective,
+  buildSlackCitationBlocks,
+  splitIncompleteSlackLink,
+  splitSlackStreamPrefix,
   stripTinyRefCitationLinks,
 } from "./utils/citations";
 
@@ -105,7 +107,6 @@ import {
   addSpaceBetweenMarkdownLinks,
   resolveSlackArtifactLink,
   getFrontendBaseUrl,
-  buildFrontendRecordUrl,
 } from "./helpers";
 
 interface TypedSlackContext {
@@ -256,16 +257,6 @@ async function uploadThreadFiles(
   }
 }
 
-function getCitationWebUrl(webUrl?: string): string {
-  if (!webUrl) {
-    return "";
-  }
-  if (/^https?:\/\//i.test(webUrl)) {
-    return webUrl;
-  }
-  return `${getFrontendBaseUrl()}${webUrl}`;
-}
-
 function rewriteInlineRecordCitationsForSlack(
   answerBody: string,
   citations?: CitationData[],
@@ -275,86 +266,6 @@ function rewriteInlineRecordCitationsForSlack(
     citations,
     getFrontendBaseUrl(),
   );
-}
-
-function buildCitationSources(citations?: CitationData[]): any[]  {
-
-  // Deduplicate by recordId, keeping the first occurrence per unique record
-  const seenRecordIds = new Set<string>();
-  const uniqueRecords: Array<{ name: string; url: string }> = [];
-
-  for (const citation of citations || []) {
-    const recordId = citation.citationData.metadata.recordId;
-    if (!recordId) continue;
-
-    let webUrl = getCitationWebUrl(citation.citationData.metadata.webUrl);
-    if (!webUrl) {
-      webUrl = buildFrontendRecordUrl(recordId);
-    }
-
-    if (seenRecordIds.has(recordId)) continue;
-    seenRecordIds.add(recordId);
-
-    const recordName = citation.citationData.metadata.recordName || "Source";
-    // Slack does not implement text fragments, and sources are deduped per record
-    const recordUrl = stripFragmentDirective(webUrl);
-    uniqueRecords.push({ name: recordName, url: recordUrl });
-  }
-
-  let blocks: any[] = [];
-  let elements: any[] = [];
-
-  for (const record of uniqueRecords) {
-    elements.push({
-      "type": "link",
-      "url": record.url,
-      "text": ` ${record.name}`,
-    });
-    elements.push({
-      "type": "text",
-      "text": `\n`,
-    });
-
-    if (elements.length === 20) {
-      blocks.push({
-        "type": "rich_text",
-        "elements": [
-          {
-            "type": "rich_text_section",
-            "elements": [
-              ...elements,
-            ]
-          }
-        ]
-      });
-      elements = [];
-    }
-  }
-
-  if (elements.length > 0) {
-    blocks.push({
-      "type": "rich_text",
-      "elements": [
-        {
-          "type": "rich_text_section",
-          "elements": [
-            ...elements,
-          ]
-        }
-      ]
-    });
-  }
-
-  if (blocks.length > 0) {
-    blocks = [ {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: "*Sources:*",
-      },
-    }, ...blocks];
-  }
-  return blocks;
 }
 
 // Middleware setup
@@ -683,6 +594,7 @@ async function processSlackMessage(
     let streamTableProbeText = "";
     let tablePauseHintSent = false;
     let streamedAnswerLength = 0;
+    let answerProgressShown = false;
     let ignoreAnswerChunks = false;
     let askUserShown = false;
     let conversationPersisted = Boolean(conversation);
@@ -868,6 +780,7 @@ async function processSlackMessage(
         clearAnswerFlushTimer();
         pendingAppendText = "";
         streamedAnswerLength = 0;
+        answerProgressShown = false;
         queuedStreamAppend = queuedStreamAppend
           .then(async () => deleteStreamMessages())
           .catch((error) => {
@@ -880,6 +793,11 @@ async function processSlackMessage(
       }
       const nextChunk = accumulated.slice(streamedAnswerLength);
       streamedAnswerLength = accumulated.length;
+      if (!answerProgressShown) {
+        activityBuilder.setStatus('Writing reply...');
+        scheduleActivityUpdate();
+        answerProgressShown = true;
+      }
       enqueueAnswerDelta(nextChunk);
     };
 
@@ -902,6 +820,7 @@ async function processSlackMessage(
       clearAnswerFlushTimer();
       pendingAppendText = "";
       streamedAnswerLength = 0;
+      answerProgressShown = false;
       pendingActivityUpdate = false;
       if (activityFlushTimer) {
         clearTimeout(activityFlushTimer);
@@ -980,6 +899,7 @@ async function processSlackMessage(
       clearAnswerFlushTimer();
       pendingAppendText = '';
       streamedAnswerLength = 0;
+      answerProgressShown = false;
       queuedStreamAppend = queuedStreamAppend
         .then(async () => deleteStreamMessages())
         .catch((error: unknown) => {
@@ -991,16 +911,6 @@ async function processSlackMessage(
       onStatus: (message) => {
         activityBuilder.setStatus(message);
         scheduleActivityUpdate();
-      },
-      onReasoning: (delta, done) => {
-        if (delta) {
-          activityBuilder.appendReasoning(delta);
-          scheduleActivityUpdate();
-        }
-        if (done) {
-          activityBuilder.finishReasoning();
-          scheduleActivityUpdate();
-        }
       },
       onModelCallDiscarded: () => {
         activityBuilder.dropTrailingReasoning();
@@ -1083,9 +993,11 @@ async function processSlackMessage(
         return;
       }
 
-      const renderedDeltaText = markdownToSlackMrkdwn(text, {
+      let renderedDeltaText = markdownToSlackMrkdwn(text, {
         preserveTrailingWhitespace: true,
       });
+      renderedDeltaText = renderedDeltaText.replace(/<(https?:\/\/[^>|\n]+)\|([^>\n]+)>/g,
+        (link, _url, label) => link.length > SLACK_STREAM_MARKDOWN_LIMIT ? label : link);
       if (renderedDeltaText.length === 0) {
         return;
       }
@@ -1110,9 +1022,7 @@ async function processSlackMessage(
 
             if (spaceLeft > 0) {
               // Prefer splitting at the last newline within the remaining space
-              const candidate = chunk.slice(0, spaceLeft);
-              const lastNewline = candidate.lastIndexOf("\n");
-              const splitIndex = lastNewline > -1 ? lastNewline + 1 : spaceLeft;
+              const splitIndex = splitSlackStreamPrefix(chunk, spaceLeft);
               const fitsInCurrent = chunk.slice(0, splitIndex);
 
               if (fitsInCurrent.length > 0) {
@@ -1162,14 +1072,17 @@ async function processSlackMessage(
       }
     };
 
-    const flushPendingAppend = (): void => {
+    const flushPendingAppend = (final = false): void => {
       clearAnswerFlushTimer();
-      const textToAppend = pendingAppendText;
+      const { ready, pending } = final
+        ? { ready: pendingAppendText, pending: "" }
+        : splitIncompleteSlackLink(pendingAppendText);
+      const textToAppend = ready;
       if (!textToAppend) {
         return;
       }
 
-      pendingAppendText = "";
+      pendingAppendText = pending;
       queuedStreamAppend = queuedStreamAppend
         .then(async () => pushTextToSlackStream(textToAppend))
         .catch((error) => {
@@ -1291,7 +1204,7 @@ async function processSlackMessage(
       clearTimeout(activityFlushTimer);
       activityFlushTimer = null;
     }
-    flushPendingAppend();
+    flushPendingAppend(true);
     // Never flush activity after ask-user — that would wipe the questions text.
     if (!askUserShown) {
       flushActivityUpdate();
@@ -1392,8 +1305,7 @@ async function processSlackMessage(
       await pushTextToSlackStream(botResponse.content);
     }
 
-    const citationBlocks = buildCitationSources(botResponse.citations);
-    const citationBlockChunks = splitSlackBlocksByLimit(citationBlocks);
+    const citationBlocks = buildSlackCitationBlocks(botResponse.citations, getFrontendBaseUrl());
     // Frontend strips ::artifact markers into an Artifacts panel; Slack must
     // not show the raw wire syntax in the final answer body.
     const { text: contentWithoutArtifacts, artifacts: contentArtifacts } =
@@ -1404,7 +1316,8 @@ async function processSlackMessage(
     );
     answerBody = removeContinuousDuplicateMarkdownLinks(answerBody);
     answerBody = addSpaceBetweenMarkdownLinks(answerBody);
-    const finalChunks = await buildFinalSlackChunks(answerBody);
+    const answerChunks = await buildFinalSlackChunks(answerBody);
+    const finalChunks = splitSlackBlocksByLimit([...answerChunks.flat(), ...citationBlocks]);
 
     const [firstFinalChunk, ...remainingFinalChunks] = finalChunks;
 
@@ -1494,9 +1407,6 @@ async function processSlackMessage(
       if (firstChunkSent) {
         for (const remainingChunk of remainingFinalChunks) {
           await postThreadChunkMessage(remainingChunk);
-        }
-        for (const citationChunk of citationBlockChunks) {
-          await postThreadChunkMessage(citationChunk);
         }
       }
     }

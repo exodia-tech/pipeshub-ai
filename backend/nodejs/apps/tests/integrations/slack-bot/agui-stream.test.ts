@@ -12,6 +12,15 @@ function snapshot(fields: Record<string, unknown>) {
 }
 
 describe('slack-bot/utils/agui-stream', () => {
+  it('shows a running action once and preserves real progress', () => {
+    const activity = new SlackActivityBuilder();
+    activity.startTool('web_search', 'Using Web Search');
+    expect(activity.format()).to.equal('• Web Search...');
+    activity.setStatus('Using Web Search... 3/10');
+    expect(activity.format()).to.contain('3/10');
+    activity.finishTool('web_search', 'Searched web', true);
+    expect(activity.format()).to.contain('✗ Searched web');
+  });
   describe("an MCP server's progress on the status line", () => {
     const running = { status: 'running_tool', current_tool: 'mcp_jira_search' };
 
