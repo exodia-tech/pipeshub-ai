@@ -6022,6 +6022,30 @@
       "draft": "Koncept připraven",
       "needs_review": "Ke kontrole",
       "needs_reconciliation": "Zkontrolovat přerušené spuštění"
-    }
+    },
+    "slackTitle": "Doručování do Slacku",
+    "sendSlack": "Posílat přehledy do Slacku",
+    "slackBot": "Bot Slacku",
+    "chooseBot": "Vybrat bota",
+    "slackChannel": "Kanál Slacku",
+    "channelPlaceholder": "Vložte odkaz nebo ID kanálu Slacku",
+    "channelHelp": "Před zapnutím doručování pozvěte vybraného bota do tohoto kanálu.",
+    "slackAdminOnly": "Doručování do Slacku spravuje administrátor organizace. Můžete ho vypnout.",
+    "manageBots": "Spravovat boty Slacku",
+    "noBots": "Nejprve připojte bota k tomuto agentovi.",
+    "slackLoadFailed": "Nastavení Slacku se nepodařilo načíst. Zavřete a znovu otevřete okno.",
+    "invalidSlack": "Vyberte bota a zadejte platný odkaz nebo ID kanálu Slacku.",
+    "saveBeforeRun": "Před spuštěním uložte změny."
+  },
+  "agentPicture": {
+    "title": "Změnit obrázek agenta",
+    "description": "Aktualizujte obrázek tohoto agenta v Brain.",
+    "choose": "Vybrat obrázek",
+    "remove": "Odebrat obrázek",
+    "formats": "PNG, JPEG nebo WebP · do 5 MB",
+    "preview": "Náhled obrázku",
+    "invalid": "Vyberte obrázek PNG, JPEG nebo WebP menší než 5 MB.",
+    "failed": "Obrázek agenta se nepodařilo uložit. Zkuste to znovu.",
+    "saving": "Ukládání…"
   }
 }

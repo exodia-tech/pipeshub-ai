@@ -2829,7 +2829,7 @@ async def create_agent(request: Request) -> JSONResponse:
             "isServiceAccount": is_service_account,
             "serviceAccountUserId": service_account_binding,
             "sendUserContext": bool(body.get("sendUserContext", True)),
-            "avatarUrl": parse_avatar_url(body.get("avatarUrl")),
+            "avatarUrl": parse_avatar_url(body.get("avatarUrl"), agent_key),
             "createdBy": user_key,
             "updatedBy": None,
             "createdAtTimestamp": time,
@@ -3440,7 +3440,7 @@ async def update_agent(request: Request, agent_id: str) -> JSONResponse:
                 )
 
         if "avatarUrl" in body:
-            body["avatarUrl"] = parse_avatar_url(body["avatarUrl"])
+            body["avatarUrl"] = parse_avatar_url(body["avatarUrl"], agent_id)
         if "defaultReasoningEffort" in body:
             body["defaultReasoningEffort"] = _parse_default_reasoning_effort(
                 body.get("defaultReasoningEffort")

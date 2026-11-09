@@ -971,6 +971,7 @@ export function AgentBuilder({ agentKey }: { agentKey: string | null }) {
     <ReactFlowProvider>
       <Flex direction="column" style={{ height: '100%', minHeight: 0, overflow: 'hidden' }}>
         <AgentBuilderHeader
+          agentId={effectiveAgentKey}
           agentName={agentName}
           onAgentNameChange={setAgentName}
           agentNameError={agentNameError}

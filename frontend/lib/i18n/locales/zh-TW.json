@@ -5842,6 +5842,30 @@
       "draft": "草稿已就緒",
       "needs_review": "審閱草稿",
       "needs_reconciliation": "檢查中斷的執行"
-    }
+    },
+    "slackTitle": "Slack 傳送",
+    "sendSlack": "將摘要傳送至 Slack",
+    "slackBot": "Slack 機器人",
+    "chooseBot": "選擇機器人",
+    "slackChannel": "Slack 頻道",
+    "channelPlaceholder": "貼上 Slack 頻道連結或 ID",
+    "channelHelp": "啟用傳送前，請先邀請所選機器人加入此頻道。",
+    "slackAdminOnly": "Slack 傳送由組織管理員管理。你可以將其關閉。",
+    "manageBots": "管理 Slack 機器人",
+    "noBots": "請先為此代理連接機器人。",
+    "slackLoadFailed": "無法載入 Slack 設定。請關閉後重新開啟以重試。",
+    "invalidSlack": "請選擇機器人，並輸入有效的 Slack 頻道連結或 ID。",
+    "saveBeforeRun": "執行前請先儲存變更。"
+  },
+  "agentPicture": {
+    "title": "變更代理圖片",
+    "description": "更新此代理在 Brain 中的圖片。",
+    "choose": "選擇圖片",
+    "remove": "移除圖片",
+    "formats": "PNG、JPEG 或 WebP · 最大 5 MB",
+    "preview": "圖片預覽",
+    "invalid": "請選擇小於 5 MB 的 PNG、JPEG 或 WebP 圖片。",
+    "failed": "無法儲存代理圖片，請重試。",
+    "saving": "儲存中…"
   }
 }

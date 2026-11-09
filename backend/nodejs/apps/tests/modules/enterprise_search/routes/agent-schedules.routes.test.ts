@@ -52,4 +52,27 @@ describe('Agent schedule access boundaries', () => {
     assert.equal(owner.callCount, 1);
     } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
   });
+  it('validates paused destination edits but lets a former admin pause an unchanged destination', async () => {
+    const container = new Container();
+    container.bind('AuthMiddleware').toConstantValue({ authenticate: (req: AuthenticatedUserRequest, _res: express.Response, next: express.NextFunction) => {
+      req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: ['agent:read', 'agent:write', 'agent:execute'] }; next();
+    } });
+    const bot = '120d1a70-989a-499b-8e41-170b2a07a820';
+    const runtime = Object.create(ScheduledAgentRuntime.prototype) as ScheduledAgentRuntime;
+    sinon.stub(runtime, 'checkOwner').resolves({});
+    const delivery = sinon.stub(runtime, 'checkDelivery').rejects(new Error('not admin'));
+    const schedules = Object.create(AgentSchedules.prototype) as AgentSchedules;
+    sinon.stub(schedules, 'read').resolves({ slackBotId: bot, slackChannelId: 'C0C6WPPH5V0' });
+    const save = sinon.stub(schedules, 'save').resolves({});
+    container.bind(ScheduledAgentRuntime).toConstantValue(runtime); container.bind(AgentSchedules).toConstantValue(schedules);
+    const app = express(); app.use(express.json()); app.use('/agents/:agentKey/schedule', createAgentScheduleRouter(container));
+    app.use((_err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.sendStatus(403); });
+    const server = createServer(app); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const path = `http://127.0.0.1:${(server.address() as AddressInfo).port}/agents/e6ed44ce-65cc-42db-95bc-5db456f5f450/schedule`;
+    const send = (channel: string) => fetch(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...valid, enabled: false, slackBotId: bot, slackChannelId: channel }) });
+    try {
+      assert.equal((await send('C0C6WPPH5V0')).status, 200); assert.equal(delivery.callCount, 0); assert.equal(save.callCount, 1);
+      assert.equal((await send('C0123456789')).status, 403); assert.equal(delivery.callCount, 1); assert.equal(save.callCount, 1);
+    } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
 });

@@ -5876,6 +5876,30 @@
       "draft": "Draft ready",
       "needs_review": "Review draft",
       "needs_reconciliation": "Check interrupted run"
-    }
+    },
+    "slackTitle": "Slack delivery",
+    "sendSlack": "Send briefings to Slack",
+    "slackBot": "Slack bot",
+    "chooseBot": "Choose a bot",
+    "slackChannel": "Slack channel",
+    "channelPlaceholder": "Paste a Slack channel link or ID",
+    "channelHelp": "Invite the selected bot to this channel before enabling delivery.",
+    "slackAdminOnly": "An organization admin manages Slack delivery. You can disable it.",
+    "manageBots": "Manage Slack bots",
+    "noBots": "Connect a bot to this agent first.",
+    "slackLoadFailed": "Slack settings couldn't load. Close and reopen to retry.",
+    "invalidSlack": "Choose a bot and enter a valid Slack channel link or ID.",
+    "saveBeforeRun": "Save your changes before running."
+  },
+  "agentPicture": {
+    "title": "Change agent picture",
+    "description": "Update this agent's picture in Brain.",
+    "choose": "Choose image",
+    "remove": "Remove picture",
+    "formats": "PNG, JPEG or WebP · up to 5 MB",
+    "preview": "Picture preview",
+    "invalid": "Choose a PNG, JPEG or WebP image smaller than 5 MB.",
+    "failed": "Couldn't save the agent picture. Please try again.",
+    "saving": "Saving…"
   }
 }

@@ -17,6 +17,9 @@ export interface AgentSchedule extends AgentScheduleSettings {
 }
 const path = (id: string) => `/api/v1/agents/${encodeURIComponent(id)}/schedule`;
 export const AgentSchedulesApi = {
+  async deliveryOptions(id: string): Promise<{ canManage: boolean; bots: { id: string; name: string }[] }> {
+    return (await apiClient.get<{ canManage: boolean; bots: { id: string; name: string }[] }>(`${path(id)}/slack-bots`)).data;
+  },
   async read(id: string): Promise<AgentSchedule | null> {
     return (await apiClient.get<{ schedule: AgentSchedule | null }>(path(id))).data.schedule;
   },

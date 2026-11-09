@@ -1,5 +1,6 @@
 'use client';
 
+import { AgentPictureDialog } from '../../agent-picture-dialog';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -27,6 +28,7 @@ import { ServiceAgentIdentityControl } from './service-agent-identity-control';
 
 export function AgentBuilderHeader(props: {
   agentName: string;
+  agentId?: string | null;
   onAgentNameChange: (v: string) => void;
   /** Inline validation message for the name field (e.g. empty on save). */
   agentNameError?: string | null;
@@ -75,6 +77,7 @@ export function AgentBuilderHeader(props: {
   const isBelowDesktop = useIsBelowDesktop();
   const {
     agentName,
+    agentId,
     onAgentNameChange,
     agentNameError = null,
     agentNameInputRef,
@@ -120,9 +123,12 @@ export function AgentBuilderHeader(props: {
   const showShareInMenu = isMobile && !hideShareControls;
   const showConvertInMenu = isBelowDesktop && showConvertOption;
   const convertDisabled = saving || loading || serviceAccountPermissionDenied;
-  const showAgentMenu = showDeleteOption || showShareInMenu || showConvertInMenu;
+  const [pictureOpen, setPictureOpen] = useState(false);
+  const showPictureOption = Boolean(agentId && canPersist);
+  const showAgentMenu = showPictureOption || showDeleteOption || showShareInMenu || showConvertInMenu;
 
   return (
+    <>
     <Flex
       align="center"
       justify="between"
@@ -258,6 +264,7 @@ export function AgentBuilderHeader(props: {
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content side="bottom" align="end" sideOffset={4} style={{ minWidth: 140 }}>
+              {showPictureOption && <DropdownMenu.Item onSelect={() => setPictureOpen(true)}>{t('agentPicture.title')}</DropdownMenu.Item>}
               {showConvertInMenu ? (
                 <DropdownMenu.Item
                   disabled={convertDisabled}
@@ -443,5 +450,7 @@ export function AgentBuilderHeader(props: {
         })()}
       </Flex>
     </Flex>
+    {pictureOpen && agentId && <AgentPictureDialog agentId={agentId} open onOpenChange={setPictureOpen} />}
+    </>
   );
 }

@@ -1282,7 +1282,7 @@ agent_schema = {
             "avatarUrl": {
                 "type": ["string", "null"],
                 "maxLength": 200,
-                "pattern": r"^/assets/agents/[a-z0-9][a-z0-9._-]*\.(?:png|webp|jpg)$",
+                "pattern": r"^(?:/assets/agents/[a-z0-9][a-z0-9._-]*\.(?:png|webp|jpg)|/api/v1/agents/[0-9a-f-]{36}/avatar/[0-9a-f-]{36})$",
             },
             "name": {"type": "string", "minLength": 1},
             "description": {"type": "string", "minLength": 1},

@@ -14284,8 +14284,8 @@ components:
           type: string
           nullable: true
           maxLength: 200
-          pattern: '^/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)$'
-          description: Deployment-owned portrait asset. External and data URLs are refused.
+          pattern: '^(/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)|/api/v1/agents/[0-9a-f-]{36}/avatar/[0-9a-f-]{36})$'
+          description: Deployment-owned raster asset or private versioned picture URL for this agent. External and data URLs are refused as metadata.
         _id:
           type: string
           description: Full document id in the backing graph store.
@@ -14738,8 +14738,8 @@ components:
           type: string
           nullable: true
           maxLength: 200
-          pattern: '^/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)$'
-          description: Deployment-owned portrait asset. External and data URLs are refused.
+          pattern: '^(/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)|/api/v1/agents/[0-9a-f-]{36}/avatar/[0-9a-f-]{36})$'
+          description: Deployment-owned raster asset or private versioned picture URL for this agent. External and data URLs are refused as metadata.
         name:
           type: string
           minLength: 1
@@ -15119,8 +15119,8 @@ components:
           type: string
           nullable: true
           maxLength: 200
-          pattern: '^/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)$'
-          description: Deployment-owned portrait asset. External and data URLs are refused.
+          pattern: '^(/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)|/api/v1/agents/[0-9a-f-]{36}/avatar/[0-9a-f-]{36})$'
+          description: Deployment-owned raster asset or private versioned picture URL for this agent. External and data URLs are refused as metadata.
         name:
           type: string
           minLength: 1
@@ -24906,6 +24906,99 @@ security:
   - bearerAuth: []
   - oauth2: []
 paths:
+  /agents/{agentKey}/avatar:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Agents]
+      summary: Upload or replace an agent's private profile picture
+      description: |
+        Requires agent:read, agent:write and creator ownership. Accepts PNG, JPEG or WebP
+        bytes up to 5 MiB and 16 megapixels, regardless of the supplied MIME type.
+        Re-encodes to a metadata-free 512px square WebP, at most 256 KiB, stored in the
+        organization's persistent KV store. Returns a versioned authenticated API URL.
+        Updates Brain only; does not change the Slack application's icon.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Picture saved and agent metadata updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [avatarUrl]
+                properties:
+                  avatarUrl: { type: string }
+        '400': { description: Missing, oversized or invalid image. }
+        '403': { description: Caller lacks scope or creator ownership. }
+    delete:
+      tags: [Agents]
+      summary: Remove an agent's profile picture
+      description: Requires agent:read, agent:write and creator ownership. Clears metadata before deleting stored image bytes.
+      responses:
+        '200':
+          description: Picture removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  avatarUrl: { type: string, nullable: true, enum: [null] }
+        '403': { description: Caller lacks scope or creator ownership. }
+  /agents/{agentKey}/avatar/{version}:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: version, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Agents]
+      summary: Read the current private agent picture
+      description: Requires agent:read and current agent visibility. Organization and active version are checked on every read. Responses use Cache-Control private, no-store.
+      responses:
+        '200':
+          description: Authenticated raster image data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dataUrl]
+                properties:
+                  dataUrl: { type: string, description: Base64 WebP data URL for display after an authenticated fetch. }
+        '403': { description: Agent visibility or scope denied. }
+        '404': { description: Picture missing or version no longer active. }
+  /agents/{agentKey}/schedule/slack-bots:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Agents]
+      summary: List existing Slack bots bound to this agent
+      description: Requires agent:read and creator ownership. Live organization administrators receive bot IDs and names only; other creators receive canManage false and an empty list. Never returns credentials or expands Slack scopes.
+      responses:
+        '200':
+          description: Available delivery settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canManage, bots]
+                properties:
+                  canManage: { type: boolean }
+                  bots:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+        '403': { description: Caller lacks scope or creator ownership. }
   /agents/{agentKey}/schedule:
     parameters:
       - in: path
@@ -24932,6 +25025,8 @@ paths:
         user-context injection. Every run revalidates the active owner and agent.
         Slack delivery additionally requires current organization-admin permission
         and a stored Slack bot mapped to this agent. No secrets are accepted here.
+        Destination edits are validated even while paused. A creator can pause or
+        clear unchanged delivery settings after losing administrator permission.
         Revision prevents lost updates. Interrupted/uncertain runs pause the schedule
         for reconciliation; they are not automatically repeated. Missed ticks are
         coalesced into one run, whose reporting window covers the gap.
