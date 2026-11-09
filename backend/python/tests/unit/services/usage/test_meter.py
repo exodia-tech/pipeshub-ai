@@ -51,6 +51,23 @@ def context(
 
 
 class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
+    async def test_langchain_resolves_configured_model_for_pricing(self) -> None:
+        from app.agents.agent_loop.langchain_transport import LangChainTransport
+
+        class NamedModel(GenericFakeChatModel):
+            model: str = "gemini-3.8-flash"
+
+        llm = NamedModel(messages=iter([AIMessage(content="done", usage_metadata={
+            "input_tokens": 10, "output_tokens": 5, "total_tokens": 15,
+        })]))
+        with bind_call_context(context()), patch("app.services.usage.ledger.catalog_rates", return_value={
+            "input": "0.3", "output": "2.5", "cache_read": "0.03", "cache_write": "0.3",
+        }):
+            await MeteredTransport(LangChainTransport(llm)).complete([])
+        self.assertEqual(self.events()[0]["model"], "gemini-3.8-flash")
+        self.assertGreater(self.events()[0]["cost_usd"], 0)
+        self.assertEqual(LangChainTransport(llm, model_name="explicit-model").model_name, "explicit-model")
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

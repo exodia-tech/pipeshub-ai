@@ -328,7 +328,7 @@ class LangChainTransport(LLMTransport):
         cache_strategy: "CacheStrategy | None" = None,
     ) -> None:
         self._llm = chat_model
-        self._model = model_name
+        self._model = model_name or getattr(chat_model, "model_name", None) or getattr(chat_model, "model", None) or ""
         # How this provider is asked to cache the tools, the system prompt and
         # the history (`prompt_cache.cache_strategy_for`). Narrowed by
         # `CacheStrategy.without` if the provider rejects a cache parameter.

@@ -24,6 +24,8 @@ Background work belongs to its organization and connector, not to the person who
 
 No historical usage is fabricated. Tracking starts when the environment flag is enabled. Existing invoices, historical chat transcripts, and historical connector activity are not imported or re-indexed.
 
+LangChain transports resolve an omitted model name from the configured chat model before emitting usage. Older events with an empty model name remain unpriced: their exact model cannot be recovered from token counts. Failed calls without a provider usage response remain recorded with unknown counters; this is different from a dropped event. An unpriced event can also retain a historical missing-price snapshot even after a catalog fix, since price changes do not rewrite history.
+
 ## Cost estimates and pricing
 
 Prices come from the installed LiteLLM package's [local fallback catalog](https://github.com/BerriAI/litellm/blob/main/litellm/model_prices_and_context_window_backup.json), read without importing LiteLLM or making a network request. It is a package-version snapshot, not a live price feed. An exact model entry or provider/model entry is required; Gemini resource names beginning with `models/` are matched to their catalog model, preferring the Gemini-specific price. Missing, invalid or tiered/threshold pricing stays unpriced. There are no invented exchange rates or guessed custom-model prices.
