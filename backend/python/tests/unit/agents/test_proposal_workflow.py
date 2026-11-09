@@ -40,7 +40,8 @@ def proposal():
 class ProposalWorkflowTest(TestCase):
     def test_detects_explicit_english_and_italian_but_flags_uncertainty(self):
         self.assertEqual(candidate_kind("We'll prepare a proposal"), 'explicit_review')
-        self.assertEqual(candidate_kind('We will be doing a proposal'), 'explicit_review')
+        self.assertEqual(candidate_kind('We will be doing a proposal'),
+                         'explicit_review')
         self.assertEqual(candidate_kind("I'll draft a proposal"), 'explicit_review')
         self.assertEqual(candidate_kind('Prepareremo una proposta'), 'explicit_review')
         for message in ['Maybe we will prepare a proposal',
@@ -94,7 +95,8 @@ class ProposalWorkflowTest(TestCase):
         self.assertEqual(item.due, due)
         self.assertEqual(item.inputs['scope'], 'Pilot delivery')
         with self.assertRaises(ValueError):
-            accept_source_edit(item, candidate(message_revision='r2'), human_verified=False)
+            accept_source_edit(item, candidate(message_revision='r2'),
+                               human_verified=False)
         accept_source_edit(item, candidate(message_revision='r2'), human_verified=True)
         self.assertFalse(item.needs_reconciliation)
         with self.assertRaises(ValueError):
@@ -106,29 +108,31 @@ class ProposalWorkflowTest(TestCase):
         item.discovery_url = 'https://example.invalid/private-discovery'
         item.document_url = 'https://example.invalid/private-proposal'
         with self.assertRaises(PermissionError):
-            draft_report(item, client_scope='other-client', source_access=True, issue_access=True,
-                         discovery_access=True, document_access=True)
+            draft_report(item, client_scope='other-client', source_access=True,
+                         issue_access=True, discovery_access=True, document_access=True)
         with self.assertRaises(PermissionError):
-            draft_report(item, client_scope='client-1', source_access=False, issue_access=True,
-                         discovery_access=True, document_access=True)
-        draft = draft_report(item, client_scope='client-1', source_access=True, issue_access=False,
+            draft_report(item, client_scope='client-1', source_access=False,
+                         issue_access=True, discovery_access=True, document_access=True)
+        draft = draft_report(item, client_scope='client-1', source_access=True,
+                             issue_access=False,
                              discovery_access=False, document_access=False)
         self.assertIsNone(draft['discovery_url'])
         self.assertIsNone(draft['document_url'])
         self.assertIsNone(draft['issue_url'])
         allowed = draft_report(item, client_scope='client-1', source_access=True,
-                               issue_access=True, discovery_access=True, document_access=True)
+                               issue_access=True, discovery_access=True,
+                               document_access=True)
         self.assertEqual(allowed['issue_url'], item.issue_url)
         self.assertEqual(allowed['document_url'], item.document_url)
         self.assertEqual(draft['owner_id'], 'owner-1')
         self.assertEqual(len(draft['missing_inputs']), 7)
 
-    def test_accelerated_full_week_coalesces_and_prevents_duplicate_or_uncertain_delivery(self):
+    def test_accelerated_week_and_delivery_deduplication(self):
         item = proposal()
         checks = [
             (datetime(2026, 11, 3, 10, tzinfo=ZONE), 'missing_inputs'),
             (datetime(2026, 11, 5, 10, tzinfo=ZONE), 'draft_progress'),
-            # Days five and six land on the weekend; Monday coalesces them into deadline.
+            # Weekend stages coalesce into Monday's deadline.
             (datetime(2026, 11, 7, 10, tzinfo=ZONE), None),
             (datetime(2026, 11, 9, 10, tzinfo=ZONE), 'deadline:0'),
             (datetime(2026, 11, 10, 10, tzinfo=ZONE), 'overdue:0:2026-11-10'),
@@ -143,12 +147,14 @@ class ProposalWorkflowTest(TestCase):
                 self.assertIsNone(next_reminder(item, now, **HOURS))
         set_reminder_result(item, 'overdue:0:2026-11-11', 'reserved')
         set_reminder_result(item, 'overdue:0:2026-11-11', 'uncertain')
-        self.assertIsNone(next_reminder(item, datetime(2026, 11, 11, 10, tzinfo=ZONE), **HOURS))
+        self.assertIsNone(next_reminder(
+            item, datetime(2026, 11, 11, 10, tzinfo=ZONE), **HOURS))
         with self.assertRaises(ValueError):
             set_reminder_result(item, 'overdue:0:2026-11-11', 'reserved')
         with self.assertRaises(ValueError):
             override_due(item, datetime(2026, 11, 16, 10, tzinfo=ZONE))
-        set_reminder_result(item, 'overdue:0:2026-11-11', 'delivered', human_reconciled=True)
+        set_reminder_result(item, 'overdue:0:2026-11-11', 'delivered',
+                            human_reconciled=True)
 
     def test_deadline_override_keeps_history_and_schedules_the_new_deadline(self):
         item = proposal()
@@ -165,6 +171,8 @@ class ProposalWorkflowTest(TestCase):
             with self.assertRaises(ValueError):
                 set_state(item, status, human_verified=False)
             set_state(item, status, human_verified=True)
-            self.assertIsNone(next_reminder(item, datetime(2026, 11, 10, 10, tzinfo=ZONE), **HOURS))
+            self.assertIsNone(next_reminder(
+                item, datetime(2026, 11, 10, 10, tzinfo=ZONE), **HOURS))
         item = proposal()
-        self.assertIsNone(next_reminder(item, datetime(2026, 11, 3, 8, 59, tzinfo=ZONE), **HOURS))
+        self.assertIsNone(next_reminder(
+            item, datetime(2026, 11, 3, 8, 59, tzinfo=ZONE), **HOURS))

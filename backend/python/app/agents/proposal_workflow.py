@@ -123,8 +123,8 @@ def override_due(proposal: Proposal, due: datetime) -> None:
     _aware(due)
     if due.astimezone(UTC) < proposal.candidate.committed_at.astimezone(UTC):
         raise ValueError('The deadline cannot precede the commitment')
-    if any(status in {'reserved', 'uncertain'} for status in proposal.reminders.values()):
-        raise ValueError('Reconcile the outstanding delivery before changing the deadline')
+    if any(s in {'reserved', 'uncertain'} for s in proposal.reminders.values()):
+        raise ValueError('Reconcile the delivery before changing the deadline')
     if due.astimezone(UTC) != proposal.due.astimezone(UTC):
         proposal.deadline_revision += 1
     proposal.due_override = due
@@ -143,7 +143,8 @@ def reconcile_source(proposal: Proposal, revision: str | None) -> None:
         proposal.needs_reconciliation = True
 
 
-def accept_source_edit(proposal: Proposal, candidate: Candidate, *, human_verified: bool) -> None:
+def accept_source_edit(proposal: Proposal, candidate: Candidate,
+                       *, human_verified: bool) -> None:
     if (not human_verified or candidate.key != proposal.candidate.key
             or candidate.committed_at != proposal.candidate.committed_at):
         raise ValueError('A human must verify the same source and commitment time')
@@ -152,11 +153,13 @@ def accept_source_edit(proposal: Proposal, candidate: Candidate, *, human_verifi
 
 
 def missing_inputs(proposal: Proposal) -> list[str]:
-    return [name for name in REQUIRED_INPUTS if not proposal.inputs.get(name, '').strip()]
+    return [name for name in REQUIRED_INPUTS
+            if not proposal.inputs.get(name, '').strip()]
 
 
 def draft_report(proposal: Proposal, *, client_scope: str, source_access: bool,
-                 issue_access: bool, discovery_access: bool, document_access: bool) -> dict:
+                 issue_access: bool, discovery_access: bool,
+                 document_access: bool) -> dict:
     """The runtime supplies freshly verified source and client permissions."""
     if not source_access or client_scope != proposal.client_scope:
         raise PermissionError('The caller cannot read this proposal source')
@@ -185,20 +188,23 @@ def next_reminder(proposal: Proposal, now: datetime, *, working_start: time,
             or not working_start < working_end):
         raise ValueError('Specify business days and a valid working-hours window')
     local = now.astimezone(ZoneInfo(proposal.timezone))
-    if local.weekday() not in working_days or not working_start <= local.time() < working_end:
+    if (local.weekday() not in working_days
+            or not working_start <= local.time() < working_end):
         return None
-    if any(status in {'reserved', 'uncertain'} for status in proposal.reminders.values()):
+    if any(s in {'reserved', 'uncertain'} for s in proposal.reminders.values()):
         return None
     start = proposal.candidate.committed_at.astimezone(ZoneInfo(proposal.timezone))
     due = proposal.due.astimezone(ZoneInfo(proposal.timezone))
-    elapsed = [name for day, name in _STEPS if min(start + timedelta(days=day), due) <= local]
+    elapsed = [name for day, name in _STEPS
+               if min(start + timedelta(days=day), due) <= local]
     deadline_key = f'deadline:{proposal.deadline_revision}'
     if local >= due:
         elapsed.append(deadline_key)
     if not elapsed:
         return None
     milestone = elapsed[-1]
-    if (milestone == deadline_key and proposal.reminders.get(deadline_key) == 'delivered'
+    if (milestone == deadline_key
+            and proposal.reminders.get(deadline_key) == 'delivered'
             and local.date() > due.date()):
         milestone = f'overdue:{proposal.deadline_revision}:{local.date().isoformat()}'
     return None if proposal.reminders.get(milestone) == 'delivered' else milestone
@@ -206,8 +212,9 @@ def next_reminder(proposal: Proposal, now: datetime, *, working_start: time,
 
 def set_reminder_result(proposal: Proposal, milestone: str, result: str,
                         *, human_reconciled: bool = False) -> None:
-    if (milestone not in {name for _, name in _STEPS}
-            and not re.fullmatch(r'deadline:\d+|overdue:\d+:\d{4}-\d{2}-\d{2}', milestone)):
+    valid_deadline = re.fullmatch(
+        r'deadline:\d+|overdue:\d+:\d{4}-\d{2}-\d{2}', milestone)
+    if milestone not in {name for _, name in _STEPS} and not valid_deadline:
         raise ValueError('Unknown reminder milestone')
     if result not in {'reserved', 'delivered', 'uncertain'}:
         raise ValueError('Unknown delivery status')
