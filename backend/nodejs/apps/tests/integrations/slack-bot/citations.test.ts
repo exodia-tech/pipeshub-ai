@@ -156,18 +156,18 @@ describe('slack-bot citations: rewriteCitationsForSlack', () => {
 
   it('replaces a citation whose URL has parentheses without leaving its tail in the text', () => {
     const out = rewriteCitationsForSlack(`Python 3.0 shipped in 2008 [1](${wiki}).`, [webCitation], 'https://app.test');
-    expect(out).to.equal(`Python 3.0 shipped in 2008 [1](${wiki.replace(/\(/g, '%28').replace(/\)/g, '%29')}).`);
+    expect(out).to.equal(`Python 3.0 shipped in 2008 [［1］](${wiki.replace(/\(/g, '%28').replace(/\)/g, '%29')}).`);
   });
 
   it('keeps the whole URL in the Slack link once converted to mrkdwn', () => {
     const md = rewriteCitationsForSlack(`Python 3.0 shipped in 2008 [1](${wiki}).`, [webCitation], 'https://app.test');
     const mrkdwn = markdownToSlackMrkdwn(md);
     const encoded = wiki.replace(/\(/g, '%28').replace(/\)/g, '%29');
-    expect(mrkdwn).to.equal(`Python 3.0 shipped in 2008 <${encoded}|1>.`);
+    expect(mrkdwn).to.equal(`Python 3.0 shipped in 2008 <${encoded}|［1］>.`);
   });
 
   it('still maps a connector record citation to its record page', () => {
     const out = rewriteCitationsForSlack('Q3 grew [2](/record/abc-123/preview#blockIndex=4).', [fileCitation], 'https://app.test');
-    expect(out).to.equal('Q3 grew [1](https://app.test/record/abc-123).');
+    expect(out).to.equal('Q3 grew [［1］](https://app.test/record/abc-123).');
   });
 });

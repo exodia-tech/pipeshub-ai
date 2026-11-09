@@ -62,7 +62,7 @@ const numbered =
   "Lease term is 33 years [1](/record/rec-1/preview#blockIndex=5). Advance ₹10,000 [2](ref93).";
 const rewritten = rewriteCitationsForSlack(numbered, citations, frontendBaseUrl);
 assert(
-  rewritten.includes("[1](http://localhost:3000/record/rec-1)"),
+  rewritten.includes("[［1］](http://localhost:3000/record/rec-1)"),
   "maps chunkIndex 1 to frontend record URL",
 );
 assert(!rewritten.includes("ref93"), "drops unmapped tiny-ref numbered link");
@@ -78,11 +78,11 @@ const prenormalizedRewritten = rewriteCitationsForSlack(
   frontendBaseUrl,
 );
 assert(
-  prenormalizedRewritten.includes("[1](http://localhost:3000/record/rec-1)"),
+  prenormalizedRewritten.includes("[［1］](http://localhost:3000/record/rec-1)"),
   "prenormalized [1](ref…) uses citation map URL",
 );
 assert(
-  prenormalizedRewritten.includes("[2](http://localhost:3000/record/rec-2)"),
+  prenormalizedRewritten.includes("[［2］](http://localhost:3000/record/rec-2)"),
   "prenormalized [2](https://ref….xyz) uses citation map URL",
 );
 
