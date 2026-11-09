@@ -56,4 +56,10 @@ describe('native schedule controls', () => {
     expect(AgentSchedulesApi.save).not.toHaveBeenCalled();
     expect((screen.getByLabelText('agentSchedule.slackChannel') as HTMLInputElement).value).toBe('https://evil.example/C0C6WPPH5V0');
   });
+  it('labels an approved project draft and hides Slack delivery controls', async () => {
+    vi.mocked(AgentSchedulesApi.read).mockResolvedValue({ ...saved, projectId: 'project-a' });
+    render(<Theme><AgentScheduleDialog agentId="elio" open onOpenChange={() => {}} /></Theme>);
+    expect(await screen.findByText('agentSchedule.projectDescription')).toBeTruthy();
+    expect(screen.queryByRole('switch', { name: 'agentSchedule.sendSlack' })).toBeNull();
+  });
 });

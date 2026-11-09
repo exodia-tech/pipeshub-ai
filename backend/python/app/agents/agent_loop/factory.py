@@ -534,7 +534,8 @@ class PipesHubAgentFactory:
         # (per-request state flag -> PIPESHUB_ENABLE_CODE_EXECUTION env ->
         # default True) rather than re-deriving an env-only check here, so
         # both paths apply identically.
-        code_exec_enabled = code_execution_enabled(context.tool_state)
+        safe_retrieval_only = context.tool_state.get("safe_retrieval_only") is True
+        code_exec_enabled = not safe_retrieval_only and code_execution_enabled(context.tool_state)
         logger.info(
             "PipesHubAgentFactory.create: code_execution_enabled=%s (org_id=%s conversation_id=%s)",
             code_exec_enabled, context.org_id, context.conversation_id,
@@ -559,7 +560,7 @@ class PipesHubAgentFactory:
         # duplicates.  Old conversation history that mentions the retired names
         # still resolves through _tool_naming.py's INTERNAL_SEARCH_TOOL_NAMES.
         skip_apps: set[str] = {"coding_sandbox", "database_sandbox"}
-        if context.has_knowledge:
+        if context.has_knowledge and not safe_retrieval_only:
             skip_apps |= {"retrieval", "knowledgehub"}
         _mark("f:transports")
         context.tool_state[NAMED_ENTITIES_ENABLED_STATE_KEY] = await is_named_entity_extraction_enabled(
@@ -652,7 +653,7 @@ class PipesHubAgentFactory:
         # `skill_manage`/... land in that call's registered-tool snapshot and
         # fall into the residual (never domain-claimed) top-level grant.
         skill_manager = None
-        if skills_enabled() and await is_skills_enabled(context.config_service):
+        if not safe_retrieval_only and skills_enabled() and await is_skills_enabled(context.config_service):
             _mark("f:sandbox")
             skill_manager = await build_skill_manager(context, transport_registry)
             if skill_manager is not None:
@@ -696,7 +697,7 @@ class PipesHubAgentFactory:
         # computed unconditionally here since every `loop_kind` shares this
         # one call site.
         _mark("f:hooks")
-        composition_plan = plan_domain_agents(tool_registry) if _composed_agents_enabled() else None
+        composition_plan = plan_domain_agents(tool_registry) if not safe_retrieval_only and _composed_agents_enabled() else None
         _mark("f:compose_plan")
         composed_tool_names = (
             composition_plan.top_level_names if composition_plan is not None else tool_registry.names()
@@ -1029,6 +1030,8 @@ class PipesHubAgentFactory:
 
         tool_names = _initial_entity_tool_grant(tool_names, context)
 
+        if safe_retrieval_only:
+            tool_names = [name for name in tool_names if tool_registry.has(name)]
         spec = AgentSpec(
             name="pipeshub-agent",
             system_prompt=prompt_builder,

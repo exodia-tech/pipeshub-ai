@@ -6035,7 +6035,8 @@
     "noBots": "Nejprve připojte bota k tomuto agentovi.",
     "slackLoadFailed": "Nastavení Slacku se nepodařilo načíst. Zavřete a znovu otevřete okno.",
     "invalidSlack": "Vyberte bota a zadejte platný odkaz nebo ID kanálu Slacku.",
-    "saveBeforeRun": "Před spuštěním uložte změny."
+    "saveBeforeRun": "Před spuštěním uložte změny.",
+    "projectDescription": "Soukromý koncept projektu. Používají se pouze schválené zdroje; odesílání do Slacku není dostupné."
   },
   "agentPicture": {
     "title": "Změnit obrázek agenta",

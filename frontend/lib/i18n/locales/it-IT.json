@@ -5962,7 +5962,8 @@
     "noBots": "Collega prima un bot a questo agente.",
     "slackLoadFailed": "Impossibile caricare le impostazioni Slack. Chiudi e riapri per riprovare.",
     "invalidSlack": "Scegli un bot e inserisci un link o ID valido di un canale Slack.",
-    "saveBeforeRun": "Salva le modifiche prima di eseguire."
+    "saveBeforeRun": "Salva le modifiche prima di eseguire.",
+    "projectDescription": "Bozza privata del progetto. Vengono usate solo le fonti approvate; l’invio a Slack non è disponibile."
   },
   "agentPicture": {
     "title": "Cambia immagine agente",

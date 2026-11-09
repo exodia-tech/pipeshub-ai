@@ -80,7 +80,7 @@ export function AgentScheduleDialog({ agentId, open, onOpenChange }: {
   return <Dialog.Root open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }}>
     <Dialog.Content maxWidth="560px" style={{ maxHeight: '90dvh', overflowY: 'auto' }}>
       <Dialog.Title>{t('agentSchedule.title')}</Dialog.Title>
-      <Dialog.Description size="2">{t('agentSchedule.description')}</Dialog.Description>
+      <Dialog.Description size="2">{t(saved?.projectId ? 'agentSchedule.projectDescription' : 'agentSchedule.description')}</Dialog.Description>
       <Flex direction="column" gap="4" mt="4">
         {error && <Text color="red" role="alert">{error}</Text>}
         {loading ? <Text role="status">{t('agentSchedule.loading')}</Text> : !loadFailed && <>
@@ -97,7 +97,7 @@ export function AgentScheduleDialog({ agentId, open, onOpenChange }: {
           </Flex>
           <Text as="label" size="2">{t('agentSchedule.prompt')}<TextArea size="3" rows={4} value={form.prompt} disabled={busy} onChange={event => setForm({ ...form, prompt: event.target.value })} /></Text>
           {saved?.nextRunAt && <Text size="2">{t('agentSchedule.next')}: {dateTime(saved.nextRunAt)}</Text>}
-          <Heading size="3">{t('agentSchedule.slackTitle')}</Heading>
+          {!saved?.projectId && <><Heading size="3">{t('agentSchedule.slackTitle')}</Heading>
           {deliveryError && <Text color="red" size="2" role="alert">{t('agentSchedule.slackLoadFailed')}</Text>}
           <Flex asChild gap="2" align="center"><label style={{ minHeight: 44 }}>
             <Switch checked={deliveryEnabled} disabled={busy || (!delivery?.canManage && !deliveryEnabled)} onCheckedChange={enabled => {
@@ -116,7 +116,7 @@ export function AgentScheduleDialog({ agentId, open, onOpenChange }: {
             <Text size="2" color="gray">{t('agentSchedule.channelHelp')}</Text>
           </>}
           {delivery && !delivery.canManage && <Text size="2" color="gray">{t('agentSchedule.slackAdminOnly')}</Text>}
-          {delivery?.canManage && <Text size="2"><a href="/workspace/bots/">{t('agentSchedule.manageBots')}</a>{delivery.bots.length === 0 && <> · {t('agentSchedule.noBots')}</>}</Text>}
+          {delivery?.canManage && <Text size="2"><a href="/workspace/bots/">{t('agentSchedule.manageBots')}</a>{delivery.bots.length === 0 && <> · {t('agentSchedule.noBots')}</>}</Text>}</>}
           <Heading size="3">{t('agentSchedule.runs')}</Heading>
           {!saved?.runs?.length ? <Text size="2" color="gray">{t('agentSchedule.empty')}</Text> : saved.runs.slice(0, 5).map(run => <Flex key={run.id} justify="between" gap="2" wrap="wrap" align="center">
             <Text size="2">{dateTime(run.startedAt)} · {t(`agentSchedule.status.${run.status}`)}</Text>

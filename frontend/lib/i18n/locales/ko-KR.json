@@ -5855,7 +5855,8 @@
     "noBots": "먼저 이 에이전트에 봇을 연결하세요.",
     "slackLoadFailed": "Slack 설정을 불러오지 못했습니다. 닫았다가 다시 열어 시도하세요.",
     "invalidSlack": "봇을 선택하고 유효한 Slack 채널 링크 또는 ID를 입력하세요.",
-    "saveBeforeRun": "실행하기 전에 변경 사항을 저장하세요."
+    "saveBeforeRun": "실행하기 전에 변경 사항을 저장하세요.",
+    "projectDescription": "비공개 프로젝트 초안입니다. 승인된 프로젝트 소스만 사용하며 Slack 전송은 사용할 수 없습니다."
   },
   "agentPicture": {
     "title": "에이전트 사진 변경",

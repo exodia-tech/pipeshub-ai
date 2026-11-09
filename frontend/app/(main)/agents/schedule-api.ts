@@ -12,6 +12,7 @@ export interface AgentScheduleSettings {
   slackChannelId?: string | null;
 }
 export interface AgentSchedule extends AgentScheduleSettings {
+  projectId?: string | null;
   nextRunAt: number | null;
   runs: { id: string; status: string; startedAt: number; conversationId?: string; slackTs?: string }[];
 }

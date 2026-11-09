@@ -8,6 +8,7 @@ import { AppConfig } from '../../tokens_manager/config/config';
 import { AgentPictures } from '../services/agent-pictures';
 import { AgentSchedules } from '../services/agent-schedules';
 import { ScheduledAgentRuntime } from '../services/scheduled-agent-runtime';
+import { AgentProjectGrants } from '../services/agent-project-grants';
 
 const loggerConfig = {
   service: 'Enterprise Search Service',
@@ -66,11 +67,13 @@ export class EnterpriseSearchAgentContainer {
       container
         .bind<AuthMiddleware>('AuthMiddleware')
         .toConstantValue(authMiddleware);
-      const runtime = new ScheduledAgentRuntime(() => container.get<AppConfig>('AppConfig'), keyValueStoreService);
+      const grants = new AgentProjectGrants(keyValueStoreService);
+      const runtime = new ScheduledAgentRuntime(() => container.get<AppConfig>('AppConfig'), keyValueStoreService, grants);
       const schedules = new AgentSchedules(keyValueStoreService, runtime.execute, () => {
         this.logger.error('Native agent schedule failed; inspect its run history');
       }, Date.now, () => runtime.isReady());
       container.bind(ScheduledAgentRuntime).toConstantValue(runtime);
+      container.bind(AgentProjectGrants).toConstantValue(grants);
       container.bind(AgentPictures).toConstantValue(new AgentPictures(keyValueStoreService, runtime));
       container.bind(AgentSchedules).toConstantValue(schedules);
       this.logger.info(
