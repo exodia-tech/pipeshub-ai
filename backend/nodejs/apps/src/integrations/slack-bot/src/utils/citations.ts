@@ -96,14 +96,14 @@ export function buildSlackCitationBlocks(citations: SlackCitationLike[] | undefi
   let size = 7;
   let count = 0;
   for (const record of records) {
-    const addedSize = record.name.length + record.url.length + 3;
+    const addedSize = record.name.length + record.url.length + 4;
     if (count && (count === 10 || size + addedSize > 10000)) {
       blocks.push({ type: 'rich_text', elements: [{ type: 'rich_text_section', elements }] });
       elements = [];
       size = 0;
       count = 0;
     }
-    elements.push({ type: 'text', text: '\n• ' }, { type: 'link', url: record.url, text: record.name });
+    elements.push({ type: 'text', text: '\n🔗 ' }, { type: 'link', url: record.url, text: record.name });
     size += addedSize;
     count += 1;
   }
@@ -230,7 +230,7 @@ export function rewriteCitationsForSlack(
           citationCount += 1;
         }
         // Encoded so the mrkdwn link conversion, which ends a URL at the first ')', keeps it whole.
-        return `[${displayNumber}](${mappedUrl.replace(/\(/g, '%28').replace(/\)/g, '%29')})`;
+        return `[［${displayNumber}］](${mappedUrl.replace(/\(/g, '%28').replace(/\)/g, '%29')})`;
       }
 
       // Unmapped tiny refs become broken Slack links — drop them.

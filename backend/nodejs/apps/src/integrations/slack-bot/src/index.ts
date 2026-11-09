@@ -38,6 +38,7 @@ import {
   toolStatusLabel,
 } from "./utils/tool-display";
 import { parseArtifactMarkers } from "./utils/parse-artifact-markers";
+import { SlackNativeStatus } from "./utils/native-status";
 import {
   rewriteCitationsForSlack,
   buildSlackCitationBlocks,
@@ -351,6 +352,8 @@ async function processSlackMessage(
   let streamCharCount = 0;
   let rolledOverStreamTs: string[] = [];
   let waitingMessageTs: string | null = null;
+  const nativeStatus = new SlackNativeStatus((method, args) => typedClient.apiCall(method, args), typedMessage.channel, threadId);
+  let useNativeStatus = false;
 
   const sendOrUpdateNonStreamMessage = async (
     text: string,
@@ -495,16 +498,19 @@ async function processSlackMessage(
       streamRecipientPayload.recipient_team_id = typedContext.teamId;
     }
 
-    try {
-      const waitingMessage = await typedClient.chat.postMessage({
-        channel: typedMessage.channel!,
-        thread_ts: threadId,
-        text: "_Thinking..._",
-        ...NO_UNFURL_OPTIONS,
-      });
-      waitingMessageTs = waitingMessage.ts || null;
-    } catch (error) {
-      console.error("Error posting Slack waiting message:", error);
+    useNativeStatus = await nativeStatus.start();
+    if (!useNativeStatus) {
+      try {
+        const waitingMessage = await typedClient.chat.postMessage({
+          channel: typedMessage.channel!,
+          thread_ts: threadId,
+          text: "_Thinking..._",
+          ...NO_UNFURL_OPTIONS,
+        });
+        waitingMessageTs = waitingMessage.ts || null;
+      } catch (error) {
+        console.error("Error posting Slack waiting message:", error);
+      }
     }
 
     // Handle file attachments for agents
@@ -609,13 +615,25 @@ async function processSlackMessage(
       text: string,
       options?: { allowAfterAskUser?: boolean },
     ): Promise<void> => {
-      if (!waitingMessageTs || !text) {
+      if (!text) {
         return;
       }
       // Drop stale activity flushes once ask-user questions own this message.
       if (askUserShown && !options?.allowAfterAskUser) {
         return;
       }
+      if (useNativeStatus && !options?.allowAfterAskUser) {
+        if (await nativeStatus.update(activityBuilder.getStatus())) return;
+        useNativeStatus = false;
+        try {
+          const message = await typedClient.chat.postMessage({ channel: typedMessage.channel!, thread_ts: threadId, text: truncateForSlack(text), ...NO_UNFURL_OPTIONS });
+          waitingMessageTs = message.ts || null;
+        } catch (error) {
+          console.error('Error posting Slack activity fallback:', error);
+        }
+        return;
+      }
+      if (!waitingMessageTs) return;
       try {
         await typedClient.chat.update({
           channel: typedMessage.channel!,
@@ -1123,6 +1141,10 @@ async function processSlackMessage(
         return;
       }
 
+      if (useNativeStatus) {
+        await nativeStatus.update('formatting a table…');
+        return;
+      }
       if (!waitingMessageTs) {
         return;
       }
@@ -1445,6 +1467,8 @@ async function processSlackMessage(
     } catch (handlerError) {
       console.error("Error in Slack message error handler:", handlerError);
     }
+  } finally {
+    await nativeStatus.clear();
   }
 }
 
