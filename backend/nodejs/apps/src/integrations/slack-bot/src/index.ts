@@ -8,6 +8,7 @@ import { connect, dropLegacyThreadBotIndex } from "./utils/db";
 import { initDocStore } from '../../../libs/repositories/doc-store';
 import { usesMongo } from '../../../libs/repositories/store-select';
 import { getFromDatabase, saveToDatabase } from "./utils/conversation";
+import { shouldHandleSlackMessage } from './message-routing';
 import axios from "axios";
 import { marked } from "marked";
 // Disable marked's email mangling to prevent HTML entity encoding of email addresses.
@@ -1537,7 +1538,7 @@ async function processSlackMessage(
   }
 }
 
-// Handle DMs via message.im events.
+// Handle DMs and unmentioned replies in this member's existing bot threads.
 app.message(async ({ message, client, context }) => {
   if (!message || typeof message !== "object") {
     return;
@@ -1551,26 +1552,23 @@ app.message(async ({ message, client, context }) => {
     return;
   }
 
-  const isDirectMessage = typedMessage.channel?.startsWith("D") || false;
-  if (!isDirectMessage) {
-    return;
-  }
-
-  const resolvedSlackBot = await resolveSlackBotForEvent(getCurrentMatchedSlackBot);
-  const { shouldAnswer, hasSupported } = await handleIncomingAttachments(
-    typedClient,
-    typedMessage,
-    typedContext.botUserId,
-  );
-  if (!shouldAnswer) return;
-
-  let query = await resolveMentionsInText(typedMessage.text, typedClient);
-  if (!query) {
-    if (hasSupported) query = "See below attached file(s).";
-    else query = "Hi";
-  }
-
   try {
+    const resolvedSlackBot = await resolveSlackBotForEvent(getCurrentMatchedSlackBot);
+    if (!await shouldHandleSlackMessage(typedMessage, typedClient, typedContext, resolvedSlackBot?.botId)) return;
+
+    const { shouldAnswer, hasSupported } = await handleIncomingAttachments(
+      typedClient,
+      typedMessage,
+      typedContext.botUserId,
+    );
+    if (!shouldAnswer) return;
+
+    let query = await resolveMentionsInText(typedMessage.text, typedClient);
+    if (!query) {
+      if (hasSupported) query = "See below attached file(s).";
+      else query = "Hi";
+    }
+
     await processSlackMessage(
       typedMessage,
       typedClient,
@@ -1579,7 +1577,7 @@ app.message(async ({ message, client, context }) => {
       resolvedSlackBot,
     );
   } catch (error) {
-    console.error("Error handling DM message:", error);
+    console.error("Error handling Slack message:", error);
     await sendUserFacingSlackErrorMessage(typedClient, typedMessage, error);
   }
 });
