@@ -97,14 +97,21 @@ def build_report(
 
     items, seconds = [], 0
     for (source, _), (updated, record, occurred) in sorted(latest.items()):
-        if not start <= occurred < end:
-            continue
         if source == 'hubstaff':
+            stopped = instant(record['ended_at'])
             duration = record.get('seconds')
-            if isinstance(duration, bool) or not isinstance(duration, int) or duration < 0:
+            if (stopped <= occurred or isinstance(duration, bool)
+                    or not isinstance(duration, int) or duration < 0
+                    or duration > (stopped - occurred).total_seconds()):
                 raise ValueError('Time entries require non-negative recorded seconds')
+            if stopped <= start or occurred >= end:
+                continue
+            if occurred < start or stopped > end:
+                raise ValueError('A time entry crosses the window; reconcile it manually')
             seconds += duration
         else:
+            if not start <= occurred < end:
+                continue
             stages = {'discussed', 'planned', 'implemented', 'merged',
                       'deployed', 'verified', 'risk', 'decision'}
             if record.get('stage') not in stages:

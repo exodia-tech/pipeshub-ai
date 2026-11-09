@@ -34,10 +34,10 @@ class MaintenanceReportTest(unittest.TestCase):
 
     def test_deduplicates_corrections_flags_late_and_excludes_boundary(self):
         self.sources['hubstaff']['records'] = [
-            entry('time-1', '2026-11-01T12:00:00Z', '2026-11-02T12:00:00Z', seconds=1800),
-            entry('time-1', '2026-11-01T12:00:00Z', '2026-11-09T12:00:00Z', seconds=2400),
-            entry('time-2', '2026-11-08T00:00:00Z', '2026-11-08T00:00:00Z', seconds=3600),
-            entry('time-3', '2026-11-01T12:00:00Z', '2026-11-11T12:00:00Z', seconds=3600),
+            entry('time-1', '2026-11-01T12:00:00Z', '2026-11-02T12:00:00Z', ended_at='2026-11-01T13:00:00Z', seconds=1800),
+            entry('time-1', '2026-11-01T12:00:00Z', '2026-11-09T12:00:00Z', ended_at='2026-11-01T13:00:00Z', seconds=2400),
+            entry('time-2', '2026-11-08T00:00:00Z', '2026-11-08T00:00:00Z', ended_at='2026-11-08T01:00:00Z', seconds=3600),
+            entry('time-3', '2026-11-01T12:00:00Z', '2026-11-11T12:00:00Z', ended_at='2026-11-01T13:00:00Z', seconds=3600),
         ]
         self.sources['linear']['records'] = [entry('issue-1', '2026-11-02T12:00:00Z', '2026-11-02T12:00:00Z', stage='merged')]
         report = build_report('client-a', self.start, self.end, self.as_of, self.sources)
@@ -46,6 +46,15 @@ class MaintenanceReportTest(unittest.TestCase):
         self.assertEqual({x['id'] for x in report['items']}, {'time-1', 'issue-1'})
         self.assertTrue(next(x for x in report['items'] if x['id'] == 'time-1')['late_or_revised'])
         self.assertEqual(next(x for x in report['items'] if x['id'] == 'issue-1')['stage'], 'merged')
+
+    def test_rejects_time_crossing_window_boundaries(self):
+        for occurred, stopped in [('2026-10-24T23:45:00Z', '2026-10-25T00:15:00Z'),
+                                  ('2026-11-07T23:45:00Z', '2026-11-08T00:15:00Z')]:
+            self.sources['hubstaff']['records'] = [entry(
+                'time-1', occurred, '2026-11-09T00:00:00Z', ended_at=stopped, seconds=1800,
+            )]
+            with self.assertRaises(ValueError):
+                build_report('client-a', self.start, self.end, self.as_of, self.sources)
 
     def test_outage_and_partial_time_are_unknown_not_zero(self):
         for status in ('unavailable', 'partial'):
