@@ -107,7 +107,7 @@ test('judges plural groups inside an absent subtree by the target language, not 
     'Chinese must not be asked for _one just because the subtree is absent');
 
   const spanish = checkLocaleParity(source, {}, 'es-ES');
-  assert.deepEqual(spanish.errors.plurals, [
+  assert.deepEqual([...spanish.errors.plurals].sort(), [
     'panel.items_many: missing cardinal string',
     'panel.items_one: missing cardinal string',
     'panel.items_other: missing cardinal string',

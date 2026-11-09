@@ -14,6 +14,8 @@ export interface AgentScheduleInput {
   revision?: number;
   slackBotId?: string | null;
   slackChannelId?: string | null;
+  projectId?: string | null;
+  projectGrantId?: string | null;
 }
 export interface ScheduledAgentRun {
   id: string;

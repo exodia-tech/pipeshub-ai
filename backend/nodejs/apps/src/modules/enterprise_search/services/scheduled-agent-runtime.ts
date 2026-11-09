@@ -6,7 +6,7 @@ import { asAccount, forOrg } from '../../../libs/context/orgContext';
 import { newSystemRoot, runWithRequestContext } from '../../../libs/context/request-context';
 import { getUserRepository } from '../../../libs/repositories/user';
 import { AppConfig } from '../../tokens_manager/config/config';
-import { buildAiChatRequest } from '../utils/ai-chat-payload';
+import { AiChatRequest, buildAiChatRequest } from '../utils/ai-chat-payload';
 import { openConversation, completeTurn } from '../utils/non-streaming-chat';
 import { buildUserQueryMessage, extractModelInfo } from '../utils/utils';
 import { AgentSchedule, ScheduledAgentRun, AgentRunResult } from './agent-schedules';
@@ -15,6 +15,20 @@ import { getSlackBotStore } from '../../configuration_manager/controller/cm_cont
 import { resolveSoleOrgId } from '../utils/scoped-request';
 import { isUserOrgAdmin } from '../../user_management/services/user-admin.service';
 import { markdownToSlackMrkdwn } from '../../../integrations/slack-bot/src/utils/md_to_mrkdwn';
+import { AgentProjectGrants } from './agent-project-grants';
+import { Logger } from '../../../libs/services/logger.service';
+
+const logger = Logger.getInstance({ service: 'ScheduledAgentRuntime' });
+
+export function constrainProjectScheduleRequest(request: AiChatRequest, model: { modelKey: string; modelName: string }, modelFingerprint: string): AiChatRequest {
+  // Project scope treats [] as all project tools; this run must grant none.
+  request.payload.tools = [];
+  request.payload.safeRetrievalOnly = true;
+  request.payload.modelKey = model.modelKey;
+  request.payload.modelName = model.modelName;
+  request.payload.safeModelFingerprint = modelFingerprint;
+  return request;
+}
 
 export function withoutSlackMentions(text: string): string {
   return text.replace(/<(?=[@#!<])/g, '&lt;');
@@ -33,7 +47,7 @@ export function requirePublicResearchAgent(agent: Record<string, unknown>): void
 }
 
 export class ScheduledAgentRuntime {
-  constructor(private readonly config: () => AppConfig, private readonly store: KeyValueStoreService) {}
+  constructor(private readonly config: () => AppConfig, private readonly store: KeyValueStoreService, private readonly grants: AgentProjectGrants) {}
 
   async isReady(): Promise<boolean> {
     try {
@@ -97,32 +111,45 @@ export class ScheduledAgentRuntime {
         const headers = { Authorization: `Bearer ${auth.generateToken({
           userId: user._id, orgId: schedule.orgId, email: user.email, role: 'member',
         }, '15m')}` };
-        const agent = await this.checkOwner(schedule.agentId, schedule.userId, headers, true);
-        const slackToken = await this.checkDelivery(schedule);
-        const query = `${schedule.prompt}\n\nReporting window: ${new Date(run.periodStart).toISOString()} inclusive to ${new Date(run.periodEnd).toISOString()} exclusive (${schedule.timezone}).\nPreviously covered public links: ${JSON.stringify(schedule.coveredLinks)}. Avoid repeats unless materially changed. This is a draft-only public-research run. Report unavailable evidence honestly. Run reference: ${run.id}.`;
+        const isProject = Boolean(schedule.projectId);
+        let agent = await this.checkOwner(schedule.agentId, schedule.userId, headers, !isProject);
+        if (isProject && (!schedule.projectGrantId || schedule.slackBotId || schedule.slackChannelId)) throw new ForbiddenError('Project schedules need an approved scope and cannot post to Slack.');
+        let approved = isProject ? await this.grants.validate(schedule.orgId, schedule.userId, schedule.agentId, agent, schedule.projectId!, schedule.projectGrantId!) : undefined;
+        let project = approved?.project;
+        const slackToken = isProject ? null : await this.checkDelivery(schedule);
+        const query = `${schedule.prompt}\n\nReporting window: ${new Date(run.periodStart).toISOString()} inclusive to ${new Date(run.periodEnd).toISOString()} exclusive (${schedule.timezone}).\n${isProject ? 'Use only the approved project sources. This is a private draft for human review. Report unavailable evidence honestly.' : `Previously covered public links: ${JSON.stringify(schedule.coveredLinks)}. Avoid repeats unless materially changed. This is a draft-only public-research run. Report unavailable evidence honestly.`} Run reference: ${run.id}.`;
         const body = {
-          query, tools: ['web_search.search'], chatMode: 'quick', timezone: schedule.timezone,
+          query, tools: isProject ? [] : ['web_search.search'], chatMode: 'quick', timezone: schedule.timezone,
           currentTime: new Date(run.startedAt).toISOString(),
-          agentCapabilities: { internalSearch: false, webSearch: true, deepSearch: false },
+          agentCapabilities: { internalSearch: isProject, webSearch: !isProject, deepSearch: false },
+          ...(isProject ? { runId: run.id, modelKey: approved!.model.modelKey, modelName: approved!.model.modelName, modelProvider: approved!.model.provider } : {}),
         };
         const conversation = await openConversation({
           orgId: schedule.orgId, userId: schedule.userId, initiator: schedule.userId,
           title: `Scheduled AI brief · ${new Date(run.periodEnd).toISOString().slice(0, 10)}`,
           lastActivityAt: Date.now(), status: 'Inprogress', modelInfo: extractModelInfo(body),
           agentKey: schedule.agentId, sessionType: 'agent', conversationSource: 'agent_chat',
+          ...(project ? { projectId: project._id, projectVisibility: 'private' as const } : {}),
         }, buildUserQueryMessage(query));
         await recordConversation(conversation._id);
+        if (isProject) {
+          agent = await this.checkOwner(schedule.agentId, schedule.userId, headers, false);
+          approved = await this.grants.validate(schedule.orgId, schedule.userId, schedule.agentId, agent, schedule.projectId!, schedule.projectGrantId!);
+          project = approved.project;
+        }
         const target = { kind: 'agent' as const, agentKey: schedule.agentId };
+        const request = buildAiChatRequest(target, body, { conversationId: conversation._id, previousConversations: [], isNewConversation: true, project });
+        if (isProject) constrainProjectScheduleRequest(request, approved!.model, approved!.modelFingerprint);
         const turn = await completeTurn({
           target, conversation, aiBackend: config.aiBackend, headers,
-          request: buildAiChatRequest(target, body, { conversationId: conversation._id, previousConversations: [], isNewConversation: true }),
+          request,
           modelInfo: extractModelInfo(body), requestId: run.id,
         });
         const messages = turn.conversation.messages;
         const content = Array.isArray(messages) ? messages.filter(message =>
           message && typeof message === 'object' && message.messageType === 'bot_response',
         ).map(message => String(message.content ?? '')).join('\n') : '';
-        const links = [...new Set((content.match(/https:\/\/[^\s)\]>]+/g) ?? []).flatMap(value => {
+        const links = isProject ? [] : [...new Set((content.match(/https:\/\/[^\s)\]>]+/g) ?? []).flatMap(value => {
           try {
             const url = new URL(value);
             if (url.username || url.password) return [];
@@ -147,8 +174,12 @@ export class ScheduledAgentRuntime {
           if (!response.ok || !posted.ok || !posted.ts) throw new Error('Slack delivery was not confirmed');
           slackTs = posted.ts;
         }
+        if (isProject) logger.info('Project agent schedule completed', { audit: 'agent_schedule_run', outcome: 'needs_review', orgId: schedule.orgId, userId: schedule.userId, agentId: schedule.agentId, projectId: schedule.projectId, grantId: schedule.projectGrantId, runId: run.id });
         return { conversationId: conversation._id, links, needsReview: true, ...(slackTs ? { slackTs } : {}) };
       });
+    }).catch(error => {
+      if (schedule.projectId) logger.warn('Project agent schedule denied or failed', { audit: 'agent_schedule_run', outcome: 'not_completed', orgId: schedule.orgId, userId: schedule.userId, agentId: schedule.agentId, projectId: schedule.projectId, grantId: schedule.projectGrantId, runId: run.id });
+      throw error;
     }),
   );
 }

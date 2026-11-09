@@ -9,6 +9,7 @@ import { AuthenticatedUserRequest } from '../../../../src/libs/middlewares/types
 import { createAgentScheduleRouter, agentScheduleInput } from '../../../../src/modules/enterprise_search/routes/agent-schedules.routes';
 import { ScheduledAgentRuntime } from '../../../../src/modules/enterprise_search/services/scheduled-agent-runtime';
 import { AgentSchedules } from '../../../../src/modules/enterprise_search/services/agent-schedules';
+import { AgentProjectGrants } from '../../../../src/modules/enterprise_search/services/agent-project-grants';
 
 describe('Agent schedule access boundaries', () => {
   afterEach(() => sinon.restore());
@@ -73,6 +74,45 @@ describe('Agent schedule access boundaries', () => {
     try {
       assert.equal((await send('C0C6WPPH5V0')).status, 200); assert.equal(delivery.callCount, 0); assert.equal(save.callCount, 1);
       assert.equal((await send('C0123456789')).status, 403); assert.equal(delivery.callCount, 1); assert.equal(save.callCount, 1);
+    } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
+  it('requires project scope and an approved matching grant and refuses Slack destinations', async () => {
+    let scopes = ['agent:read'];
+    const container = new Container();
+    container.bind('AuthMiddleware').toConstantValue({ authenticate: (req: AuthenticatedUserRequest, _res: express.Response, next: express.NextFunction) => {
+      req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: scopes }; next();
+    } });
+    const runtime = Object.create(ScheduledAgentRuntime.prototype) as ScheduledAgentRuntime;
+    sinon.stub(runtime, 'checkOwner').resolves({ createdBy: 'owner' });
+    sinon.stub(runtime, 'checkDelivery').resolves(null);
+    const grants = Object.create(AgentProjectGrants.prototype) as AgentProjectGrants;
+    sinon.stub(grants, 'preview').resolves({ project: { name: 'private object' }, modelFingerprint: 'secret-metadata', projectId: 'project', fingerprint: 'a'.repeat(64) });
+    const approve = sinon.stub(grants, 'approve').resolves({ id: 'grant-1' });
+    const validate = sinon.stub(grants, 'validate').resolves({ grant: { id: 'grant-1' } });
+    const schedules = Object.create(AgentSchedules.prototype) as AgentSchedules;
+    sinon.stub(schedules, 'read').resolves(null);
+    const save = sinon.stub(schedules, 'save').resolves({});
+    container.bind(ScheduledAgentRuntime).toConstantValue(runtime); container.bind(AgentProjectGrants).toConstantValue(grants); container.bind(AgentSchedules).toConstantValue(schedules);
+    const app = express(); app.use(express.json()); app.use('/agents/:agentKey/schedule', createAgentScheduleRouter(container));
+    app.use((_err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.sendStatus(403); });
+    const server = createServer(app); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const path = `http://127.0.0.1:${(server.address() as AddressInfo).port}/agents/e6ed44ce-65cc-42db-95bc-5db456f5f450/schedule`;
+    const send = (method: string, suffix: string, body?: object) => fetch(path + suffix, { method, headers: { 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    try {
+      assert.equal((await send('GET', '/project-grant/preview?projectId=project')).status, 403);
+      scopes = ['agent:read', 'project:read'];
+      const preview = await (await send('GET', '/project-grant/preview?projectId=project')).json();
+      assert.equal(preview.fingerprint, 'a'.repeat(64)); assert.equal(preview.modelFingerprint, undefined); assert.equal(preview.project, undefined);
+      assert.equal((await send('POST', '/project-grant', { projectId: 'project', fingerprint: 'a'.repeat(64) })).status, 403);
+      scopes.push('agent:write', 'agent:execute');
+      assert.equal((await send('POST', '/project-grant', { projectId: 'project', fingerprint: 'a'.repeat(64) })).status, 201);
+      assert.equal(approve.callCount, 1);
+      assert.equal((await send('PUT', '', { ...valid, projectId: 'project', slackBotId: '120d1a70-989a-499b-8e41-170b2a07a820', slackChannelId: 'C0C6WPPH5V0' })).status, 403);
+      assert.equal(validate.callCount, 0); assert.equal(save.callCount, 0);
+      assert.equal((await send('PUT', '', { ...valid, projectId: 'project' })).status, 200);
+      assert.equal(validate.callCount, 1); assert.equal(save.firstCall.args[3].projectGrantId, 'grant-1');
+      scopes = ['agent:read', 'agent:write', 'agent:execute'];
+      assert.equal((await send('PUT', '', { ...valid, projectId: 'project' })).status, 403);
     } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
   });
 });

@@ -823,6 +823,10 @@ components:
         prompt: { type: string, minLength: 1, maxLength: 8000 }
         revision: { type: integer, minimum: 0 }
         slackBotId: { type: string, format: uuid, nullable: true }
+        projectId:
+          type: string
+          nullable: true
+          description: Approved project for a private draft; omit to preserve the existing mode, or set null to return to public research.
         slackChannelId:
           type: string
           nullable: true
@@ -840,6 +844,8 @@ components:
         revision: { type: integer }
         slackBotId: { type: string, nullable: true }
         slackChannelId: { type: string, nullable: true }
+        projectId: { type: string, nullable: true }
+        projectGrantId: { type: string, format: uuid, nullable: true, readOnly: true }
         orgId: { type: string }
         userId: { type: string }
         agentId: { type: string, format: uuid }
@@ -24999,6 +25005,64 @@ paths:
                         id: { type: string, format: uuid }
                         name: { type: string }
         '403': { description: Caller lacks scope or creator ownership. }
+  /agents/{agentKey}/schedule/project-grant/preview:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+      - { in: query, name: projectId, required: true, schema: { type: string, maxLength: 128 } }
+    get:
+      tags: [Agents]
+      summary: Review the sources and model for a project draft schedule
+      description: Requires agent:read, project:read, agent ownership, live organization administrator role and direct or organization-wide project access. The returned fingerprint binds the exact current agent, project and model configuration. No credentials are returned.
+      responses:
+        '200':
+          description: Reviewable source and model scope with an approval fingerprint
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [projectId, projectName, agentKnowledge, projectSources, model, fingerprint]
+                properties:
+                  projectId: { type: string }
+                  projectName: { type: string }
+                  agentKnowledge: { type: array, items: { type: object, additionalProperties: true } }
+                  projectSources: { type: object, additionalProperties: true }
+                  linkedKnowledgeBaseId: { type: string, nullable: true }
+                  model:
+                    type: object
+                    properties:
+                      modelKey: { type: string }
+                      modelName: { type: string }
+                      provider: { type: string }
+                  fingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
+        '403': { description: Missing privilege, inaccessible project, unsupported agent or invalid model. }
+  /agents/{agentKey}/schedule/project-grant:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      summary: Approve the exact reviewed project and model scope
+      description: Requires agent:read, agent:write, agent:execute, project:read, agent ownership and a live organization administrator. Preview first; approval fails when the fingerprint changed. Approving a replacement invalidates any schedule bound to the earlier grant until it is saved again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [projectId, fingerprint]
+              properties:
+                projectId: { type: string, minLength: 1, maxLength: 128 }
+                fingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
+      responses:
+        '201': { description: Project scope approved; response contains the bound grant metadata. }
+        '403': { description: Scope or privilege changed, or caller lacks ownership. }
+    delete:
+      tags: [Agents]
+      summary: Revoke a project schedule approval
+      description: Requires agent:read, agent:write, project:read and agent ownership. Future runs fail closed. A run already underway cannot be recalled.
+      responses:
+        '204': { description: Approval revoked. }
+        '403': { description: Scope or creator ownership denied. }
   /agents/{agentKey}/schedule:
     parameters:
       - in: path
@@ -25018,11 +25082,16 @@ paths:
         '403': { description: Caller is not the agent creator or lacks scope. }
     put:
       tags: [Agents]
-      summary: Save or pause a native public-research schedule
+      summary: Save or pause a native agent schedule
       description: |
-        Requires agent:read, agent:write and agent:execute and agent ownership. Runs have
-        no company knowledge, action tools, service-account delegation or personal
-        user-context injection. Every run revalidates the active owner and agent.
+        Requires agent:read, agent:write and agent:execute and agent ownership. With
+        projectId, enabling or changing the project additionally requires project:read,
+        a matching approved project grant, current organization admin status and access
+        to that project. Project runs use only that project's scope, current owner ACLs,
+        and the approved model; action tools, MCP, skills, web search, Slack delivery,
+        service-agent delegation and user-context injection are unavailable. The draft
+        remains private to its owner. An omitted projectId preserves the existing mode;
+        null explicitly chooses public research. Public runs retain the original policy.
         Slack delivery additionally requires current organization-admin permission
         and a stored Slack bot mapped to this agent. No secrets are accepted here.
         Destination edits are validated even while paused. A creator can pause or
@@ -25054,7 +25123,8 @@ paths:
       tags: [Agents]
       summary: Run the saved native schedule now
       description: |
-        Requires agent:read, agent:execute and ownership. Works while automatic runs are paused.
+        Requires agent:read, agent:execute and ownership, plus project:read and a valid
+        project approval for a project schedule. Works while automatic runs are paused.
         Returns after execution; on a transport timeout read the ledger before taking
         further action. Never blindly retry. A saved draft does not prove source coverage.
       responses:

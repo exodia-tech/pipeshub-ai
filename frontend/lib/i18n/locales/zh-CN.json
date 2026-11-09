@@ -5855,7 +5855,8 @@
     "noBots": "请先为此智能体连接机器人。",
     "slackLoadFailed": "无法加载 Slack 设置。请关闭后重新打开以重试。",
     "invalidSlack": "请选择机器人，并输入有效的 Slack 频道链接或 ID。",
-    "saveBeforeRun": "运行前请先保存更改。"
+    "saveBeforeRun": "运行前请先保存更改。",
+    "projectDescription": "私有项目草稿。仅使用已批准的项目来源；无法发送到 Slack。"
   },
   "agentPicture": {
     "title": "更改智能体图片",

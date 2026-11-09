@@ -602,6 +602,7 @@ def build_initial_state(chat_query: dict[str, Any], user_info: dict[str, Any], l
         "filters": filters,
         "retrieval_mode": chat_query.get("retrievalMode", "HYBRID"),
         "chat_mode": chat_query.get("chatMode", "standard"),
+        "safe_retrieval_only": chat_query.get("safeRetrievalOnly") is True,
         "graph_type": graph_type,
 
         # Query analysis (will be populated by analyze_query_node)

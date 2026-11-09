@@ -5889,7 +5889,8 @@
     "noBots": "Connect a bot to this agent first.",
     "slackLoadFailed": "Slack settings couldn't load. Close and reopen to retry.",
     "invalidSlack": "Choose a bot and enter a valid Slack channel link or ID.",
-    "saveBeforeRun": "Save your changes before running."
+    "saveBeforeRun": "Save your changes before running.",
+    "projectDescription": "Private project draft. Only the approved project sources are used; Slack delivery is unavailable."
   },
   "agentPicture": {
     "title": "Change agent picture",

@@ -170,6 +170,9 @@ class ChatQuery(BaseModel):
     systemPrompt: str | None = None
     instructions: str | None = None
     tools: list[str] | None = None
+    # Narrows this turn to scoped retrieval and a terminal answer; never adds access.
+    safeRetrievalOnly: bool = False
+    safeModelFingerprint: str | None = None
     chatMode: str | None = "auto"
     modelKey: str | None = None
     modelName: str | None = None
@@ -4420,6 +4423,11 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
 
                 llm = llm_result[0]
                 llm_config = llm_result[1]
+                if chat_query.safeRetrievalOnly:
+                    from app.agents.agent_loop.read_only_registry import matches_approved_model
+                    if not matches_approved_model(llm_config, model_key, model_name, chat_query.safeModelFingerprint):
+                        yield _stream_error_frame(protocol, "The approved model configuration changed. Review the project schedule again.", code="model_approval_changed")
+                        return
                 is_multimodal_llm = llm_config.get("isMultimodal", False)
 
                 # Get and filter toolsets — gated on the `ENABLE_ACTIONS` platform flag:
@@ -4877,6 +4885,7 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                     "custom_instructions": custom_instructions,
                     "projectInstructions": chat_query.projectInstructions,
                     "projectToolsSelected": chat_query.strictScope and chat_query.tools is not None,
+                    "safeRetrievalOnly": chat_query.safeRetrievalOnly,
                     "timezone": chat_query.timezone,
                     "currentTime": chat_query.currentTime,
                     "toolsets": agent_toolsets,
