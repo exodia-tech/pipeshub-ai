@@ -31,6 +31,7 @@ import {
   metricValue,
   money,
   seriesSegments,
+  timelineTicks,
   type UsageMetric,
 } from "./format";
 
@@ -645,16 +646,20 @@ export default function UsagePage() {
                       ),
                     )}
                   </svg>
-                  <Flex justify="between" gap="3" mt="2">
-                    <Text size="1" color="gray">
-                      {timeline[0].label}
-                    </Text>
-                    {timeline.length > 1 && (
-                      <Text size="1" color="gray" align="right">
-                        {timeline[timeline.length - 1].label}
-                      </Text>
-                    )}
-                  </Flex>
+                  {[3, 5].map((count) => (
+                    <Box key={count} display={count === 3 ? { initial: "block", sm: "none" } : { initial: "none", sm: "block" }}
+                      style={{ position: "relative", height: 40 }}>
+                      {timelineTicks(timeline.map((row) => row.label), interval, i18n.language, count).map((tick, index, ticks) => (
+                        <Box key={tick.index} style={{ position: "absolute", left: `${tick.position}%`, top: 0,
+                          transform: index === 0 ? undefined : index === ticks.length - 1 ? "translateX(-100%)" : "translateX(-50%)" }}>
+                          <Box style={{ position: "relative", height: 6, marginBottom: 6 }}>
+                            <Box style={{ position: "absolute", left: index === 0 ? "0%" : index === ticks.length - 1 ? "100%" : "50%", height: 6, borderLeft: "1px solid var(--gray-7)" }} />
+                          </Box>
+                          <Text size="1" color="gray" title={tick.raw} style={{ whiteSpace: "nowrap" }}>{tick.label}</Text>
+                        </Box>
+                      ))}
+                    </Box>
+                  ))}
                   <VisuallyHidden asChild>
                     <table>
                       <caption>{label("overTime")}</caption>
