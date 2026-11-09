@@ -14,7 +14,7 @@ export type ResponseTab = 'answer' | 'sources' | 'citation';
 /**
  * Platform-normalized reasoning effort levels. `null`/absent means "no
  * explicit user choice" — the backend applies the model's own default
- * effort, else `DEFAULT_REASONING_EFFORT` ("high"), for any reasoning-capable
+ * effort, else `DEFAULT_REASONING_EFFORT` ("low"), for any reasoning-capable
  * model rather than deferring to the provider's own default.
  *
  * `'none'` is kept in the type for backward compatibility with
@@ -32,7 +32,7 @@ export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'max';
  * in `backend/python/app/utils/aimodels.py`) when neither the user, the agent
  * nor the model set one. Kept in sync with `DEFAULT_REASONING_EFFORT` there.
  */
-export const DEFAULT_REASONING_EFFORT: ReasoningEffort = 'high';
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = 'low';
 
 /**
  * What the backend actually floors a legacy `'none'` to
@@ -46,9 +46,10 @@ const REASONING_MANDATORY_FALLBACK_EFFORT: ReasoningEffort = 'low';
  * agrees with server behavior instead of echoing a choice that's no longer offered.
  */
 export function normalizeReasoningEffort(
-  value: ReasoningEffort | null
+  value: unknown
 ): ReasoningEffort | null {
-  return value === 'none' ? REASONING_MANDATORY_FALLBACK_EFFORT : value;
+  if (value === 'none') return REASONING_MANDATORY_FALLBACK_EFFORT;
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'max' ? value : null;
 }
 
 // Inline citation for display within answer text

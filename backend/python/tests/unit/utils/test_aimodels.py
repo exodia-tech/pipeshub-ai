@@ -158,11 +158,11 @@ class TestReasoningEffortKwargs:
         config = {"isReasoning": False}
         assert _reasoning_effort_kwargs("high", config) == {}
 
-    def test_defaults_to_high_when_effort_is_none_and_reasoning_capable(self):
+    def test_defaults_to_low_when_effort_is_none_and_reasoning_capable(self):
         """A reasoning-capable model with no explicit effort defaults to
-        'high' rather than silently deferring to the provider's own default."""
+        'low' rather than silently deferring to the provider's own default."""
         config = {"isReasoning": True}
-        assert _reasoning_effort_kwargs(None, config) == {"reasoning_effort": "high"}
+        assert _reasoning_effort_kwargs(None, config) == {"reasoning_effort": "low"}
 
     def test_returns_empty_when_effort_is_none_and_not_reasoning(self):
         config = {"isReasoning": False}
@@ -578,10 +578,10 @@ class TestReasoningEffortKwargs:
         config = {"isReasoning": False}
         assert _reasoning_effort_kwargs("high", config, provider="ollama") == {}
 
-    def test_ollama_defaults_to_high_when_effort_is_none_and_reasoning_capable(self):
+    def test_ollama_defaults_to_low_when_effort_is_none_and_reasoning_capable(self):
         config = {"isReasoning": True}
         assert _reasoning_effort_kwargs(None, config, provider="ollama") == {
-            "reasoning": "high"
+            "reasoning": "low"
         }
 
     # -- gpt-5.x model-name detection (routers/proxies fronting real OpenAI) -
@@ -1212,13 +1212,13 @@ class TestGetGeneratorModel:
         assert call_kwargs["reasoning"] == "high"
 
     @patch("langchain_ollama.ChatOllama")
-    def test_ollama_reasoning_effort_defaults_to_high_when_unset(self, mock_cls):
+    def test_ollama_reasoning_effort_defaults_to_low_when_unset(self, mock_cls):
         mock_cls.return_value = MagicMock()
         config = self._base_config("gpt-oss:20b")
         config["isReasoning"] = True
         get_generator_model(LLMProvider.OLLAMA.value, config, reasoning_effort=None)
         call_kwargs = mock_cls.call_args.kwargs
-        assert call_kwargs["reasoning"] == "high"
+        assert call_kwargs["reasoning"] == "low"
 
     @patch("langchain_openai.ChatOpenAI")
     def test_openai(self, mock_cls):
@@ -1355,9 +1355,9 @@ class TestGetGeneratorModel:
         assert "use_responses_api" not in call_kwargs
 
     @patch("langchain_openai.ChatOpenAI")
-    def test_openai_reasoning_effort_defaults_to_high_when_none(self, mock_cls):
+    def test_openai_reasoning_effort_defaults_to_low_when_none(self, mock_cls):
         """Absent reasoning_effort on a reasoning-capable model now defaults to
-        'high' (via the Responses API for direct OpenAI) instead of silently
+        'low' (via the Responses API for direct OpenAI) instead of silently
         deferring to the provider's own default."""
         mock_cls.return_value = MagicMock()
         config = self._base_config("gpt-5")
@@ -1366,7 +1366,7 @@ class TestGetGeneratorModel:
         get_generator_model(LLMProvider.OPENAI.value, config, reasoning_effort=None)
         call_kwargs = mock_cls.call_args.kwargs
         assert "reasoning_effort" not in call_kwargs
-        assert call_kwargs["reasoning"] == {"effort": "high"}
+        assert call_kwargs["reasoning"] == {"effort": "low"}
         assert call_kwargs["use_responses_api"] is True
 
     @patch("langchain_openai.AzureChatOpenAI")
@@ -2016,6 +2016,12 @@ class TestModelDefaultReasoningEffort:
         config = {"defaultReasoningEffort": "high", "configuration": {"defaultReasoningEffort": "low"}}
         assert model_default_reasoning_effort(config) == "low"
 
+    def test_explicit_clear_does_not_restore_a_legacy_high_default(self) -> None:
+        for value in [None, "", "  "]:
+            config = {"defaultReasoningEffort": "high", "configuration": {"defaultReasoningEffort": value}}
+            assert model_default_reasoning_effort(config) is None
+            assert _reasoning_effort_kwargs(None, {**config, "isReasoning": True}) == {"reasoning_effort": "low"}
+
     @pytest.mark.parametrize("value", [None, "", "  "])
     def test_absent_or_blank_means_no_default(self, value) -> None:
         assert model_default_reasoning_effort({"configuration": {"defaultReasoningEffort": value}}) is None
@@ -2049,9 +2055,9 @@ class TestModelDefaultReasoningEffort:
         config = {"isReasoning": False, "configuration": {"defaultReasoningEffort": "extreme"}}
         assert _reasoning_effort_kwargs(None, config) == {}
 
-    def test_no_default_still_means_high(self) -> None:
+    def test_no_default_uses_platform_low(self) -> None:
         config = {"isReasoning": True, "configuration": {"model": "m"}}
-        assert _reasoning_effort_kwargs(None, config) == {"reasoning_effort": "high"}
+        assert _reasoning_effort_kwargs(None, config) == {"reasoning_effort": "low"}
 
     def test_bedrock_uses_the_model_default(self) -> None:
         from app.utils.aimodels import _bedrock_additional_model_request_fields

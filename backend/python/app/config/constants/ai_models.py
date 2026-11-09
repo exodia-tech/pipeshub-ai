@@ -70,11 +70,9 @@ REASONING_EFFORT_VALUES = frozenset(item.value for item in ReasoningEffort)
 # Applied by the LLM factory (`_reasoning_effort_kwargs`) whenever a
 # reasoning-capable model has no explicit effort — from the user's selection,
 # an agent's `defaultReasoningEffort`, the model's own `defaultReasoningEffort`,
-# or any other caller. Reasoning-capable models should reason thoroughly by
-# default rather than falling back to whatever a given provider's own default
-# happens to be (which varies and is often a lower/cheaper tier than users
-# expect).
-DEFAULT_REASONING_EFFORT = ReasoningEffort.HIGH.value
+# or any other caller. Keep ordinary turns responsive; deeper reasoning is
+# an explicit request, agent or model setting.
+DEFAULT_REASONING_EFFORT = ReasoningEffort.LOW.value
 
 
 def validate_reasoning_effort(value: str | None) -> str | None:

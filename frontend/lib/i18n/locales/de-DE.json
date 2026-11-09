@@ -5902,5 +5902,11 @@
     "invalid": "Wähle ein PNG-, JPEG- oder WebP-Bild unter 5 MB.",
     "failed": "Das Agentenbild konnte nicht gespeichert werden. Bitte erneut versuchen.",
     "saving": "Wird gespeichert…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "Standard-Denkaufwand des Modells",
+    "inheritPlatform": "Plattformstandard verwenden (Niedrig)",
+    "inheritModel": "Modellstandard übernehmen",
+    "priority": "Priorität: Nachrichtenauswahl → Agent → Modell → Niedrig."
   }
 }

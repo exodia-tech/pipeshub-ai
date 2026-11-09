@@ -18971,7 +18971,7 @@ components:
           description: |
             Reasoning effort for this model when a chat or agent request doesn't
             choose one. Applies only when `isReasoning` is true. Empty or absent
-            means the platform default (`high`). `none` is accepted for
+            means the platform default (`low`). `none` is accepted for
             compatibility and treated as `low`.
         identityForwardingEnabled:
           type: boolean

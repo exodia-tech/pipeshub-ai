@@ -5902,5 +5902,11 @@
     "invalid": "Choose a PNG, JPEG or WebP image smaller than 5 MB.",
     "failed": "Couldn't save the agent picture. Please try again.",
     "saving": "Saving…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "Model default reasoning",
+    "inheritPlatform": "Use platform default (Low)",
+    "inheritModel": "Inherit model default",
+    "priority": "Priority: message choice → agent default → model default → Low."
   }
 }
