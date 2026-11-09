@@ -649,11 +649,11 @@ export default function UsagePage() {
                   {[3, 5].map((count) => (
                     <Box key={count} display={count === 3 ? { initial: "block", sm: "none" } : { initial: "none", sm: "block" }}
                       style={{ position: "relative", height: 40 }}>
-                      {timelineTicks(timeline.map((row) => row.label), interval, i18n.language, count).map((tick, index, ticks) => (
+                      {timelineTicks(timeline.map((row) => row.label), interval, i18n.language, count).map((tick, index) => (
                         <Box key={tick.index} style={{ position: "absolute", left: `${tick.position}%`, top: 0,
-                          transform: index === 0 ? undefined : index === ticks.length - 1 ? "translateX(-100%)" : "translateX(-50%)" }}>
+                          transform: index === 0 ? undefined : tick.position === 100 ? "translateX(-100%)" : "translateX(-50%)" }}>
                           <Box style={{ position: "relative", height: 6, marginBottom: 6 }}>
-                            <Box style={{ position: "absolute", left: index === 0 ? "0%" : index === ticks.length - 1 ? "100%" : "50%", height: 6, borderLeft: "1px solid var(--gray-7)" }} />
+                            <Box style={{ position: "absolute", left: index === 0 ? "0%" : tick.position === 100 ? "100%" : "50%", height: 6, borderLeft: "1px solid var(--gray-7)" }} />
                           </Box>
                           <Text size="1" color="gray" title={tick.raw} style={{ whiteSpace: "nowrap" }}>{tick.label}</Text>
                         </Box>

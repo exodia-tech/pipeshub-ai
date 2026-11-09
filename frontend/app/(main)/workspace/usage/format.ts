@@ -3,9 +3,10 @@ import type { Totals } from "./api";
 export type UsageMetric = "tokens" | "cost" | "requests";
 
 export function timelineTicks(labels: string[], interval: string, locale: string, count: number) {
-  const size = Math.min(labels.length, count);
+  const step = Math.max(1, Math.ceil((labels.length - 1) / Math.max(1, count - 1)));
+  const size = labels.length ? Math.floor((labels.length - 1) / step) + 1 : 0;
   return Array.from({ length: size }, (_, tick) => {
-    const index = Math.round(tick * (labels.length - 1) / Math.max(1, size - 1));
+    const index = tick * step;
     const raw = labels[index];
     // Server buckets are UTC, including timestamps without a zone suffix.
     const date = new Date(raw.includes("T") ? raw : `${raw.length === 7 ? raw + "-01" : raw}T00:00:00Z`);
