@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "project_key": "demo-verde",
+  "project_name": "Progetto Verde",
+  "language": "it",
+  "source_ref": "wispr:demo-verde-approved",
+  "source_url": "https://example.invalid/demo-verde/meeting-1",
+  "meeting_id": "demo-meeting-1",
+  "revision": "v1",
+  "content_ready": true,
+  "notes": "RIUNIONE FITTIZIA. Il team ha deciso di rivedere il prototipo con il cliente. Amina preparerà una bozza di schermata; non è stata concordata alcuna scadenza. Luca chiede se il report debba includere dati storici: la domanda rimane aperta. Una stima di costo è stata proposta ma non approvata."
+}
