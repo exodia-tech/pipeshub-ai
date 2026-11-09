@@ -1009,7 +1009,12 @@ export function splitByLengthPreferringNewlines(text: string, limit: number): st
   while (remaining.length > limit) {
     const candidate = remaining.slice(0, limit);
     const lastNewlineIndex = candidate.lastIndexOf("\n");
-    const splitIndex = lastNewlineIndex > -1 ? lastNewlineIndex + 1 : limit;
+    let splitIndex = lastNewlineIndex > -1 ? lastNewlineIndex + 1 : limit;
+    const openLink = remaining.lastIndexOf('<', splitIndex - 1);
+    if (openLink > 0 && /^<(?:https?:\/\/|mailto:|tel:|[@#!])/.test(remaining.slice(openLink))) {
+      const closeLink = remaining.indexOf('>', openLink);
+      if (closeLink >= splitIndex) splitIndex = openLink;
+    }
     chunks.push(remaining.slice(0, splitIndex));
     remaining = remaining.slice(splitIndex);
   }
@@ -1689,15 +1694,19 @@ export async function buildFinalSlackChunks(
         continue;
       }
       const slackMrkdwn = markdownToSlackMrkdwn(segment.content);
-      const markdownBlocks = [{
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": slackMrkdwn,
-        },
-      }];
-      const normalizedMarkdownBlocks = normalizeSlackBlocksForLimits(markdownBlocks);
-      combinedBlocks.push(...normalizedMarkdownBlocks);
+      // A link longer than a section's text limit must remain one rich-text
+      // link; splitting its mrkdwn would make it unclickable.
+      const linkPattern = /<(https?:\/\/[^>|\n]+)\|([^>\n]+)>/g;
+      let offset = 0;
+      for (const match of slackMrkdwn.matchAll(linkPattern)) {
+        if (match[0].length <= SLACK_SECTION_TEXT_LIMIT) continue;
+        const prefix = slackMrkdwn.slice(offset, match.index);
+        if (prefix.trim()) combinedBlocks.push(...normalizeSlackBlocksForLimits([{ type: 'section', text: { type: 'mrkdwn', text: prefix } }]));
+        combinedBlocks.push({ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'link', url: (match[1] ?? '').replace(/&amp;/g, '&'), text: match[2] ?? '' }] }] });
+        offset = (match.index ?? 0) + match[0].length;
+      }
+      const remainder = slackMrkdwn.slice(offset);
+      if (remainder.trim()) combinedBlocks.push(...normalizeSlackBlocksForLimits([{ type: 'section', text: { type: 'mrkdwn', text: remainder } }]));
       continue;
     }
 
