@@ -5,10 +5,30 @@ import {
   metricValue,
   money,
   seriesSegments,
+  timelineTicks,
 } from "../format";
 import type { Totals } from "../api";
 
 describe("usage presentation", () => {
+  it("aligns readable date ticks with actual buckets, including uneven ranges", () => {
+    const labels = Array.from({ length: 8 }, (_, i) => `2026-11-${String(i + 1).padStart(2, "0")}`);
+    const ticks = timelineTicks(labels, "day", "en-US", 5);
+    expect(ticks.map((t) => t.index)).toEqual([0, 2, 4, 6]);
+    expect(ticks.map((t) => t.label)).toEqual(["Nov 1", "Nov 3", "Nov 5", "Nov 7"]);
+    expect(ticks[1].position).toBeCloseTo(2 / 7 * 100);
+    expect(timelineTicks(labels, "day", "en-US", 3).map((t) => t.index)).toEqual([0, 4]);
+    for (let length = 2; length <= 366; length++) {
+      const ticks = timelineTicks(Array.from({length}, () => "2026-11-01"), "day", "en-US", 5);
+      const gaps = ticks.slice(1).map((tick, i) => tick.position - ticks[i].position);
+      gaps.forEach((gap) => expect(gap).toBeCloseTo(gaps[0]));
+    }
+  });
+  it("distinguishes UTC hours across midnight and handles short ranges", () => {
+    expect(timelineTicks(["2026-11-08T23:00:00Z", "2026-11-09T00:00:00Z"], "hour", "en-US", 5).map((t) => t.label))
+      .toEqual(["Nov 8, 23:00", "Nov 9, 00:00"]);
+    expect(timelineTicks(["2026-11"], "month", "en-US", 5)[0]).toMatchObject({ position: 0, label: "Nov 2026" });
+    expect(timelineTicks([], "day", "en-US", 5)).toEqual([]);
+  });
   it("uses an exclusive UTC end across month and daylight-saving boundaries", () => {
     expect(exclusiveEnd("2026-10-31")).toBe("2026-11-01T00:00:00.000Z");
     expect(exclusiveEnd("2026-03-29")).toBe("2026-03-30T00:00:00.000Z");
