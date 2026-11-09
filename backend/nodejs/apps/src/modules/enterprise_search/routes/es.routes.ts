@@ -1,4 +1,5 @@
 import { requireChatCompareEnabled } from '../utils/chat-compare-feature';
+import { createAgentPictureRouter } from './agent-pictures.routes';
 import { createAgentScheduleRouter } from './agent-schedules.routes';
 import {
   chooseCompare,
@@ -819,6 +820,7 @@ export function createSemanticSearchRouter(container: Container): Router {
 export function createAgentConversationalRouter(container: Container): Router {
   const router = Router();
   router.use('/:agentKey/schedule', createAgentScheduleRouter(container));
+  router.use('/:agentKey/avatar', createAgentPictureRouter(container));
   guardPathParams(router, 'agentKey', 'recordId', 'provider', 'model_key');
   const authMiddleware = container.get<AuthMiddleware>('AuthMiddleware');
   const appConfig = container.get<AppConfig>('AppConfig');

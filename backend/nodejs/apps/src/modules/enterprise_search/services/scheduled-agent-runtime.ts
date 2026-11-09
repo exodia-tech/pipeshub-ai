@@ -52,17 +52,34 @@ export class ScheduledAgentRuntime {
     return bot.botToken;
   }
 
-  async checkOwner(agentId: string, userId: string, headers: Record<string, string>, publicOnly: boolean): Promise<Record<string, unknown>> {
+  async getAgent(agentId: string, headers: Record<string, string>): Promise<Record<string, unknown>> {
     const result = await new AIServiceCommand<{ agent: Record<string, unknown> }>({
       uri: `${this.config().aiBackend}/api/v1/agent/${encodeURIComponent(agentId)}`,
       method: HttpMethod.GET, headers, maxAttempts: 1, timeoutMs: 30_000,
     }).execute();
-    const agent = result.data?.agent;
-    if (result.statusCode !== 200 || !agent || agent.createdBy !== userId) {
-      throw new ForbiddenError('Only the agent creator can manage its schedule.');
-    }
+    if (result.statusCode !== 200 || !result.data?.agent) throw new ForbiddenError('This agent is not available.');
+    return result.data.agent;
+  }
+
+  async checkOwner(agentId: string, userId: string, headers: Record<string, string>, publicOnly: boolean): Promise<Record<string, unknown>> {
+    const agent = await this.getAgent(agentId, headers);
+    if (agent.createdBy !== userId) throw new ForbiddenError('Only the agent creator can manage its settings.');
     if (publicOnly) requirePublicResearchAgent(agent);
     return agent;
+  }
+
+  async updateAvatar(agentId: string, avatarUrl: string | null, headers: Record<string, string>): Promise<void> {
+    const result = await new AIServiceCommand({
+      uri: `${this.config().aiBackend}/api/v1/agent/${encodeURIComponent(agentId)}`,
+      method: HttpMethod.PUT, headers, body: { avatarUrl }, maxAttempts: 1, timeoutMs: 30_000,
+    }).execute();
+    if (result.statusCode !== 200) throw new Error('The agent picture could not be saved.');
+  }
+
+  async deliveryOptions(orgId: string, userId: string, agentId: string): Promise<{ canManage: boolean; bots: { id: string; name: string }[] }> {
+    if (!await isUserOrgAdmin(userId, orgId) || await resolveSoleOrgId() !== orgId) return { canManage: false, bots: [] };
+    const store = await getSlackBotStore(this.store);
+    return { canManage: true, bots: store.configs.filter(bot => bot.agentId === agentId).map(bot => ({ id: bot.id, name: bot.name })) };
   }
 
   execute = async (

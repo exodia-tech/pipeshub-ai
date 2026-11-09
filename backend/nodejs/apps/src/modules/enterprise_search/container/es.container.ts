@@ -5,6 +5,7 @@ import { KeyValueStoreService } from '../../../libs/services/keyValueStore.servi
 import { AuthTokenService } from '../../../libs/services/authtoken.service';
 import { AuthMiddleware } from '../../../libs/middlewares/auth.middleware';
 import { AppConfig } from '../../tokens_manager/config/config';
+import { AgentPictures } from '../services/agent-pictures';
 import { AgentSchedules } from '../services/agent-schedules';
 import { ScheduledAgentRuntime } from '../services/scheduled-agent-runtime';
 
@@ -70,6 +71,7 @@ export class EnterpriseSearchAgentContainer {
         this.logger.error('Native agent schedule failed; inspect its run history');
       }, Date.now, () => runtime.isReady());
       container.bind(ScheduledAgentRuntime).toConstantValue(runtime);
+      container.bind(AgentPictures).toConstantValue(new AgentPictures(keyValueStoreService, runtime));
       container.bind(AgentSchedules).toConstantValue(schedules);
       this.logger.info(
         'Enterprise Search Agent services initialized successfully',

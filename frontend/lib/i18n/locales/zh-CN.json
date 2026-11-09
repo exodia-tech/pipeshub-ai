@@ -5842,6 +5842,30 @@
       "draft": "草稿已就绪",
       "needs_review": "审核草稿",
       "needs_reconciliation": "检查中断的运行"
-    }
+    },
+    "slackTitle": "Slack 发送",
+    "sendSlack": "将简报发送到 Slack",
+    "slackBot": "Slack 机器人",
+    "chooseBot": "选择机器人",
+    "slackChannel": "Slack 频道",
+    "channelPlaceholder": "粘贴 Slack 频道链接或 ID",
+    "channelHelp": "启用发送前，请先邀请所选机器人加入此频道。",
+    "slackAdminOnly": "Slack 发送由组织管理员管理。你可以将其关闭。",
+    "manageBots": "管理 Slack 机器人",
+    "noBots": "请先为此智能体连接机器人。",
+    "slackLoadFailed": "无法加载 Slack 设置。请关闭后重新打开以重试。",
+    "invalidSlack": "请选择机器人，并输入有效的 Slack 频道链接或 ID。",
+    "saveBeforeRun": "运行前请先保存更改。"
+  },
+  "agentPicture": {
+    "title": "更改智能体图片",
+    "description": "更新此智能体在 Brain 中的图片。",
+    "choose": "选择图片",
+    "remove": "移除图片",
+    "formats": "PNG、JPEG 或 WebP · 最大 5 MB",
+    "preview": "图片预览",
+    "invalid": "请选择小于 5 MB 的 PNG、JPEG 或 WebP 图片。",
+    "failed": "无法保存智能体图片，请重试。",
+    "saving": "正在保存…"
   }
 }

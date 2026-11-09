@@ -5876,6 +5876,30 @@
       "draft": "Entwurf bereit",
       "needs_review": "Entwurf prüfen",
       "needs_reconciliation": "Unterbrochene Ausführung prüfen"
-    }
+    },
+    "slackTitle": "Slack-Zustellung",
+    "sendSlack": "Briefings an Slack senden",
+    "slackBot": "Slack-Bot",
+    "chooseBot": "Bot auswählen",
+    "slackChannel": "Slack-Kanal",
+    "channelPlaceholder": "Slack-Kanallink oder Kanal-ID einfügen",
+    "channelHelp": "Lade den ausgewählten Bot vor dem Aktivieren in diesen Kanal ein.",
+    "slackAdminOnly": "Ein Organisationsadministrator verwaltet die Slack-Zustellung. Du kannst sie deaktivieren.",
+    "manageBots": "Slack-Bots verwalten",
+    "noBots": "Verbinde zuerst einen Bot mit diesem Agenten.",
+    "slackLoadFailed": "Slack-Einstellungen konnten nicht geladen werden. Zum Wiederholen schließen und erneut öffnen.",
+    "invalidSlack": "Wähle einen Bot und gib einen gültigen Slack-Kanallink oder eine Kanal-ID ein.",
+    "saveBeforeRun": "Speichere deine Änderungen vor dem Ausführen."
+  },
+  "agentPicture": {
+    "title": "Agentenbild ändern",
+    "description": "Aktualisiere das Bild dieses Agenten in Brain.",
+    "choose": "Bild auswählen",
+    "remove": "Bild entfernen",
+    "formats": "PNG, JPEG oder WebP · bis zu 5 MB",
+    "preview": "Bildvorschau",
+    "invalid": "Wähle ein PNG-, JPEG- oder WebP-Bild unter 5 MB.",
+    "failed": "Das Agentenbild konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "saving": "Wird gespeichert…"
   }
 }

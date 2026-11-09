@@ -38,6 +38,11 @@ export function createAgentScheduleRouter(container: Container): Router {
       Authorization: String(req.headers.authorization),
     }, publicOnly);
 
+  router.get('/slack-bots', requireScopes(OAuthScopeNames.AGENT_READ), handle(async (req, res) => {
+    await check(req, false);
+    res.json(await container.get(ScheduledAgentRuntime).deliveryOptions(req.user!.orgId, req.user!.userId, String(req.params.agentKey)));
+  }));
+
   router.get('/', requireScopes(OAuthScopeNames.AGENT_READ), handle(async (req, res) => {
     await check(req, false);
     res.json({ schedule: await container.get(AgentSchedules).read(req.user!.orgId, req.user!.userId, String(req.params.agentKey)) });
@@ -45,7 +50,9 @@ export function createAgentScheduleRouter(container: Container): Router {
   router.put('/', requireScopes(OAuthScopeNames.AGENT_READ), requireScopes(OAuthScopeNames.AGENT_WRITE), requireScopes(OAuthScopeNames.AGENT_EXECUTE),
     ValidationMiddleware.validate(z.object({ body: agentScheduleInput })), handle(async (req, res) => {
       await check(req, req.body.enabled);
-      if (req.body.enabled) await container.get(ScheduledAgentRuntime).checkDelivery({ ...req.body, orgId: req.user!.orgId, userId: req.user!.userId, agentId: String(req.params.agentKey) });
+      const previous = await container.get(AgentSchedules).read(req.user!.orgId, req.user!.userId, String(req.params.agentKey));
+      const deliveryChanged = (req.body.slackBotId ?? null) !== (previous?.slackBotId ?? null) || (req.body.slackChannelId ?? null) !== (previous?.slackChannelId ?? null);
+      if (req.body.enabled || deliveryChanged) await container.get(ScheduledAgentRuntime).checkDelivery({ ...req.body, orgId: req.user!.orgId, userId: req.user!.userId, agentId: String(req.params.agentKey) });
       res.json({ schedule: await container.get(AgentSchedules).save(req.user!.orgId, req.user!.userId, String(req.params.agentKey), req.body) });
     }));
   router.post('/run', requireScopes(OAuthScopeNames.AGENT_READ), requireScopes(OAuthScopeNames.AGENT_EXECUTE), handle(async (req, res) => {

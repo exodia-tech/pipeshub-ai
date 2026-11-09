@@ -7,6 +7,7 @@ export const SWR_NS = {
   agentLists: 'agents/lists',
   teamConnectorLists: 'connectors/team-lists',
   agentDetails: 'agents/detail',
+  agentPictures: 'agents/pictures',
   projectDetails: 'projects/detail',
   org: 'org',
   aiModelConfig: 'ai-models/config',

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { AgentPictureDialog } from '@/app/(main)/agents/agent-picture-dialog';
 import { AgentPortrait } from '@/app/(main)/agents/agent-portrait';
 import { AgentScheduleDialog } from '@/app/(main)/agents/agent-schedule-dialog';
 import { useRouter } from 'next/navigation';
@@ -43,6 +44,7 @@ export function AgentChatHeader({
   readOnly,
 }: AgentChatHeaderProps) {
   const router = useRouter();
+  const [pictureOpen, setPictureOpen] = React.useState(false);
   const [scheduleOpen, setScheduleOpen] = React.useState(false);
   const { t } = useTranslation();
   const toggleAgentsSidebar = useChatStore((s) => s.toggleAgentsSidebar);
@@ -157,6 +159,7 @@ export function AgentChatHeader({
             {t('chat.moreAgents')}
           </DropdownMenu.Item>
           {(canEdit || showViewAgent) && <DropdownMenu.Separator />}
+          {canEdit && <DropdownMenu.Item onSelect={() => setPictureOpen(true)}>{t('agentPicture.title')}</DropdownMenu.Item>}
           {canEdit && (
             <DropdownMenu.Item onSelect={() => setScheduleOpen(true)}>
               {t('agentSchedule.title')}
@@ -184,6 +187,7 @@ export function AgentChatHeader({
       </DropdownMenu.Root>
       )}
     </Box>
+    {pictureOpen && <AgentPictureDialog agentId={agentId} open onOpenChange={setPictureOpen} />}
     {scheduleOpen && <AgentScheduleDialog agentId={agentId} open onOpenChange={setScheduleOpen} />}
     </>
   );

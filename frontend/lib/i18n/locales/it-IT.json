@@ -5949,6 +5949,30 @@
       "draft": "Bozza pronta",
       "needs_review": "Da rivedere",
       "needs_reconciliation": "Verifica esecuzione interrotta"
-    }
+    },
+    "slackTitle": "Invio su Slack",
+    "sendSlack": "Invia i riepiloghi su Slack",
+    "slackBot": "Bot Slack",
+    "chooseBot": "Scegli un bot",
+    "slackChannel": "Canale Slack",
+    "channelPlaceholder": "Incolla il link o l’ID di un canale Slack",
+    "channelHelp": "Invita il bot selezionato nel canale prima di attivare l’invio.",
+    "slackAdminOnly": "Un amministratore gestisce l’invio su Slack. Puoi disattivarlo.",
+    "manageBots": "Gestisci bot Slack",
+    "noBots": "Collega prima un bot a questo agente.",
+    "slackLoadFailed": "Impossibile caricare le impostazioni Slack. Chiudi e riapri per riprovare.",
+    "invalidSlack": "Scegli un bot e inserisci un link o ID valido di un canale Slack.",
+    "saveBeforeRun": "Salva le modifiche prima di eseguire."
+  },
+  "agentPicture": {
+    "title": "Cambia immagine agente",
+    "description": "Aggiorna l’immagine di questo agente in Brain.",
+    "choose": "Scegli immagine",
+    "remove": "Rimuovi immagine",
+    "formats": "PNG, JPEG o WebP · fino a 5 MB",
+    "preview": "Anteprima immagine",
+    "invalid": "Scegli un’immagine PNG, JPEG o WebP inferiore a 5 MB.",
+    "failed": "Impossibile salvare l’immagine dell’agente. Riprova.",
+    "saving": "Salvataggio…"
   }
 }
