@@ -17,7 +17,7 @@ export function AgentPortrait({ src, name, size = 32 }: { src?: string | null; n
     ([, url]: [string, string]) => AgentPicturesApi.read(url), SWR_POLICY.list60s);
   if (!isAgentPortrait(src)) return null;
   const image = isUploadedAgentPortrait(src) ? (isSwrReadUnavailable(Boolean(data), error) ? undefined : data) : src;
-  if (!image) return null;
+  if (!image) return <span aria-hidden="true" style={{ display: 'inline-block', width: size, height: size, borderRadius: '50%', background: 'var(--gray-a3)', flexShrink: 0 }} />;
   return <img src={image} alt={name} width={size} height={size}
     style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />;
 }

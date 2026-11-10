@@ -19,6 +19,15 @@ describe('agent portraits', () => {
     rerender(<AgentPortrait src="https://example.com/photo.png" name="Elio" />);
     expect(screen.queryByAltText('Elio')).toBeNull();
   });
+  it('reserves portrait space while an authenticated image loads', () => {
+    const src = '/api/v1/agents/e6ed44ce-65cc-42db-95bc-5db456f5f450/avatar/120d1a70-989a-499b-8e41-170b2a07a820';
+    cached.data = undefined; cached.error = undefined;
+    const { container } = render(<AgentPortrait src={src} name="Elio" size={24} />);
+    const placeholder = container.firstElementChild as HTMLElement;
+    expect(placeholder).not.toBeNull();
+    expect(placeholder.style.width).toBe('24px');
+    expect(placeholder.style.height).toBe('24px');
+  });
   it('hides cached private bytes when the agent is no longer visible or the picture was removed', () => {
     const src = '/api/v1/agents/e6ed44ce-65cc-42db-95bc-5db456f5f450/avatar/120d1a70-989a-499b-8e41-170b2a07a820';
     cached.data = 'data:image/webp;base64,cached';
