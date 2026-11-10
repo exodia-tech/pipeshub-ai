@@ -5981,5 +5981,27 @@
     "inheritPlatform": "Usa il valore della piattaforma (Basso)",
     "inheritModel": "Eredita dal modello",
     "priority": "Priorità: scelta del messaggio → agente → modello → Basso."
+  },
+  "graph": {
+    "title": "Grafo della conoscenza",
+    "intro": "Esplora le connessioni tra i documenti e le entità a cui hai accesso.",
+    "placeholder": "Cerca un argomento, una persona o un documento",
+    "search": "Cerca",
+    "loading": "Ricerca in corso…",
+    "error": "Impossibile caricare il grafo. Riprova.",
+    "noResults": "Nessuna entità accessibile trovata.",
+    "select": "Seleziona un risultato da esplorare",
+    "back": "Torna ai risultati",
+    "explanation": "Le entità correlate compaiono in uno o più documenti mostrati. Seleziona un nodo per esaminarlo.",
+    "viaRecords": "tramite documenti",
+    "sample": "Questo è un campione limitato dei documenti accessibili.",
+    "openSource": "Apri fonte",
+    "explore": "Esplora connessioni",
+    "records": "Documenti",
+    "noRecords": "Nessun documento accessibile in questa area.",
+    "related": "Entità correlate",
+    "openRecord": "Apri documento",
+    "recordLink": "documento",
+    "scope": "Mostra fino a 6 documenti e 4 entità correlate."
   }
 }

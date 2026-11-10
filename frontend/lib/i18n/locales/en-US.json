@@ -5908,5 +5908,27 @@
     "inheritPlatform": "Use platform default (Low)",
     "inheritModel": "Inherit model default",
     "priority": "Priority: message choice → agent default → model default → Low."
+  },
+  "graph": {
+    "title": "Knowledge graph",
+    "intro": "Explore connections between the records and entities you can access.",
+    "placeholder": "Search for a topic, person or record",
+    "search": "Search",
+    "loading": "Searching…",
+    "error": "Could not load the graph. Please try again.",
+    "noResults": "No matching accessible entities found.",
+    "select": "Select a result to explore",
+    "back": "Back to results",
+    "explanation": "Related entities occur in one or more displayed records. Select a node to inspect it.",
+    "viaRecords": "via records",
+    "sample": "This is a limited sample of accessible records.",
+    "openSource": "Open source",
+    "explore": "Explore connections",
+    "records": "Records",
+    "noRecords": "No accessible records in this neighborhood.",
+    "related": "Related entities",
+    "openRecord": "Open record",
+    "recordLink": "record",
+    "scope": "Showing up to 6 records and 4 related entities."
   }
 }

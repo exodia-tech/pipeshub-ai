@@ -5874,5 +5874,27 @@
     "inheritPlatform": "使用平台預設值（低）",
     "inheritModel": "繼承模型預設值",
     "priority": "優先順序：訊息選擇 → 代理 → 模型 → 低。"
+  },
+  "graph": {
+    "title": "知識圖譜",
+    "intro": "探索您有權存取的紀錄與實體之間的連結。",
+    "placeholder": "搜尋主題、人員或紀錄",
+    "search": "搜尋",
+    "loading": "搜尋中…",
+    "error": "無法載入圖譜，請重試。",
+    "noResults": "找不到可存取的實體。",
+    "select": "選擇結果以探索",
+    "back": "返回結果",
+    "explanation": "相關實體出現在一筆或多筆顯示的紀錄中。選擇節點查看詳情。",
+    "viaRecords": "透過紀錄",
+    "sample": "這裡只顯示可存取紀錄的部分樣本。",
+    "openSource": "開啟來源",
+    "explore": "探索連結",
+    "records": "紀錄",
+    "noRecords": "此區域沒有可存取的紀錄。",
+    "related": "相關實體",
+    "openRecord": "開啟紀錄",
+    "recordLink": "紀錄",
+    "scope": "最多顯示 6 筆紀錄和 4 個相關實體。"
   }
 }

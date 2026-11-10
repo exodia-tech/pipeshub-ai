@@ -6054,5 +6054,27 @@
     "inheritPlatform": "Použít výchozí hodnotu platformy (Nízká)",
     "inheritModel": "Převzít výchozí hodnotu modelu",
     "priority": "Priorita: volba zprávy → agent → model → Nízká."
+  },
+  "graph": {
+    "title": "Znalostní graf",
+    "intro": "Prozkoumejte vztahy mezi dostupnými dokumenty a entitami.",
+    "placeholder": "Hledat téma, osobu nebo dokument",
+    "search": "Hledat",
+    "loading": "Vyhledávání…",
+    "error": "Graf se nepodařilo načíst. Zkuste to znovu.",
+    "noResults": "Nebyly nalezeny žádné dostupné entity.",
+    "select": "Vyberte výsledek k prozkoumání",
+    "back": "Zpět na výsledky",
+    "explanation": "Související entity se vyskytují v jednom či více zobrazených dokumentech. Vyberte uzel.",
+    "viaRecords": "přes dokumenty",
+    "sample": "Toto je omezený vzorek dostupných dokumentů.",
+    "openSource": "Otevřít zdroj",
+    "explore": "Prozkoumat vztahy",
+    "records": "Dokumenty",
+    "noRecords": "V této oblasti nejsou dostupné dokumenty.",
+    "related": "Související entity",
+    "openRecord": "Otevřít dokument",
+    "recordLink": "dokument",
+    "scope": "Zobrazuje až 6 dokumentů a 4 související entity."
   }
 }
