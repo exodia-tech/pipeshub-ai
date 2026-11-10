@@ -27,13 +27,13 @@ export default defineConfig({
     // files sit unrun: three never ran, and one of them caught a real bug.
     // Playwright (tests/e2e) and Electron (electron/, run by
     // test:electron) have their own runners.
-    include: ['app/**/*.test.{ts,tsx}', 'lib/**/*.test.{ts,tsx}'],
+    include: ['app/**/*.test.{ts,tsx}', 'lib/**/*.test.{ts,tsx}', 'addons/**/*.test.{ts,tsx}'],
     passWithNoTests: false,
     // `include` lists every source file, loaded by a test or not, so the
     // percentage counts untested files instead of hiding them.
     coverage: {
       provider: 'v8',
-      include: ['app/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}'],
+      include: ['app/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}', 'addons/**/*.{ts,tsx}'],
       exclude: ['**/*.test.{ts,tsx}', '**/__tests__/**', '**/*.d.ts'],
       reporter: ['text-summary', 'json-summary', 'json', 'html'],
       reportsDirectory: 'coverage/unit',

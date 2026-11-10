@@ -19,6 +19,7 @@ import time
 from typing import TYPE_CHECKING, Any, Literal
 
 import regex
+from app.addons import register_search_addons
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
@@ -31,7 +32,7 @@ from app.agents.actions.knowledge_graph.ops.entity_filters import (
     load_entity_access_context,
 )
 from app.agents.actions.knowledge_graph.views import _compact_date
-from app.api.middlewares.auth import connection_limit, require_scopes
+from app.api.middlewares.auth import require_scopes
 from app.config.constants.arangodb import CollectionNames
 from app.config.constants.service import OAuthScopes
 from app.core.org_context import (
@@ -115,35 +116,6 @@ async def _retrieval_service(request: Request) -> RetrievalService:
 
 async def _graph_provider(request: Request) -> IGraphDBProvider:
     return await request.app.container.graph_provider()
-
-
-class GraphOverviewQuery(BaseModel):
-    cursor: str | None = Field(default=None, min_length=1, max_length=16384)
-
-
-@router.post("/search/graph", dependencies=[Depends(require_scopes(*SEARCH_SCOPES))])
-async def graph_overview(
-    request: Request, body: GraphOverviewQuery,
-    graph_provider: IGraphDBProvider = Depends(_graph_provider),
-) -> JSONResponse:
-    from app.connectors.sources.localKB.handlers.knowledge_hub_service import KnowledgeHubService
-    from app.modules.retrieval.graph_overview import GraphOverviewError, graph_page
-
-    org_id, user_id = _user(request)
-    config = request.app.container.config_service()
-    try:
-        graph = await graph_page(
-            graph_provider, KnowledgeHubService(logger, graph_provider, config),
-            user_id=user_id, org_id=org_id, cursor=body.cursor,
-            source_limited=connection_limit(request.state.user) is not None,
-            named_enabled=await _named_entities_enabled({"config_service": config}),
-        )
-    except GraphOverviewError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    except Exception as exc:
-        logger.warning("graph adjacency lookup failed", exc_info=True)
-        raise HTTPException(status_code=503, detail="Graph lookup failed - try again.") from exc
-    return JSONResponse(content=graph)
 
 
 def _user(request: Request) -> tuple[str, str]:
@@ -644,3 +616,5 @@ async def entity_neighbors(
         **({"relatedNote": "Related entities are counted over the records listed here, not the whole entity."} if page.next_cursor else {}),
     })
 
+
+register_search_addons(router, identity=_user, provider=_graph_provider)

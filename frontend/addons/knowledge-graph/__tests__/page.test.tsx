@@ -5,14 +5,16 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
 import { clusterLayout } from '../cluster-layout';
 import type { GraphData } from '../api';
+import { clearSessionCache } from '@/lib/api/session-cache';
 
 const api = vi.hoisted(() => ({ loadGraph: vi.fn(), cluster: vi.fn(), node: vi.fn(), reset: vi.fn() }));
 vi.mock('../api', () => ({ loadGraph: api.loadGraph }));
-vi.mock('../graph-canvas', () => ({ GraphCanvas: React.forwardRef(function Canvas({ label }: { label: string }, ref) {
+vi.mock('../graph-canvas', () => ({ GraphCanvas: React.forwardRef(function Canvas({ label, onReady }: { label: string; onReady(): void }, ref) {
   React.useImperativeHandle(ref, () => ({ cluster: api.cluster, node: api.node, reset: api.reset, zoom: vi.fn() }));
+  React.useEffect(() => { onReady(); }, []);
   return <div role="img" aria-label={label} />;
 }) }));
-import KnowledgeGraphPage from '../page';
+import KnowledgeGraphPage from '../index';
 
 beforeEach(() => {
   vi.stubGlobal('Worker', class {
@@ -21,7 +23,7 @@ beforeEach(() => {
     terminate() {}
   });
 });
-afterEach(() => { cleanup(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); clearSessionCache(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Cluster overview', () => {
   it('loads without search, zooms into a cluster and finds/opens a record', async () => {

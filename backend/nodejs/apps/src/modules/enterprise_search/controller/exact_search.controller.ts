@@ -51,7 +51,7 @@ type Handler = (
   next: NextFunction,
 ) => Promise<void>;
 
-const forward =
+export const forwardSearch =
   (
     appConfig: AppConfig,
     path: string,
@@ -105,15 +105,12 @@ const forward =
 
 /** POST /api/v1/search/grep */
 export const grepRecords = (appConfig: AppConfig): Handler =>
-  forward(appConfig, 'grep', GREP_FIELDS, 'Exact-text search');
+  forwardSearch(appConfig, 'grep', GREP_FIELDS, 'Exact-text search');
 
 /** POST /api/v1/search/entities */
 export const searchEntities = (appConfig: AppConfig): Handler =>
-  forward(appConfig, 'entities', ENTITY_SEARCH_FIELDS, 'Entity search');
+  forwardSearch(appConfig, 'entities', ENTITY_SEARCH_FIELDS, 'Entity search');
 
 /** POST /api/v1/search/entities/neighbors */
 export const entityNeighbors = (appConfig: AppConfig): Handler =>
-  forward(appConfig, 'entities/neighbors', NEIGHBOR_FIELDS, 'Entity lookup');
-
-export const graphOverview = (appConfig: AppConfig): Handler =>
-  forward(appConfig, 'graph', ['cursor'], 'Graph overview');
+  forwardSearch(appConfig, 'entities/neighbors', NEIGHBOR_FIELDS, 'Entity lookup');

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { loadPolicy, readLocale } from './check-i18n-parity.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const SEARCH_DIRS = ['app', 'lib'];
+const SEARCH_DIRS = ['app', 'lib', 'addons'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '__tests__', 'coverage']);
 const SOURCE_FILE = /\.tsx?$/;
 

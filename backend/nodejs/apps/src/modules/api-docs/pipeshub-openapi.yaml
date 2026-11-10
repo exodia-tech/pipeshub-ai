@@ -74259,7 +74259,7 @@ paths:
       summary: Page through the caller's knowledge graph
       operationId: graphOverview
       description: |
-        Lists up to 200 items through the same access checks as All Records,
+        Lists up to 1000 items through the same access checks as All Records,
         with readable parents, taxonomy and enabled named-entity mention edges.
         Follow nextCursor until null to cover the whole visible listing. Cursors
         are signed and bound to the caller and organization. Each page rechecks

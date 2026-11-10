@@ -25,7 +25,7 @@ async def graph_page(
     if source_limited:
         raise GraphOverviewError(403)
     listing = await listing_service.get_nodes(
-        user_id=user_id, org_id=org_id, flattened=True, limit=200,
+        user_id=user_id, org_id=org_id, flattened=True, limit=1000, bulk=True,
         sort_by="name", sort_order="asc", cursor=cursor,
     )
     if not listing.success:

@@ -365,7 +365,8 @@
     "searchChats": "Hledat v chatech",
     "inbox": "Doručené",
     "notifications": "Oznámení",
-    "home": "Domů"
+    "home": "Domů",
+    "addons": "Doplňky"
   },
   "artifacts": {
     "title": "Všechny artefakty",
@@ -6066,7 +6067,7 @@
     "retry": "Zkusit znovu",
     "error": "Graf se nepodařilo načíst. Zkuste to znovu.",
     "rendererError": "Prohlížeč nedokázal vykreslit graf. Zapněte WebGL nebo zkuste jiný prohlížeč. Skupiny a vyhledávání uzlů jsou stále dostupné níže.",
-    "canvasLabel": "Znalostní graf. Přibližujte gestem nebo kolečkem, posouvejte tažením.",
+    "canvasLabel": "3D znalostní graf. Otáčejte, přibližujte a vyberte skupinu pro prozkoumání uzlů.",
     "zoomIn": "Přiblížit",
     "zoomOut": "Oddálit",
     "fit": "Zobrazit celý graf",
@@ -6090,6 +6091,19 @@
       "topic": "Téma",
       "language": "Jazyk",
       "named_entity": "Pojmenovaná entita"
-    }
+    },
+    "preparing": "Příprava znalostního grafu",
+    "rendering": "Vykreslování mapy…",
+    "metricLegend": "Velikost skupiny: uzly · Velikost bodu: spojení",
+    "refresh": "Obnovit graf",
+    "connections": "Spojení: {{value}}",
+    "layout": {
+      "progress": "Rozmísťování uzlů: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Otočit doleva",
+    "rotateRight": "Otočit doprava",
+    "controls3d": "Tažením otáčíte · Kolečkem přibližujete · Pravým tlačítkem posouváte. Dotyk: jeden prst otáčí, dva přibližují nebo posouvají.",
+    "connectionHint": "Vyberte uzel a zobrazte jeho spojení."
   }
 }
