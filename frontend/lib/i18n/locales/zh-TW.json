@@ -5874,5 +5874,42 @@
     "inheritPlatform": "使用平台預設值（低）",
     "inheritModel": "繼承模型預設值",
     "priority": "優先順序：訊息選擇 → 代理 → 模型 → 低。"
+  },
+  "graph": {
+    "title": "知識圖譜",
+    "overviewIntro": "以互相連接的群組探索知識，放大查看其中的文件與概念。",
+    "arranging": "正在尋找群組並排列圖譜…",
+    "progress": "正在載入文件：{{loaded}} / {{total}}",
+    "counts": "{{nodes}} 個節點 · {{edges}} 條連線 · {{clusters}} 個群組",
+    "findNode": "尋找節點…",
+    "empty": "你的帳戶目前沒有可見的知識內容。",
+    "retry": "重試",
+    "error": "無法載入圖譜，請重試。",
+    "rendererError": "此瀏覽器無法繪製圖譜。請啟用 WebGL 或嘗試其他瀏覽器。你仍可在下方瀏覽群組及搜尋節點。",
+    "canvasLabel": "知識圖譜。以雙指或捲動縮放，拖曳以平移。",
+    "zoomIn": "放大",
+    "zoomOut": "縮小",
+    "fit": "顯示完整圖譜",
+    "openRecord": "開啟文件",
+    "searchResults": "符合的節點",
+    "noResults": "沒有符合的節點。",
+    "clusters": "群組",
+    "unconnected": "未連接的節點",
+    "clusterHint": "選擇群組以放大，選擇節點以查看詳情。",
+    "coverage": "所有可存取的文件及其儲存的連線。群組遵循你的權限。同步後請重新整理。",
+    "entity": "實體",
+    "kinds": {
+      "record": "文件",
+      "folder": "資料夾",
+      "kb": "集合",
+      "app": "來源",
+      "recordGroup": "文件群組",
+      "department": "部門",
+      "category": "類別",
+      "subcategory": "子類別",
+      "topic": "主題",
+      "language": "語言",
+      "named_entity": "命名實體"
+    }
   }
 }

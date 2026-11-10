@@ -5981,5 +5981,42 @@
     "inheritPlatform": "Usa il valore della piattaforma (Basso)",
     "inheritModel": "Eredita dal modello",
     "priority": "Priorità: scelta del messaggio → agente → modello → Basso."
+  },
+  "graph": {
+    "title": "Grafo della conoscenza",
+    "overviewIntro": "Esplora la conoscenza in gruppi collegati. Ingrandisci per scoprire documenti e concetti.",
+    "arranging": "Individuazione dei gruppi e disposizione del grafo…",
+    "progress": "Caricamento documenti: {{loaded}} / {{total}}",
+    "counts": "{{nodes}} nodi · {{edges}} collegamenti · {{clusters}} gruppi",
+    "findNode": "Cerca un nodo…",
+    "empty": "Non ci sono ancora contenuti visibili al tuo account.",
+    "retry": "Riprova",
+    "error": "Impossibile caricare il grafo. Riprova.",
+    "rendererError": "Questo browser non riesce a visualizzare il grafo. Abilita WebGL o prova un altro browser. Puoi comunque cercare i nodi ed esplorare i gruppi qui sotto.",
+    "canvasLabel": "Grafo della conoscenza. Pizzica o scorri per ingrandire; trascina per spostarti.",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "fit": "Mostra tutto il grafo",
+    "openRecord": "Apri documento",
+    "searchResults": "Nodi corrispondenti",
+    "noResults": "Nessun nodo corrispondente.",
+    "clusters": "Gruppi",
+    "unconnected": "Nodi non collegati",
+    "clusterHint": "Seleziona un gruppo per ingrandirlo. Seleziona un nodo per esaminarlo.",
+    "coverage": "Tutti i documenti accessibili e i loro collegamenti salvati. I gruppi rispettano i tuoi permessi. Aggiorna dopo la sincronizzazione.",
+    "entity": "Entità",
+    "kinds": {
+      "record": "Documento",
+      "folder": "Cartella",
+      "kb": "Raccolta",
+      "app": "Fonte",
+      "recordGroup": "Gruppo di documenti",
+      "department": "Reparto",
+      "category": "Categoria",
+      "subcategory": "Sottocategoria",
+      "topic": "Argomento",
+      "language": "Lingua",
+      "named_entity": "Entità nominata"
+    }
   }
 }

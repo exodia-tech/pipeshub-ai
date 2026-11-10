@@ -74253,6 +74253,77 @@ paths:
         '504':
           description: The AI search service did not answer in time.
 
+  /search/graph:
+    post:
+      tags: [Semantic Search]
+      summary: Page through the caller's knowledge graph
+      operationId: graphOverview
+      description: |
+        Lists up to 200 items through the same access checks as All Records,
+        with readable parents, taxonomy and enabled named-entity mention edges.
+        Follow nextCursor until null to cover the whole visible listing. Cursors
+        are signed and bound to the caller and organization. Each page rechecks
+        access; refresh the graph after permission changes or new syncs. Graph
+        counts and communities must be calculated from returned nodes only.
+        This is a knowledge view, not an export of database administration nodes.
+        Source-limited connected-app tokens are refused; use the signed-in
+        dashboard session or an app authorized for the user's full knowledge.
+      security:
+        - bearerAuth: []
+        - oauth2: [semantic:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 16384
+      responses:
+        '200':
+          description: One access-filtered graph page. A failed read is never returned as an empty graph.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodes, edges, listed, total, nextCursor]
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, kind]
+                      properties:
+                        id: {type: string}
+                        name: {type: string}
+                        kind: {type: string}
+                        recordId: {type: string}
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      required: [source, target]
+                      properties:
+                        source: {type: string}
+                        target: {type: string}
+                  listed: {type: integer, minimum: 0}
+                  total: {type: integer, minimum: 0}
+                  nextCursor: {type: string, nullable: true}
+        '400':
+          description: Invalid or expired cursor.
+        '401':
+          description: Missing user authentication.
+        '403':
+          description: Missing semantic:read or semantic:write scope, or a source-limited connected-app token.
+        '503':
+          description: Graph listing, adjacency or signed pagination is unavailable.
+        '504':
+          description: The graph service timed out.
+
   /search/entities:
     post:
       tags:

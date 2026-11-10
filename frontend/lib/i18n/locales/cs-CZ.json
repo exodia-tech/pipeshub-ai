@@ -6054,5 +6054,42 @@
     "inheritPlatform": "Použít výchozí hodnotu platformy (Nízká)",
     "inheritModel": "Převzít výchozí hodnotu modelu",
     "priority": "Priorita: volba zprávy → agent → model → Nízká."
+  },
+  "graph": {
+    "title": "Znalostní graf",
+    "overviewIntro": "Prozkoumejte znalosti v propojených skupinách. Přibližte si dokumenty a témata.",
+    "arranging": "Hledání a rozmísťování skupin…",
+    "progress": "Načítání dokumentů: {{loaded}} / {{total}}",
+    "counts": "{{nodes}} uzlů · {{edges}} spojení · {{clusters}} skupin",
+    "findNode": "Najít uzel…",
+    "empty": "Pro váš účet zatím nejsou viditelné žádné znalosti.",
+    "retry": "Zkusit znovu",
+    "error": "Graf se nepodařilo načíst. Zkuste to znovu.",
+    "rendererError": "Prohlížeč nedokázal vykreslit graf. Zapněte WebGL nebo zkuste jiný prohlížeč. Skupiny a vyhledávání uzlů jsou stále dostupné níže.",
+    "canvasLabel": "Znalostní graf. Přibližujte gestem nebo kolečkem, posouvejte tažením.",
+    "zoomIn": "Přiblížit",
+    "zoomOut": "Oddálit",
+    "fit": "Zobrazit celý graf",
+    "openRecord": "Otevřít dokument",
+    "searchResults": "Odpovídající uzly",
+    "noResults": "Žádné odpovídající uzly.",
+    "clusters": "Skupiny",
+    "unconnected": "Nepropojené uzly",
+    "clusterHint": "Vyberte skupinu pro přiblížení nebo uzel pro podrobnosti.",
+    "coverage": "Všechny dostupné dokumenty a uložená spojení. Skupiny respektují vaše oprávnění. Po synchronizaci obnovte stránku.",
+    "entity": "Entita",
+    "kinds": {
+      "record": "Dokument",
+      "folder": "Složka",
+      "kb": "Kolekce",
+      "app": "Zdroj",
+      "recordGroup": "Skupina dokumentů",
+      "department": "Oddělení",
+      "category": "Kategorie",
+      "subcategory": "Podkategorie",
+      "topic": "Téma",
+      "language": "Jazyk",
+      "named_entity": "Pojmenovaná entita"
+    }
   }
 }

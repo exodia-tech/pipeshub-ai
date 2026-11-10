@@ -5908,5 +5908,42 @@
     "inheritPlatform": "Use platform default (Low)",
     "inheritModel": "Inherit model default",
     "priority": "Priority: message choice → agent default → model default → Low."
+  },
+  "graph": {
+    "title": "Knowledge graph",
+    "overviewIntro": "Explore your knowledge as connected clusters. Zoom in to discover the records and ideas within them.",
+    "arranging": "Finding clusters and arranging the graph…",
+    "progress": "Loading records: {{loaded}} / {{total}}",
+    "counts": "{{nodes}} nodes · {{edges}} connections · {{clusters}} clusters",
+    "findNode": "Find a node…",
+    "empty": "No knowledge is visible to your account yet.",
+    "retry": "Try again",
+    "error": "The graph could not be loaded. Try again.",
+    "rendererError": "This browser could not render the graph. Enable WebGL or try another browser. You can still browse clusters and search nodes below.",
+    "canvasLabel": "Knowledge graph. Pinch or scroll to zoom; drag to pan.",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Show whole graph",
+    "openRecord": "Open record",
+    "searchResults": "Matching nodes",
+    "noResults": "No matching nodes.",
+    "clusters": "Clusters",
+    "unconnected": "Unconnected nodes",
+    "clusterHint": "Select a cluster to zoom in. Select a node to inspect it.",
+    "coverage": "All readable records and their stored connections. Clusters reflect your permissions. Refresh after syncing.",
+    "entity": "Entity",
+    "kinds": {
+      "record": "Record",
+      "folder": "Folder",
+      "kb": "Collection",
+      "app": "Source",
+      "recordGroup": "Record group",
+      "department": "Department",
+      "category": "Category",
+      "subcategory": "Subcategory",
+      "topic": "Topic",
+      "language": "Language",
+      "named_entity": "Named entity"
+    }
   }
 }

@@ -5874,5 +5874,42 @@
     "inheritPlatform": "使用平台默认值（低）",
     "inheritModel": "继承模型默认值",
     "priority": "优先级：消息选择 → 智能体 → 模型 → 低。"
+  },
+  "graph": {
+    "title": "知识图谱",
+    "overviewIntro": "以相互连接的群组探索知识，放大查看其中的文档和概念。",
+    "arranging": "正在发现群组并排列图谱…",
+    "progress": "正在加载文档：{{loaded}} / {{total}}",
+    "counts": "{{nodes}} 个节点 · {{edges}} 条连接 · {{clusters}} 个群组",
+    "findNode": "查找节点…",
+    "empty": "你的账户暂时没有可见的知识内容。",
+    "retry": "重试",
+    "error": "无法加载图谱，请重试。",
+    "rendererError": "此浏览器无法绘制图谱。请启用 WebGL 或尝试其他浏览器。你仍可在下方浏览群组和搜索节点。",
+    "canvasLabel": "知识图谱。双指缩放或滚动以缩放，拖动以平移。",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fit": "显示完整图谱",
+    "openRecord": "打开文档",
+    "searchResults": "匹配的节点",
+    "noResults": "没有匹配的节点。",
+    "clusters": "群组",
+    "unconnected": "未连接的节点",
+    "clusterHint": "选择群组以放大，选择节点以查看详情。",
+    "coverage": "所有可访问的文档及其存储的连接。群组遵循你的权限。同步后请刷新。",
+    "entity": "实体",
+    "kinds": {
+      "record": "文档",
+      "folder": "文件夹",
+      "kb": "集合",
+      "app": "来源",
+      "recordGroup": "文档组",
+      "department": "部门",
+      "category": "类别",
+      "subcategory": "子类别",
+      "topic": "主题",
+      "language": "语言",
+      "named_entity": "命名实体"
+    }
   }
 }

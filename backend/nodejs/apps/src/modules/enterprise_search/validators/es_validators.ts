@@ -1428,6 +1428,10 @@ export const enterpriseSearchEntityNeighborsSchema = z.object({
   }),
 });
 
+export const enterpriseSearchGraphSchema = z.object({
+  body: z.object({ cursor: z.string().min(1).max(16384).optional() }).strict(),
+});
+
 export const enterpriseSearchSearchHistorySchema = z.object({
   params: z.object({
     limit: limitSchema.optional(),

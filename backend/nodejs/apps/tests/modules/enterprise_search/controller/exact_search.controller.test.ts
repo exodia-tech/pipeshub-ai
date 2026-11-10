@@ -7,6 +7,7 @@ import yaml from 'js-yaml'
 import { AIServiceCommand } from '../../../../src/libs/commands/ai_service/ai.service.command'
 import {
   entityNeighbors,
+  graphOverview,
   grepRecords,
   searchEntities,
 } from '../../../../src/modules/enterprise_search/controller/exact_search.controller'
@@ -14,6 +15,7 @@ import {
   enterpriseSearchEntitiesSchema,
   enterpriseSearchEntityNeighborsSchema,
   enterpriseSearchGrepSchema,
+  enterpriseSearchGraphSchema,
 } from '../../../../src/modules/enterprise_search/validators/es_validators'
 
 const appConfig: any = { aiBackend: 'http://ai:8000' }
@@ -44,6 +46,15 @@ describe('entity search controller', () => {
 
   const answer = (statusCode: number, data: any) =>
     execute.callsFake(async function (this: any) { uris.push(this.url ?? ''); return { statusCode, data } })
+
+  it('forwards only the graph cursor and preserves the page', async () => {
+    const page = { nodes: [], edges: [], listed: 0, total: 0, nextCursor: null }
+    answer(200, page)
+    const { res, error } = await run(graphOverview(appConfig), { cursor: 'signed', userId: 'other', orgId: 'other' })
+    expect(error).to.equal(undefined)
+    expect(res.payload).to.deep.equal(page)
+    expect(JSON.parse(bodies[0])).to.deep.equal({ cursor: 'signed' })
+  })
 
   it('forwards only the grep fields, so a body cannot name another user or organisation, and returns the AI service answer as is', async () => {
     answer(200, { status: 'success', records: [{ recordId: 'r1' }] })
@@ -150,11 +161,18 @@ describe('entity routes match the published spec', () => {
   )
 
   it('documents both routes behind a bearer token and the semantic scopes', () => {
-    for (const path of ['/search/grep', '/search/entities', '/search/entities/neighbors']) {
+    for (const path of ['/search/grep', '/search/entities', '/search/entities/neighbors', '/search/graph']) {
       const op = spec.paths[path].post
       expect(op.operationId, path).to.be.a('string')
       expect(Object.keys(op.responses), path).to.include.members(['200', '400', '401', '403', '503'])
       expect(JSON.stringify(op.responses['403']), path).to.contain('semantic:read')
+    }
+  })
+
+  it('rejects client identity and invalid graph cursors at the gateway', () => {
+    expect(enterpriseSearchGraphSchema.safeParse({ body: {} }).success).to.equal(true)
+    for (const body of [{ orgId: 'other' }, { userId: 'other' }, { cursor: '' }, { cursor: 'a'.repeat(16385) }]) {
+      expect(enterpriseSearchGraphSchema.safeParse({ body }).success).to.equal(false)
     }
   })
 

@@ -31,6 +31,7 @@ const MAIN_NAV_ITEMS: NavItem[] = [
   // { icon: 'search', labelKey: 'nav.searchChats', route: '/search' },
   { icon: 'folder', labelKey: 'nav.collections', route: '/knowledge-base/' },
   { icon: 'inventory_2', labelKey: 'nav.allRecords', route: '/knowledge-base/?view=all-records' },
+  { icon: 'hub', labelKey: 'graph.title', route: '/knowledge-graph/' },
   { icon: 'attachment', labelKey: 'nav.allArtifacts', route: '/artifacts/', beta: true },
 ];
 
@@ -158,8 +159,8 @@ export function StaticNavSection() {
           href={item.route}
           onClick={closeOnMobile}
           isActive={
-            item.route.startsWith('/artifacts') &&
-            pathname.startsWith('/artifacts')
+            (item.route.startsWith('/artifacts') && pathname.startsWith('/artifacts')) ||
+            (item.route.startsWith('/knowledge-graph') && pathname.startsWith('/knowledge-graph'))
           }
         />
       ))}
