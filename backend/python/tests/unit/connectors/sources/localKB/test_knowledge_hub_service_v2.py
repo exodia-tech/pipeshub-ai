@@ -124,13 +124,12 @@ def admitted_scope(node_id: str = "p1", node_type: str = "recordGroup") -> dict:
 # --------------------------------------------------------------- routing
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("bulk,expected", [(False, 200), (True, 1000)])
-async def test_bulk_export_is_bounded_without_widening_public_pages(service, provider, bulk, expected):
+async def test_listing_keeps_the_query_memory_page_bound(service, provider):
     provider.get_knowledge_hub_root_nodes_v2.return_value = envelope([])
-    result = await service.get_nodes(user_id="u1", org_id="o1", limit=99999, bulk=bulk)
+    result = await service.get_nodes(user_id="u1", org_id="o1", limit=99999)
     assert result.success
-    assert result.pagination.limit == expected
-    assert provider.get_knowledge_hub_root_nodes_v2.call_args.kwargs["limit"] == expected
+    assert result.pagination.limit == 200
+    assert provider.get_knowledge_hub_root_nodes_v2.call_args.kwargs["limit"] == 200
 
 @pytest.mark.asyncio
 async def test_a_root_listing_uses_the_root_query(service, provider) -> None:

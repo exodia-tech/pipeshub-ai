@@ -24,8 +24,9 @@ async def graph_page(
     # A full overview must never widen a connected app's narrower source grant.
     if source_limited:
         raise GraphOverviewError(403)
+    # Keep each source fanout within the listing's shared transaction-memory budget.
     listing = await listing_service.get_nodes(
-        user_id=user_id, org_id=org_id, flattened=True, limit=1000, bulk=True,
+        user_id=user_id, org_id=org_id, flattened=True, limit=200,
         sort_by="name", sort_order="asc", cursor=cursor,
     )
     if not listing.success:
