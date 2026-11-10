@@ -329,7 +329,8 @@
     "searchChats": "搜索聊天",
     "inbox": "收件箱",
     "notifications": "通知",
-    "home": "首页"
+    "home": "首页",
+    "addons": "附加组件"
   },
   "artifacts": {
     "title": "所有产物",
@@ -5886,7 +5887,7 @@
     "retry": "重试",
     "error": "无法加载图谱，请重试。",
     "rendererError": "此浏览器无法绘制图谱。请启用 WebGL 或尝试其他浏览器。你仍可在下方浏览群组和搜索节点。",
-    "canvasLabel": "知识图谱。双指缩放或滚动以缩放，拖动以平移。",
+    "canvasLabel": "3D 知识图谱。旋转、缩放并选择群组以探索节点。",
     "zoomIn": "放大",
     "zoomOut": "缩小",
     "fit": "显示完整图谱",
@@ -5910,6 +5911,19 @@
       "topic": "主题",
       "language": "语言",
       "named_entity": "命名实体"
-    }
+    },
+    "preparing": "正在准备知识图谱",
+    "rendering": "正在绘制地图…",
+    "metricLegend": "群组大小：节点数 · 点大小：连接数",
+    "refresh": "刷新图谱",
+    "connections": "连接数：{{value}}",
+    "layout": {
+      "progress": "正在排列节点：{{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "向左旋转",
+    "rotateRight": "向右旋转",
+    "controls3d": "拖动旋转 · 滚动缩放 · 右键拖动平移。触屏：单指旋转，双指缩放或平移。",
+    "connectionHint": "选择节点以查看其连接。"
   }
 }

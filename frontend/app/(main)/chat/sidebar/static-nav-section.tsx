@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Badge, Flex } from '@radix-ui/themes';
+import { Badge, Flex, Text } from '@radix-ui/themes';
+import { addons } from '@/addons/registry';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { ICON_SIZE_DEFAULT } from '@/app/components/sidebar';
 import { useCommandStore } from '@/lib/store/command-store';
@@ -31,7 +32,6 @@ const MAIN_NAV_ITEMS: NavItem[] = [
   // { icon: 'search', labelKey: 'nav.searchChats', route: '/search' },
   { icon: 'folder', labelKey: 'nav.collections', route: '/knowledge-base/' },
   { icon: 'inventory_2', labelKey: 'nav.allRecords', route: '/knowledge-base/?view=all-records' },
-  { icon: 'hub', labelKey: 'graph.title', route: '/knowledge-graph/' },
   { icon: 'attachment', labelKey: 'nav.allArtifacts', route: '/artifacts/', beta: true },
 ];
 
@@ -159,11 +159,16 @@ export function StaticNavSection() {
           href={item.route}
           onClick={closeOnMobile}
           isActive={
-            (item.route.startsWith('/artifacts') && pathname.startsWith('/artifacts')) ||
-            (item.route.startsWith('/knowledge-graph') && pathname.startsWith('/knowledge-graph'))
+            (item.route.startsWith('/artifacts') && pathname.startsWith('/artifacts'))
           }
         />
       ))}
+      {addons.length > 0 && <Text size="1" color="gray" mt="3" mb="1" mx="3">{t('nav.addons')}</Text>}
+      {addons.map(addon => <SidebarItem key={addon.id}
+        icon={<MaterialIcon name={addon.icon} size={ICON_SIZE_DEFAULT} color={NAV_ICON_COLOR} />}
+        label={t(addon.labelKey)} href={addon.route} textColor={NAV_ICON_COLOR}
+        onClick={closeOnMobile} isActive={pathname.startsWith(addon.route)}
+      />)}
     </Flex>
   );
 }

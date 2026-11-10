@@ -252,7 +252,8 @@
     "searchChats": "Buscar chats",
     "inbox": "Bandeja de entrada",
     "notifications": "Notificaciones",
-    "home": "Inicio"
+    "home": "Inicio",
+    "addons": "Complementos"
   },
   "artifacts": {
     "title": "Todos los artefactos",
@@ -5993,7 +5994,7 @@
     "retry": "Reintentar",
     "error": "No se pudo cargar el grafo. Inténtalo de nuevo.",
     "rendererError": "Este navegador no pudo mostrar el grafo. Activa WebGL o prueba otro navegador. Puedes seguir explorando grupos y buscando nodos abajo.",
-    "canvasLabel": "Grafo de conocimiento. Pellizca o desplázate para ampliar; arrastra para mover.",
+    "canvasLabel": "Grafo de conocimiento 3D. Gira, amplía y selecciona un grupo para explorar sus nodos.",
     "zoomIn": "Ampliar",
     "zoomOut": "Reducir",
     "fit": "Mostrar todo el grafo",
@@ -6017,6 +6018,19 @@
       "topic": "Tema",
       "language": "Idioma",
       "named_entity": "Entidad nombrada"
-    }
+    },
+    "preparing": "Preparando tu grafo de conocimiento",
+    "rendering": "Mostrando el mapa…",
+    "metricLegend": "Tamaño del grupo: nodos · Tamaño del punto: conexiones",
+    "refresh": "Actualizar grafo",
+    "connections": "Conexiones: {{value}}",
+    "layout": {
+      "progress": "Organizando nodos: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Girar a la izquierda",
+    "rotateRight": "Girar a la derecha",
+    "controls3d": "Arrastra para girar · Desplaza para ampliar · Arrastra con el botón derecho para mover. Pantalla táctil: un dedo gira, dos amplían o mueven.",
+    "connectionHint": "Selecciona un nodo para ver sus conexiones."
   }
 }

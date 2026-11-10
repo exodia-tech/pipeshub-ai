@@ -4,10 +4,10 @@ import sinon from 'sinon'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import yaml from 'js-yaml'
+import { graphOverview, enterpriseSearchGraphSchema } from '../../../../src/addons/knowledge-graph'
 import { AIServiceCommand } from '../../../../src/libs/commands/ai_service/ai.service.command'
 import {
   entityNeighbors,
-  graphOverview,
   grepRecords,
   searchEntities,
 } from '../../../../src/modules/enterprise_search/controller/exact_search.controller'
@@ -15,7 +15,6 @@ import {
   enterpriseSearchEntitiesSchema,
   enterpriseSearchEntityNeighborsSchema,
   enterpriseSearchGrepSchema,
-  enterpriseSearchGraphSchema,
 } from '../../../../src/modules/enterprise_search/validators/es_validators'
 
 const appConfig: any = { aiBackend: 'http://ai:8000' }

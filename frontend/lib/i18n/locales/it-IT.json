@@ -347,7 +347,8 @@
     "searchChats": "Cerca nelle chat",
     "inbox": "Posta in arrivo",
     "notifications": "Notifiche",
-    "home": "Home"
+    "home": "Home",
+    "addons": "Componenti aggiuntivi"
   },
   "artifacts": {
     "title": "Tutti gli artefatti",
@@ -5993,7 +5994,7 @@
     "retry": "Riprova",
     "error": "Impossibile caricare il grafo. Riprova.",
     "rendererError": "Questo browser non riesce a visualizzare il grafo. Abilita WebGL o prova un altro browser. Puoi comunque cercare i nodi ed esplorare i gruppi qui sotto.",
-    "canvasLabel": "Grafo della conoscenza. Pizzica o scorri per ingrandire; trascina per spostarti.",
+    "canvasLabel": "Grafo della conoscenza 3D. Ruota, ingrandisci e seleziona un gruppo per esplorarne i nodi.",
     "zoomIn": "Ingrandisci",
     "zoomOut": "Riduci",
     "fit": "Mostra tutto il grafo",
@@ -6017,6 +6018,19 @@
       "topic": "Argomento",
       "language": "Lingua",
       "named_entity": "Entità nominata"
-    }
+    },
+    "preparing": "Preparazione del grafo della conoscenza",
+    "rendering": "Visualizzazione della mappa…",
+    "metricLegend": "Dimensione dei gruppi: nodi · Dimensione dei punti: collegamenti",
+    "refresh": "Aggiorna grafo",
+    "connections": "Collegamenti: {{value}}",
+    "layout": {
+      "progress": "Disposizione dei nodi: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Ruota a sinistra",
+    "rotateRight": "Ruota a destra",
+    "controls3d": "Trascina per ruotare · Scorri per ingrandire · Trascina con il tasto destro per spostare. Su touch: un dito ruota, due dita ingrandiscono o spostano.",
+    "connectionHint": "Seleziona un nodo per vedere i suoi collegamenti."
   }
 }

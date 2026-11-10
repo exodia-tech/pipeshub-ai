@@ -329,7 +329,8 @@
     "searchChats": "채팅 검색",
     "inbox": "받은 편지함",
     "notifications": "알림",
-    "home": "홈"
+    "home": "홈",
+    "addons": "추가 기능"
   },
   "artifacts": {
     "title": "모든 아티팩트",
@@ -5886,7 +5887,7 @@
     "retry": "다시 시도",
     "error": "그래프를 불러오지 못했습니다. 다시 시도하세요.",
     "rendererError": "이 브라우저에서 그래프를 표시할 수 없습니다. WebGL을 활성화하거나 다른 브라우저를 사용하세요. 아래에서 클러스터와 노드를 계속 탐색할 수 있습니다.",
-    "canvasLabel": "지식 그래프. 손가락이나 스크롤로 확대하고 드래그하여 이동하세요.",
+    "canvasLabel": "3D 지식 그래프. 회전하거나 확대하고 클러스터를 선택해 노드를 탐색하세요.",
     "zoomIn": "확대",
     "zoomOut": "축소",
     "fit": "전체 그래프 보기",
@@ -5910,6 +5911,19 @@
       "topic": "주제",
       "language": "언어",
       "named_entity": "명명된 개체"
-    }
+    },
+    "preparing": "지식 그래프 준비 중",
+    "rendering": "지도 표시 중…",
+    "metricLegend": "클러스터 크기: 노드 수 · 점 크기: 연결 수",
+    "refresh": "그래프 새로고침",
+    "connections": "연결: {{value}}",
+    "layout": {
+      "progress": "노드 배치 중: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "왼쪽으로 회전",
+    "rotateRight": "오른쪽으로 회전",
+    "controls3d": "드래그: 회전 · 스크롤: 확대/축소 · 오른쪽 드래그: 이동. 터치: 한 손가락으로 회전, 두 손가락으로 확대/축소 또는 이동.",
+    "connectionHint": "노드를 선택하면 연결을 볼 수 있습니다."
   }
 }

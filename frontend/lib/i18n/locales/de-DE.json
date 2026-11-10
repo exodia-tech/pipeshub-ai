@@ -245,7 +245,8 @@
     "searchChats": "Chats suchen",
     "inbox": "Posteingang",
     "notifications": "Benachrichtigungen",
-    "home": "Startseite"
+    "home": "Startseite",
+    "addons": "Erweiterungen"
   },
   "artifacts": {
     "title": "Alle Artefakte",
@@ -5920,7 +5921,7 @@
     "retry": "Erneut versuchen",
     "error": "Der Graph konnte nicht geladen werden. Versuche es erneut.",
     "rendererError": "Dieser Browser kann den Graphen nicht darstellen. Aktiviere WebGL oder nutze einen anderen Browser. Gruppen und Knotensuche bleiben unten verfügbar.",
-    "canvasLabel": "Wissensgraph. Zum Zoomen scrollen oder Finger zusammenziehen; zum Verschieben ziehen.",
+    "canvasLabel": "3D-Wissensgraph. Drehen, zoomen und eine Gruppe auswählen, um ihre Knoten zu erkunden.",
     "zoomIn": "Vergrößern",
     "zoomOut": "Verkleinern",
     "fit": "Gesamten Graphen zeigen",
@@ -5944,6 +5945,19 @@
       "topic": "Thema",
       "language": "Sprache",
       "named_entity": "Benannte Entität"
-    }
+    },
+    "preparing": "Dein Wissensgraph wird vorbereitet",
+    "rendering": "Karte wird dargestellt…",
+    "metricLegend": "Gruppengröße: Knoten · Punktgröße: Verbindungen",
+    "refresh": "Graph aktualisieren",
+    "connections": "Verbindungen: {{value}}",
+    "layout": {
+      "progress": "Knoten anordnen: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Nach links drehen",
+    "rotateRight": "Nach rechts drehen",
+    "controls3d": "Ziehen zum Drehen · Scrollen zum Zoomen · Mit rechter Maustaste ziehen zum Verschieben. Touch: Ein Finger dreht, zwei Finger zoomen oder verschieben.",
+    "connectionHint": "Wähle einen Knoten, um seine Verbindungen zu sehen."
   }
 }

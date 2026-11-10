@@ -245,7 +245,8 @@
     "searchChats": "Search chats",
     "inbox": "Inbox",
     "notifications": "Notifications",
-    "home": "Home"
+    "home": "Home",
+    "addons": "Add-ons"
   },
   "artifacts": {
     "title": "All artifacts",
@@ -5920,7 +5921,7 @@
     "retry": "Try again",
     "error": "The graph could not be loaded. Try again.",
     "rendererError": "This browser could not render the graph. Enable WebGL or try another browser. You can still browse clusters and search nodes below.",
-    "canvasLabel": "Knowledge graph. Pinch or scroll to zoom; drag to pan.",
+    "canvasLabel": "3D knowledge graph. Rotate, zoom and select a cluster to explore its nodes.",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fit": "Show whole graph",
@@ -5944,6 +5945,19 @@
       "topic": "Topic",
       "language": "Language",
       "named_entity": "Named entity"
-    }
+    },
+    "preparing": "Preparing your knowledge graph",
+    "rendering": "Rendering the map…",
+    "metricLegend": "Cluster size: nodes · Dot size: connections",
+    "refresh": "Refresh graph",
+    "connections": "Connections: {{value}}",
+    "layout": {
+      "progress": "Arranging nodes: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Rotate left",
+    "rotateRight": "Rotate right",
+    "controls3d": "Drag to rotate · Scroll to zoom · Right-drag to pan. On touch: one finger rotates, two fingers zoom or pan.",
+    "connectionHint": "Select a node to see its connections."
   }
 }

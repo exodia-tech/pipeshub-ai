@@ -1,0 +1,13 @@
+# Knowledge graph add-on
+
+The page, API client, session cache, worker and Three.js renderer live here. The host route only mounts the add-on. Navigation comes from `addons/registry.ts`; the authenticated Node search gateway and Python query service have corresponding add-on registries. This is a bundled add-on, not a runtime plugin marketplace. Removing its three registry entries disables its navigation and API registration; remove the host route as well when uninstalling the bundle.
+
+The API uses the existing identity, semantic scopes and readable-record listing. It never accepts a caller-supplied user or organization. Connections only include readable endpoints. Source-limited connected-app tokens cannot export the overview.
+
+The browser caches the complete graph and computed layout for two minutes in memory. It deduplicates in-flight visits, refresh bypasses completed cache, and the host's session reset aborts requests, terminates the worker and clears private data. No graph content is saved to browser storage.
+
+Louvain finds communities. A worker lays out both the weighted community graph and its members with a three-dimensional force simulation. These are topology-based coordinates, not document embedding distances. Cluster sphere volume represents member count; individual nodes grow with degree, with minimum and maximum radii for visibility. Overview links aggregate cross-community connections. Opening a cluster renders its members. Clusters with up to 500 visible nodes show their detailed links; larger clusters reveal connections when a node is selected to avoid a hairball. Selection also reveals external neighbors. All data remains available through search and cluster selection.
+
+Drag rotates, right-drag pans, and scroll zooms. Orbit controls support one-finger rotation and two-finger zoom/pan. Buttons provide rotation, zoom and reset without dragging. Rendering happens on interaction or resize, not in a perpetual animation loop. GPU resources are disposed when rebuilding or leaving the page. A lost graphics context offers a renderer-only retry.
+
+Run `vitest run addons/knowledge-graph/__tests__`, TypeScript and the i18n checks. Verify a static export because production serves the exported Next.js UI through Express. Browser checks should cover a dense synthetic graph, narrow portrait and landscape viewports, rotation, cluster selection, record search and reset. Real-device GPU/touch behavior still needs hardware testing.

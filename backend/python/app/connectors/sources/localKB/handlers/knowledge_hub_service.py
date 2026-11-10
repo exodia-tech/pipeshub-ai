@@ -675,9 +675,13 @@ class KnowledgeHubService:
         cursor: str | None = None,
         is_org_admin: bool | None = None,
         within_app_ids: Iterable[str] | None = None,
+        bulk: bool = False,
     ) -> KnowledgeHubNodesResponse:
         """
         Get nodes for the Knowledge Hub unified browse API
+
+        ``bulk`` is internal: graph exports allow 1000 rows; public browsing
+        keeps its 200-row ceiling.
 
         `is_org_admin` is the caller's org role from the auth token; the root
         permissions block needs it because graph User nodes carry no role.
@@ -696,7 +700,8 @@ class KnowledgeHubService:
         permissions_task: asyncio.Task | None = None
         try:
             page = max(1, page)
-            limit = min(max(1, limit), 200)  # Max 200
+            # Internal graph exports avoid repeating the global source fanout for tiny pages.
+            limit = min(max(1, limit), 1000 if bulk else 200)
 
             # Get user key
             user = await self._shared(("user", user_id, org_id), lambda: self._resolve_user(user_id, org_id))

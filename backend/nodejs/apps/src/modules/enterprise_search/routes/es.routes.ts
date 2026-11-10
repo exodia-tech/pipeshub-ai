@@ -14,9 +14,9 @@ import {
   grepRecords,
   searchEntities,
   entityNeighbors,
-  graphOverview,
 } from '../controller/exact_search.controller';
 import multer from 'multer';
+import { searchAddons } from '../../../addons/registry';
 import { createMulter } from '../../../libs/utils/multer.utils';
 import { AuthMiddleware } from '../../../libs/middlewares/auth.middleware';
 import {
@@ -107,7 +107,6 @@ import {
   enterpriseSearchEntitiesSchema,
   enterpriseSearchGrepSchema,
   enterpriseSearchEntityNeighborsSchema,
-  enterpriseSearchGraphSchema,
   enterpriseSearchSearchHistorySchema,
   searchIdParamsSchema,
   addMessageParamsSchema,
@@ -717,7 +716,7 @@ export function createSemanticSearchRouter(container: Container): Router {
     );
   };
   entityRoute('/grep', enterpriseSearchGrepSchema, grepRecords(appConfig));
-  entityRoute('/graph', enterpriseSearchGraphSchema, graphOverview(appConfig));
+  for (const addon of searchAddons) entityRoute(addon.path, addon.schema, addon.createHandler(appConfig));
   entityRoute(
     '/entities',
     enterpriseSearchEntitiesSchema,
