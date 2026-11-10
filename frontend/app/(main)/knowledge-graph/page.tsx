@@ -1,107 +1,94 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Box, Button, Flex, Heading, Text, TextField } from '@radix-ui/themes';
-import { Background, Controls, ReactFlow, type Edge, type Node } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Box, Button, Flex, Heading, Spinner, Text, TextField } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
+import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { useThemeAppearance } from '@/app/components/theme-provider';
 import { MOBILE_HAMBURGER_GUTTER_PX } from '@/app/components/sidebar/constants';
 import { useIsMobile } from '@/lib/hooks/use-is-mobile';
-import { GraphApi, type Entity, type GraphRecord, type Neighborhood } from './api';
-
-type GraphSelection = { kind: 'entity'; value: Entity } | { kind: 'record'; value: GraphRecord };
-
-function safeSourceUrl(value?: string | null): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value, window.location.origin);
-    return ['https:', 'http:'].includes(url.protocol) ? url.href : null;
-  } catch { return null; }
-}
+import { useSidebarWidthStore } from '@/lib/store/sidebar-width-store';
+import { loadGraph } from './api';
+import type { ClusteredGraph, PositionedNode } from './cluster-layout';
+import { GraphCanvas, type GraphCamera } from './graph-canvas';
 
 export default function KnowledgeGraphPage() {
   const { t } = useTranslation();
   const { appearance } = useThemeAppearance();
-  const isMobile = useIsMobile();
+  const mobile = useIsMobile();
+  const collapsed = useSidebarWidthStore(s => s.isNavCollapsed);
+  const camera = useRef<GraphCamera>(null);
+  const [data, setData] = useState<ClusteredGraph | null>(null);
+  const [progress, setProgress] = useState({ loaded: 0, total: 0 });
+  const [phase, setPhase] = useState<'loading' | 'layout' | 'ready' | 'error' | 'rendererError'>('loading');
+  const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Entity[]>([]);
-  const [searched, setSearched] = useState(false);
-  const [center, setCenter] = useState<Entity | null>(null);
-  const [neighborhood, setNeighborhood] = useState<Neighborhood | null>(null);
-  const [selection, setSelection] = useState<GraphSelection | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const request = useRef(0);
+  const [selected, setSelected] = useState<PositionedNode | null>(null);
+  const [cluster, setCluster] = useState<number | null>(null);
 
-  async function search() {
-    if (!query.trim()) return;
-    const id = ++request.current;
-    setLoading(true); setError(false); setSearched(true);
-    setResults([]); setCenter(null); setNeighborhood(null); setSelection(null);
-    try {
-      const found = await GraphApi.search(query.trim());
-      if (id === request.current) setResults(found);
-    } catch { if (id === request.current) setError(true); }
-    finally { if (id === request.current) setLoading(false); }
-  }
+  useEffect(() => {
+    const controller = new AbortController();
+    let worker: Worker | undefined;
+    setData(null); setSelected(null); setCluster(null); setPhase('loading'); setProgress({ loaded: 0, total: 0 });
+    void loadGraph(controller.signal, (loaded, total) => setProgress({ loaded, total })).then(graph => {
+      if (controller.signal.aborted) return;
+      setPhase('layout');
+      worker = new Worker(new URL('./layout-worker.ts', import.meta.url));
+      worker.onmessage = ({ data: message }: MessageEvent<{ result?: ClusteredGraph; error?: boolean }>) => {
+        if (controller.signal.aborted) return;
+        if (message.result) { setData(message.result); setPhase('ready'); } else setPhase('error');
+        worker?.terminate();
+      };
+      worker.onerror = () => { if (!controller.signal.aborted) setPhase('error'); worker?.terminate(); };
+      worker.postMessage(graph);
+    }).catch(() => { if (!controller.signal.aborted) setPhase('error'); });
+    return () => { controller.abort(); worker?.terminate(); };
+  }, [attempt]);
 
-  async function explore(entity: Entity) {
-    const id = ++request.current;
-    setLoading(true); setError(false); setCenter(entity); setNeighborhood(null);
-    setSelection({ kind: 'entity', value: entity });
-    try {
-      const data = await GraphApi.neighbors(entity);
-      if (id === request.current) setNeighborhood(data);
-    } catch { if (id === request.current) setError(true); }
-    finally { if (id === request.current) setLoading(false); }
-  }
+  const matches = useMemo(() => query.trim() && data ? data.nodes.filter(n => n.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).slice(0, 30) : [], [query, data]);
+  const counts = data ? t('graph.counts', { nodes: data.nodes.length.toLocaleString(), edges: data.edges.length.toLocaleString(), clusters: data.clusters.length.toLocaleString() }) : '';
+  function focusCluster(id: number) { setCluster(id); setSelected(null); setQuery(''); camera.current?.cluster(id); }
 
-  const nodes: Node[] = [];
-  const edges: Edge[] = [];
-  const targets = new Map<string, GraphSelection>();
-  const nodeStyle = { border: '1px solid var(--agent-flow-well-border)', borderRadius: 14, background: 'var(--agent-flow-well-bg)', color: 'var(--agent-flow-text)', padding: '10px 12px', width: 170, fontSize: 15, boxShadow: '0 2px 8px #0002' };
-  if (center && neighborhood) {
-    nodes.push({ id: 'center', position: isMobile ? { x: 95, y: 0 } : { x: 230, y: 200 }, data: { label: center.name }, style: { ...nodeStyle, border: '2px solid var(--accent-9)', fontWeight: 600 } });
-    const entries: GraphSelection[] = [
-      ...neighborhood.records.map(value => ({ kind: 'record' as const, value })),
-      ...neighborhood.relatedEntities.map(value => ({ kind: 'entity' as const, value })),
-    ];
-    entries.forEach((item, index) => {
-      const id = `item-${index}`;
-      const name = item.kind === 'record' ? item.value.recordName || item.value.recordId : item.value.name;
-      targets.set(id, item);
-      const row = item.kind === 'record' ? index : index - neighborhood.records.length;
-      nodes.push({ id, position: isMobile ? { x: item.kind === 'record' ? 0 : 190, y: 90 + row * 72 } : { x: item.kind === 'record' ? 0 : 460, y: 30 + row * 72 }, data: { label: name }, style: { ...nodeStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderColor: item.kind === 'record' ? 'var(--blue-8)' : 'var(--violet-8)' } });
-      const label = row === 0 ? (item.kind === 'entity' ? t('graph.viaRecords') : t('graph.recordLink')) : undefined;
-      edges.push({ id: `edge-${index}`, source: 'center', target: id, type: 'straight', style: { stroke: 'var(--gray-8)' }, label: isMobile ? undefined : label, labelStyle: { fill: 'var(--agent-flow-text-muted)', fontSize: 11 }, labelBgStyle: { fill: 'var(--color-panel-solid)' } });
-    });
-  }
-  const source = selection?.kind === 'record' ? safeSourceUrl(selection.value.webUrl) : null;
-
-  return <Flex direction="column" gap="4" p={{ initial: '4', md: '6' }} style={{ height: '100%', overflow: 'auto', minWidth: 0 }}>
-    <Box><Heading size="6" style={{ paddingLeft: isMobile ? MOBILE_HAMBURGER_GUTTER_PX : 0 }}>{t('graph.title')}</Heading><Text as="p" size="2" color="gray" mt="2">{t('graph.intro')}</Text></Box>
-    <form onSubmit={event => { event.preventDefault(); void search(); }}>
-      <Flex gap="2" wrap="wrap"><Box style={{ flex: '1 1 220px' }}><TextField.Root size="3" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('graph.placeholder')} aria-label={t('graph.placeholder')} /></Box><Button size="3" type="submit" disabled={loading || !query.trim()}>{t('graph.search')}</Button></Flex>
-    </form>
-    {loading && <Text role="status">{t('graph.loading')}</Text>}
-    {error && <Text role="alert" color="red">{t('graph.error')}</Text>}
-    {!loading && !error && searched && !results.length && !center && <Text color="gray">{t('graph.noResults')}</Text>}
-    {!center && results.length > 0 && <Flex direction="column" gap="2"><Text weight="medium">{t('graph.select')}</Text>{results.map(item => <Button key={`${item.entityType}:${item.entityId}`} variant="soft" color="gray" onClick={() => void explore(item)} style={{ justifyContent: 'space-between', minHeight: 44, height: 'auto', textAlign: 'left' }}><span>{item.name}</span><Text size="1">{item.entityType.replaceAll('_', ' ')}</Text></Button>)}</Flex>}
-    {center && <>
-      <Flex align="center" justify="between" gap="3" wrap="wrap"><Text weight="medium">{center.name}</Text><Button variant="soft" color="gray" onClick={() => { ++request.current; setCenter(null); setNeighborhood(null); setSelection(null); setLoading(false); setError(false); }}>{t('graph.back')}</Button></Flex>
-      {neighborhood && <>
-        <Text size="2" color="gray">{t('graph.explanation')} {t('graph.scope')}</Text>
-        <Flex gap="4" wrap="wrap"><Text size="2"><span style={{ color: 'var(--blue-9)' }}>●</span> {t('graph.records')}</Text><Text size="2"><span style={{ color: 'var(--violet-9)' }}>●</span> {t('graph.related')}</Text></Flex>
-        {selection?.kind === 'record' && <Flex direction="column" gap="2"><Text weight="medium">{selection.value.recordName || selection.value.recordId}</Text><Text size="2" color="gray">{[selection.value.recordType, selection.value.app].filter(Boolean).join(' · ')}</Text><a href={`/record/?recordId=${encodeURIComponent(selection.value.recordId)}`}>{t('graph.openRecord')}</a>{source && <a href={source} target="_blank" rel="noopener noreferrer">{t('graph.openSource')}</a>}</Flex>}
-        {selection?.kind === 'entity' && selection.value.entityId !== center.entityId && <Flex gap="3" align="center" wrap="wrap"><Text>{selection.value.name}</Text><Button size="3" variant="soft" onClick={() => void explore(selection.value as Entity)}>{t('graph.explore')}</Button></Flex>}
-        <Box className="knowledge-graph-canvas" style={{ height: 480, minHeight: 320, flexShrink: 0, border: '1px solid var(--gray-6)', borderRadius: 16, overflow: 'hidden', background: 'var(--gray-2)' }}>
-          <ReactFlow key={`${center.entityType}:${center.entityId}:${isMobile}`} colorMode={appearance} nodes={nodes} edges={edges} fitView fitViewOptions={{ padding: 0.15, minZoom: 0.7, maxZoom: 1 }} minZoom={0.7} maxZoom={1.5} nodesDraggable={false} nodesConnectable={false} onNodeClick={(_, node) => { const item = targets.get(node.id); if (item) setSelection(item); }}><Background color="var(--gray-6)" gap={24} /><Controls position={isMobile ? 'bottom-right' : 'bottom-left'} showInteractive={false} /></ReactFlow>
+  return <Flex direction="column" gap="3" p={{ initial: '3', md: '5' }} style={{ minWidth: 0, width: '100%', height: '100%', overflowY: 'auto' }}>
+    <Box style={{ paddingLeft: mobile || collapsed ? MOBILE_HAMBURGER_GUTTER_PX : 0 }}>
+      <Heading size={{ initial: '5', md: '6' }}>{t('graph.title')}</Heading>
+      <Text as="p" size="2" color="gray" mt="1">{t('graph.overviewIntro')}</Text>
+    </Box>
+    {(phase === 'loading' || phase === 'layout') && <Flex gap="2" align="center" role="status" py="4"><Spinner /><Text size="2">{phase === 'layout' ? t('graph.arranging') : t('graph.progress', progress)}</Text></Flex>}
+    {(phase === 'error' || phase === 'rendererError') && <Flex direction="column" gap="3" role="alert"><Text color="red">{t(phase === 'rendererError' ? 'graph.rendererError' : 'graph.error')}</Text><Button style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => setAttempt(a => a + 1)}>{t('graph.retry')}</Button></Flex>}
+    {data && <>
+      <Flex gap="3" direction={{ initial: 'column', md: 'row' }} align={{ initial: 'stretch', md: 'center' }} justify="between">
+        <Text size="2" color="gray" role="status">{counts}</Text>
+        <TextField.Root aria-label={t('graph.findNode')} placeholder={t('graph.findNode')} value={query} onChange={e => setQuery(e.target.value)} style={{ minHeight: 44, width: mobile ? '100%' : 280 }}>
+          <TextField.Slot><MaterialIcon name="search" size={18} /></TextField.Slot>
+        </TextField.Root>
+      </Flex>
+      {!data.nodes.length ? <Text>{t('graph.empty')}</Text> : <Flex gap="3" direction={{ initial: 'column', md: 'row' }} style={{ flex: 1, minHeight: mobile ? undefined : 520 }}>
+        <Box style={{ flex: 1, minWidth: 0, position: 'relative', height: mobile ? '55dvh' : '100%', minHeight: 340, border: '1px solid var(--gray-6)', borderRadius: 'var(--radius-4)', overflow: 'hidden', background: 'var(--gray-2)' }}>
+          {phase !== 'rendererError' && <GraphCanvas ref={camera} data={data} dark={appearance === 'dark'} label={t('graph.canvasLabel')} onSelect={n => { setSelected(n); setCluster(n.community); }} onError={() => setPhase('rendererError')} />}
+          <Flex gap="1" style={{ position: 'absolute', right: 12, bottom: 12, padding: 4, borderRadius: 'var(--radius-3)', background: 'var(--color-panel-solid)', border: '1px solid var(--gray-6)' }}>
+            <Button variant="soft" aria-label={t('graph.zoomIn')} style={{ width: 44, height: 44, padding: 0 }} onClick={() => camera.current?.zoom(0.65)}><MaterialIcon name="add" size={20} /></Button>
+            <Button variant="soft" aria-label={t('graph.zoomOut')} style={{ width: 44, height: 44, padding: 0 }} onClick={() => camera.current?.zoom(1.5)}><MaterialIcon name="remove" size={20} /></Button>
+            <Button variant="soft" aria-label={t('graph.fit')} style={{ width: 44, height: 44, padding: 0 }} onClick={() => { setCluster(null); setSelected(null); camera.current?.reset(); }}><MaterialIcon name="fit_screen" size={20} /></Button>
+          </Flex>
         </Box>
-        {(neighborhood.nextCursor || neighborhood.note) && <Text size="1" color="gray">{t('graph.sample')}</Text>}
-        <Flex direction="column" gap="2"><Text weight="medium">{t('graph.records')}</Text>{neighborhood.records.map(record => <Button key={record.recordId} variant="ghost" color="gray" onClick={() => setSelection({ kind: 'record', value: record })} style={{ justifyContent: 'start', minHeight: 44, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }}>{record.recordName || record.recordId}</Button>)}{!neighborhood.records.length && <Text color="gray">{t('graph.noRecords')}</Text>}</Flex>
-        {neighborhood.relatedEntities.length > 0 && <Flex direction="column" gap="2"><Text weight="medium">{t('graph.related')}</Text>{neighborhood.relatedEntities.map(entity => <Button key={`${entity.entityType}:${entity.entityId}`} variant="ghost" color="gray" onClick={() => void explore(entity)} style={{ justifyContent: 'start', minHeight: 44, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }}>{entity.name}</Button>)}</Flex>}
-      </>}
+        <Flex direction="column" gap="3" style={{ width: mobile ? '100%' : 260, flexShrink: 0, maxHeight: mobile ? undefined : '70dvh', overflowY: mobile ? undefined : 'auto' }}>
+          {selected && <Box p="3" style={{ background: 'var(--accent-3)', borderRadius: 'var(--radius-3)', overflowWrap: 'anywhere' }}>
+            <Text as="p" weight="medium">{selected.name}</Text>
+            <Text as="p" size="1" color="gray" mt="1">{t(`graph.kinds.${selected.kind}`, { defaultValue: t('graph.entity') })}</Text>
+            {selected.recordId && <Button asChild mt="3" style={{ minHeight: 44 }}><a href={selected.kind === 'record' ? `/record/?recordId=${encodeURIComponent(selected.recordId)}` : `/knowledge-base/?nodeType=${encodeURIComponent(selected.kind)}&nodeId=${encodeURIComponent(selected.recordId)}`}>{t('graph.openRecord')}</a></Button>}
+          </Box>}
+          {query.trim() ? <><Text weight="medium" size="2">{t('graph.searchResults')}</Text>{!matches.length && <Text size="2" color="gray">{t('graph.noResults')}</Text>}{matches.map(n => <Button key={n.id} variant="ghost" onClick={() => { setSelected(n); setCluster(n.community); camera.current?.node(n.id); }} style={{ boxSizing: 'border-box', margin: 0, width: '100%', flexShrink: 0, whiteSpace: 'normal', minHeight: 44, height: 'auto', padding: '10px 12px', justifyContent: 'flex-start', textAlign: 'left', overflowWrap: 'anywhere' }}>{n.name}</Button>)}</> : <>
+            <Text weight="medium" size="2">{t('graph.clusters')}</Text>
+            {data.clusters.map(c => <Button key={c.id} variant={cluster === c.id ? 'soft' : 'ghost'} aria-pressed={cluster === c.id} onClick={() => focusCluster(c.id)} style={{ boxSizing: 'border-box', margin: 0, width: '100%', flexShrink: 0, minHeight: 48, height: 'auto', padding: '10px 12px', justifyContent: 'flex-start', whiteSpace: 'normal', textAlign: 'left' }}>
+              <span aria-hidden="true" style={{ width: 9, height: 9, flexShrink: 0, borderRadius: '50%', background: c.color }} />
+              <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{c.isolated ? t('graph.unconnected') : c.name}</span><Text size="1" color="gray">{c.count.toLocaleString()}</Text>
+            </Button>)}
+          </>}
+          <Text size="1" color="gray">{t('graph.clusterHint')}</Text>
+        </Flex>
+      </Flex>}
+      <Text as="p" size="1" color="gray">{t('graph.coverage')}</Text>
     </>}
   </Flex>;
 }

@@ -1773,9 +1773,3 @@ th code {
   .chat-companion-button:hover .chat-companion__head,
   .chat-companion--greeting .chat-companion__head { transform: none; }
 }
-@media (max-width: 768px) {
-  .knowledge-graph-canvas .react-flow__controls-button {
-    width: 44px;
-    height: 44px;
-  }
-}
