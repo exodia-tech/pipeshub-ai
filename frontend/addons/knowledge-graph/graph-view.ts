@@ -1,12 +1,5 @@
 import type { ClusteredGraph } from './cluster-layout';
 
-export interface LabelBox { left: number; right: number; top: number; bottom: number }
-
-export function fitsLabel(box: LabelBox, occupied: LabelBox[], width: number, height: number) {
-  return box.left >= 4 && box.right <= width - 4 && box.top >= 4 && box.bottom <= height - 4
-    && !occupied.some(b => box.left < b.right && box.right > b.left && box.top < b.bottom && box.bottom > b.top);
-}
-
 export function connectionRadius(degree: number) {
   return Math.min(14, Math.max(1.5, Math.cbrt(degree + 1) * 1.8));
 }
