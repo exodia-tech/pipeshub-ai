@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ClusteredGraph, PositionedNode } from './cluster-layout';
-import { visibleGraph } from './graph-view';
+import { fitsLabel, visibleGraph, type LabelBox } from './graph-view';
 
 export interface GraphCamera {
   cluster(id: number): void; node(id: string): void; reset(): void; zoom(factor: number): void; rotate(angle: number): void;
@@ -43,7 +43,7 @@ export const GraphCanvas = forwardRef<GraphCamera, {
       let group = new THREE.Group(); scene.add(group);
       let expanded: number | undefined, selected: string | undefined;
       let instances: ReturnType<typeof makeInstances> | undefined;
-      let bubbles: { mesh: InstanceType<typeof THREE.Mesh>; id: number }[] = [];
+      let bubbles: { mesh: InstanceType<typeof THREE.Mesh>; id: number; radius: number }[] = [];
       let labels: { sprite: InstanceType<typeof THREE.Sprite>; center: InstanceType<typeof THREE.Vector3>; radius: number; screen?: boolean }[] = [];
       const byId = new Map(data.nodes.map(n => [n.id, n]));
       const bounds = new THREE.Box3();
@@ -52,6 +52,9 @@ export const GraphCanvas = forwardRef<GraphCamera, {
       const compact = new Intl.NumberFormat(i18n.resolvedLanguage || 'en-US', { notation: 'compact', maximumFractionDigits: 1 });
       const draw = () => {
         if (disposed) return;
+        perspective.updateMatrixWorld();
+        const occupied: LabelBox[] = [];
+        const ray = new THREE.Ray(), hit = new THREE.Vector3(), sphere = new THREE.Sphere();
         for (const label of labels) {
           label.sprite.position.copy(label.center).addScaledVector(perspective.position.clone().sub(label.center).normalize(), label.radius * 1.02);
           if (label.screen) {
@@ -59,6 +62,17 @@ export const GraphCanvas = forwardRef<GraphCamera, {
             label.sprite.scale.set(size * 4, size, 1);
             label.sprite.position.addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(perspective.quaternion), size * 0.8);
           }
+          const distance = perspective.position.distanceTo(label.center);
+          ray.set(perspective.position, label.center.clone().sub(perspective.position).normalize());
+          const occluded = !label.screen && bubbles.some(b => !b.mesh.position.equals(label.center) && ray.intersectSphere(sphere.set(b.mesh.position, b.radius), hit) && hit.distanceTo(perspective.position) < distance - label.radius);
+          const position = label.sprite.position.clone().project(perspective);
+          const depth = -label.sprite.position.clone().applyMatrix4(perspective.matrixWorldInverse).z;
+          const scale = host.clientHeight / (2 * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2)) * depth);
+          const x = (position.x + 1) / 2 * host.clientWidth, y = (1 - position.y) / 2 * host.clientHeight;
+          const width = label.sprite.scale.x * scale, height = label.sprite.scale.y * scale;
+          const box = { left: x - width / 2 - 3, right: x + width / 2 + 3, top: y - height / 2 - 3, bottom: y + height / 2 + 3 };
+          label.sprite.visible = !occluded && depth > 0 && fitsLabel(box, occupied, host.clientWidth, host.clientHeight);
+          if (label.sprite.visible) occupied.push(box);
         }
         renderer.render(scene, perspective);
       };
@@ -80,7 +94,7 @@ export const GraphCanvas = forwardRef<GraphCamera, {
         nodes.forEach((n, i) => {
           const size = n.id === selected ? Math.max(9, n.size * 2) : Math.max(2, n.size);
           matrix.makeScale(size, size, size); matrix.setPosition(n.x, n.y, n.z); mesh.setMatrixAt(i, matrix);
-          mesh.setColorAt(i, color.set(n.id === selected ? '#ffffff' : n.color));
+          mesh.setColorAt(i, color.set(n.id === selected ? dark ? '#ffffff' : '#1859d6' : n.color));
         });
         group.add(mesh); return { mesh, nodes };
       }
@@ -108,7 +122,7 @@ export const GraphCanvas = forwardRef<GraphCamera, {
           let name = n.name; while (context.measureText(name).width > 480 && name.length > 1) name = name.slice(0, -2) + '…';
           context.fillText(name, 256, 55); context.font = '36px Inter, sans-serif'; context.fillText(n.degree.toLocaleString(), 256, 105);
           const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
-          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthWrite: false }));
+          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthWrite: false, depthTest: false }));
           group.add(sprite); labels.push({ sprite, center: new THREE.Vector3(n.x, n.y, n.z), radius: Math.max(9, n.size * 2), screen: true });
         }
         for (const c of data.clusters) {
@@ -116,7 +130,7 @@ export const GraphCanvas = forwardRef<GraphCamera, {
           // Volume encodes members; text stays camera-facing while the sphere shows depth.
           const radius = Math.max(55, Math.cbrt(c.count) * 24);
           const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.65 }));
-          mesh.position.set(c.x, c.y, c.z); group.add(mesh); bubbles.push({ mesh, id: c.id });
+          mesh.position.set(c.x, c.y, c.z); group.add(mesh); bubbles.push({ mesh, id: c.id, radius });
           const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256;
           const context = canvas.getContext('2d'); if (!context) throw new Error('Label canvas unavailable');
           context.fillStyle = '#101820'; context.textAlign = 'center'; context.textBaseline = 'middle';
@@ -129,7 +143,7 @@ export const GraphCanvas = forwardRef<GraphCamera, {
           context.font = '600 42px Inter, sans-serif'; context.fillText(compact.format(c.count), 256, 172);
           const texture = new THREE.CanvasTexture(canvas);
           texture.colorSpace = THREE.SRGBColorSpace;
-          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthWrite: false }));
+          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthWrite: false, depthTest: false }));
           sprite.scale.set(radius * 2, radius, 1); group.add(sprite);
           labels.push({ sprite, center: mesh.position.clone(), radius });
         }

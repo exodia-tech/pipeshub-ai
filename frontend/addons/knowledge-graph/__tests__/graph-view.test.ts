@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { visibleGraph } from '../graph-view';
+import { fitsLabel, visibleGraph } from '../graph-view';
 import type { ClusteredGraph } from '../cluster-layout';
 
 describe('3D graph detail', () => {
+  it('keeps complete labels within the canvas and rejects overlapping labels', () => {
+    const box = { left: 10, top: 10, right: 110, bottom: 50 };
+    expect(fitsLabel(box, [], 375, 500)).toBe(true);
+    expect(fitsLabel(box, [{ left: 100, top: 40, right: 200, bottom: 80 }], 375, 500)).toBe(false);
+    expect(fitsLabel({ ...box, left: -5 }, [], 375, 500)).toBe(false);
+    expect(fitsLabel({ ...box, right: 376 }, [], 375, 500)).toBe(false);
+  });
   const nodes = Array.from({ length: 502 }, (_, i) => ({ id: String(i), name: `Node ${i}`, kind: 'record', community: i === 501 ? 1 : 0, x: i, y: i, z: i, size: 2, color: '#538bff', degree: 1 }));
   const edges = nodes.slice(1).map(n => ({ source: '0', target: n.id }));
   const data: ClusteredGraph = { nodes, edges, clusters: [], clusterEdges: [] };
