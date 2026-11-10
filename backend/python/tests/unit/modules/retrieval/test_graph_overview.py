@@ -50,7 +50,7 @@ async def test_page_uses_existing_listing_with_identity_and_signed_cursor():
     service = SimpleNamespace(get_nodes=AsyncMock(return_value=listing))
     result = await graph_page(None, service, user_id="member", org_id="org", cursor="signed", named_enabled=False, source_limited=False)
     assert result == {"nodes": [], "edges": [], "listed": 0, "total": 0, "nextCursor": None}
-    service.get_nodes.assert_awaited_once_with(user_id="member", org_id="org", flattened=True, limit=1000, bulk=True, sort_by="name", sort_order="asc", cursor="signed")
+    service.get_nodes.assert_awaited_once_with(user_id="member", org_id="org", flattened=True, limit=200, sort_by="name", sort_order="asc", cursor="signed")
 
 
 @pytest.mark.asyncio
