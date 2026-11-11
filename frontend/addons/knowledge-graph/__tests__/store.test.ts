@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearSessionCache } from '@/lib/api/session-cache';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { clearGraphSnapshots } from '@/lib/storage/graph-snapshot';
 import { useGraphStore } from '../store';
 
 const api = vi.hoisted(() => ({ loadGraph: vi.fn(), workers: vi.fn(), terminate: vi.fn() }));
@@ -7,6 +9,10 @@ vi.mock('../api', () => ({ loadGraph: api.loadGraph }));
 const graph = { nodes: [], edges: [], clusters: [], clusterEdges: [] };
 
 beforeEach(() => {
+  const entries = new Map<string, Response>();
+  vi.stubGlobal('caches', { open: async () => ({ keys: async () => [...entries.keys()], match: async key => entries.get(key)?.clone(), put: async (key, value) => { entries.set(key, value); }, delete: async key => entries.delete(key) }), delete: async () => entries.clear() });
+  useAuthStore.setState({ accessToken: 'header.' + btoa(JSON.stringify({ userId: 'user-a', orgId: 'org-a' })) + '.test' });
+
   vi.stubGlobal('Worker', class {
     onmessage?: (event: { data: unknown }) => void;
     constructor() { api.workers(); }
@@ -15,7 +21,7 @@ beforeEach(() => {
   });
   api.loadGraph.mockResolvedValue({ nodes: [], edges: [] });
 });
-afterEach(() => { clearSessionCache(); vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+afterEach(async () => { clearSessionCache(); await clearGraphSnapshots(); vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Session-scoped graph cache', () => {
   it('deduplicates in-flight requests and reuses completed layout, but refresh and expiry reload', async () => {
@@ -28,15 +34,24 @@ describe('Session-scoped graph cache', () => {
     expect(api.workers).toHaveBeenCalledTimes(1);
     await useGraphStore.getState().load(true);
     expect(api.workers).toHaveBeenCalledTimes(2);
-    clock.mockReturnValue(122000);
+    clock.mockReturnValue(302000);
     await useGraphStore.getState().load();
     expect(api.workers).toHaveBeenCalledTimes(3);
+  });
+
+  it('restores a completed snapshot after page memory is recreated', async () => {
+    await useGraphStore.getState().load();
+    useGraphStore.setState(useGraphStore.getInitialState(), true);
+    await useGraphStore.getState().load();
+    expect(api.loadGraph).toHaveBeenCalledTimes(1);
+    expect(api.workers).toHaveBeenCalledTimes(1);
   });
 
   it('clears private data on session change and ignores a late response from the old session', async () => {
     let finish: (value: { nodes: []; edges: [] }) => void;
     api.loadGraph.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     const old = useGraphStore.getState().load();
+    await vi.waitFor(() => expect(api.loadGraph).toHaveBeenCalled());
     const signal = api.loadGraph.mock.calls[0][0] as AbortSignal;
     clearSessionCache();
     expect(signal.aborted).toBe(true);

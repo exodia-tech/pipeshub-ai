@@ -5958,6 +5958,8 @@
     "rotateLeft": "Nach links drehen",
     "rotateRight": "Nach rechts drehen",
     "controls3d": "Ziehen zum Drehen · Scrollen zum Zoomen · Mit rechter Maustaste ziehen zum Verschieben. Touch: Ein Finger dreht, zwei Finger zoomen oder verschieben.",
-    "connectionHint": "Wähle einen Knoten, um seine Verbindungen zu sehen."
+    "connectionHint": "Wähle einen Knoten, um seine Verbindungen zu sehen.",
+    "visibleNodes": "{{shown}} von {{total}} Knoten sichtbar · Für mehr Details hineinzoomen.",
+    "cacheHint": "Layout für 5 Minuten zwischengespeichert. Aktualisieren lädt die neuesten Daten."
   }
 }
