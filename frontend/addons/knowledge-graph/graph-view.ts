@@ -1,3 +1,4 @@
+import type { GraphData } from './api';
 import type { ClusteredGraph } from './cluster-layout';
 
 export function connectionRadius(degree: number) {
@@ -9,8 +10,7 @@ export function visibleGraph(data: ClusteredGraph, community?: number, selected?
   if (selected) for (const e of data.edges) { if (e.source === selected) neighbors.add(e.target); if (e.target === selected) neighbors.add(e.source); }
   const nodes = data.nodes.filter(n => selected ? n.id === selected || neighbors.has(n.id) : n.community === community);
   const ids = new Set(nodes.map(n => n.id));
-  // Dense clusters reveal detailed connections on selection instead of a hairball.
-  const edges = !selected && nodes.length > 500 ? [] : data.edges.filter(e => ids.has(e.source) && ids.has(e.target) && (!selected || e.source === selected || e.target === selected));
+  const edges = data.edges.filter(e => ids.has(e.source) && ids.has(e.target) && (!selected || e.source === selected || e.target === selected));
   return { nodes, edges };
 }
 
@@ -29,6 +29,13 @@ export function graphDetail(data: ClusteredGraph, community?: number, selected?:
     const step = Math.max(1, Math.ceil(group.length / 24));
     for (let i = 0; i < group.length; i += step) nodes.set(group[i].id, group[i]);
   }
-  const ids = new Set(detail.map(n => n.id));
-  return { nodes: [...nodes.values()], edges: focused.edges.filter(e => ids.has(e.source) && ids.has(e.target)) };
+  return { nodes: [...nodes.values()], edges: data.edges.filter(e => nodes.has(e.source) && nodes.has(e.target)) };
+}
+
+export function sameGraph(a: GraphData, b: GraphData) {
+  const fingerprint = (graph: typeof b) => JSON.stringify([
+    graph.nodes.map(n => JSON.stringify([n.id, n.name, n.kind, n.recordId || ''])).sort(),
+    [...new Set(graph.edges.filter(e => e.source !== e.target).map(e => JSON.stringify([e.source, e.target].sort())))].sort(),
+  ]);
+  return fingerprint(a) === fingerprint(b);
 }

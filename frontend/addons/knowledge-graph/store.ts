@@ -4,6 +4,7 @@ import { useAuthStore } from '@/lib/store/auth-store';
 import { decodeJwtPayload } from '@/lib/api/token-refresh';
 import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 import { readGraphSnapshot, writeGraphSnapshot, clearGraphSnapshots } from '@/lib/storage/graph-snapshot';
+import { sameGraph } from './graph-view';
 import { loadGraph } from './api';
 import type { ClusteredGraph } from './cluster-layout';
 
@@ -30,17 +31,26 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const controller = new AbortController();
     activeController = controller;
     let worker: Worker | undefined;
-    set({ data: null, phase: 'loading', progress: { loaded: 0, total: 0 }, layoutProgress: { done: 0, total: 0 } });
+    set({ phase: 'loading', progress: { loaded: 0, total: 0 }, layoutProgress: { done: 0, total: 0 } });
     const work = async () => {
       const claims = decodeJwtPayload(useAuthStore.getState().accessToken);
       const scope = typeof claims?.userId === 'string' && typeof claims?.orgId === 'string' ? JSON.stringify([getApiBaseUrl(), claims.userId, claims.orgId]) : '';
-      if (force) await clearGraphSnapshots();
       const saved = force ? null : await readGraphSnapshot(scope);
       if (!current()) return;
-      if (saved) { set({ data: saved.data, expiresAt: saved.expiresAt, phase: 'ready' }); return; }
+      if (saved) {
+        set({ data: saved.data, expiresAt: saved.expiresAt });
+        if (saved.expiresAt > Date.now()) { set({ phase: 'ready' }); return; }
+      }
 
       const graph = await loadGraph(controller.signal, (loaded, total) => { if (current()) set({ progress: { loaded, total } }); });
       if (!current()) return;
+      const previous = get().data;
+      if (previous && sameGraph(previous, graph)) {
+        const expiresAt = Date.now() + CACHE_TTL_MS;
+        set({ phase: 'ready', expiresAt });
+        await writeGraphSnapshot(scope, previous, expiresAt, current);
+        return;
+      }
       set({ phase: 'layout' });
       const data = await new Promise<ClusteredGraph>((resolve, reject) => {
         worker = new Worker(new URL('./layout-worker.ts', import.meta.url));
@@ -61,7 +71,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }
     };
     const task = failOnSessionEnd(work()).catch(() => {
-      if (current()) set({ data: null, phase: 'error', expiresAt: 0 });
+      if (current()) set({ phase: 'error', expiresAt: 0 });
     }).finally(() => {
       worker?.terminate();
       if (pending === task) pending = undefined;

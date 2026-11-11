@@ -39,13 +39,14 @@ export default function KnowledgeGraphPage() {
     <Flex gap="3" align="start" justify="between" style={{ paddingLeft: mobile || collapsed ? MOBILE_HAMBURGER_GUTTER_PX : 0 }}>
       <Box style={{ minWidth: 0 }}><Flex gap="2" align="center" wrap="wrap"><Heading size={{ initial: '5', md: '6' }}>{t('graph.title')}</Heading><Badge>{t('graph.view3d')}</Badge></Flex>
       <Text as="p" size="2" color="gray" mt="1">{t('graph.overviewIntro')}</Text></Box>
-      {data && <Button variant="soft" aria-label={t('graph.refresh')} title={t('graph.refresh')} style={{ minWidth: 44, height: 44, padding: 0, flexShrink: 0 }} onClick={() => void load(true)}><MaterialIcon name="refresh" size={18} /></Button>}
+      {data && <Button variant="soft" loading={phase === 'loading' || phase === 'layout'} aria-label={t('graph.refresh')} title={t('graph.refresh')} style={{ minWidth: 44, height: 44, padding: 0, flexShrink: 0 }} onClick={() => void load(true)}><MaterialIcon name="refresh" size={18} /></Button>}
     </Flex>
-    {(phase === 'idle' || phase === 'loading' || phase === 'layout') && <GraphLoading
-      description={phase === 'loading' ? t('graph.progress', progress) : layoutProgress.total ? t('graph.layout.progress', layoutProgress) : t('graph.arranging')}
+    {!data && (phase === 'idle' || phase === 'loading' || phase === 'layout') && <GraphLoading
+      description={phase === 'loading' ? progress.total ? t('graph.progress', progress) : undefined : phase === 'layout' ? layoutProgress.total ? t('graph.layout.progress', layoutProgress) : t('graph.arranging') : undefined}
       value={phase === 'loading' ? progress.total ? Math.min(100, progress.loaded / progress.total * 100) : undefined : layoutProgress.total ? layoutProgress.done / layoutProgress.total * 100 : undefined}
     />}
-    {(phase === 'error' || renderPhase === 'error') && <Flex direction="column" gap="3" role="alert"><Text color="red">{t(renderPhase === 'error' ? 'graph.rendererError' : 'graph.error')}</Text><Button style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => renderPhase === 'error' ? setRenderPhase('drawing') : void load(true)}>{t('graph.retry')}</Button></Flex>}
+    {data && (phase === 'loading' || phase === 'layout') && <Text size="1" color="gray" role="status">{t('graph.updating')}</Text>}
+    {(phase === 'error' || renderPhase === 'error') && <Flex direction="column" gap="3" role="alert"><Text color="red">{t(renderPhase === 'error' ? 'graph.rendererError' : data ? 'graph.refreshError' : 'graph.error')}</Text><Button style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => renderPhase === 'error' ? setRenderPhase('drawing') : void load(true)}>{t('graph.retry')}</Button></Flex>}
     {data && <>
       <Flex gap="3" wrap="wrap" align="center" justify="between">
         <Flex direction="column" gap="1"><Text size="2" color="gray" role="status">{counts}</Text><Text size="1" color="gray">{t('graph.metricLegend')}</Text></Flex>

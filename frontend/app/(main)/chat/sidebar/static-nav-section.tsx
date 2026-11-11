@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Badge, Flex, Text } from '@radix-ui/themes';
+import { Badge, Flex } from '@radix-ui/themes';
 import { addons } from '@/addons/registry';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { ICON_SIZE_DEFAULT } from '@/app/components/sidebar';
@@ -163,7 +163,6 @@ export function StaticNavSection() {
           }
         />
       ))}
-      {addons.length > 0 && <Text size="1" color="gray" mt="3" mb="1" mx="3">{t('nav.addons')}</Text>}
       {addons.map(addon => <SidebarItem key={addon.id}
         icon={<MaterialIcon name={addon.icon} size={ICON_SIZE_DEFAULT} color={NAV_ICON_COLOR} />}
         label={t(addon.labelKey)} href={addon.route} textColor={NAV_ICON_COLOR}

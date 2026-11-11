@@ -33,10 +33,12 @@ describe('Session-scoped graph cache', () => {
     expect(api.loadGraph).toHaveBeenCalledTimes(1);
     expect(api.workers).toHaveBeenCalledTimes(1);
     await useGraphStore.getState().load(true);
-    expect(api.workers).toHaveBeenCalledTimes(2);
+    expect(api.workers).toHaveBeenCalledTimes(1);
+    expect(api.loadGraph).toHaveBeenCalledTimes(2);
     clock.mockReturnValue(302000);
     await useGraphStore.getState().load();
-    expect(api.workers).toHaveBeenCalledTimes(3);
+    expect(api.workers).toHaveBeenCalledTimes(1);
+    expect(api.loadGraph).toHaveBeenCalledTimes(3);
   });
 
   it('restores a completed snapshot after page memory is recreated', async () => {
@@ -45,6 +47,20 @@ describe('Session-scoped graph cache', () => {
     await useGraphStore.getState().load();
     expect(api.loadGraph).toHaveBeenCalledTimes(1);
     expect(api.workers).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([false, true])('keeps the saved graph visible during %s refresh', async force => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    await useGraphStore.getState().load();
+    clock.mockReturnValue(302000);
+    if (!force) useGraphStore.setState(useGraphStore.getInitialState(), true);
+    let finish: (value: { nodes: []; edges: [] }) => void;
+    api.loadGraph.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const refresh = useGraphStore.getState().load(force);
+    await vi.waitFor(() => expect(api.loadGraph).toHaveBeenCalledTimes(2));
+    expect(useGraphStore.getState().data).toEqual(graph);
+    finish({ nodes: [], edges: [] });
+    await refresh;
   });
 
   it('clears private data on session change and ignores a late response from the old session', async () => {

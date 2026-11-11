@@ -13,7 +13,7 @@ it('restores only the same account/workspace snapshot within its lifetime', asyn
   expect(await readGraphSnapshot('org-b/user-a')).toBeNull();
 });
 it('drops expired, signed-out and late-session snapshots', async () => {
-  await writeGraphSnapshot('a', data, Date.now() - 1, () => true);
+  await writeGraphSnapshot('a', data, Date.now() - 26 * 60 * 1000, () => true);
   expect(await readGraphSnapshot('a')).toBeNull();
   await writeGraphSnapshot('a', data, Date.now() + 60000, () => true);
   await clearGraphSnapshots();
@@ -38,4 +38,10 @@ it('keeps separate cache entries from evicting one another', async () => {
   await writeGraphSnapshot('b', data, Date.now() + 60000, () => true);
   expect((await readGraphSnapshot('a'))?.data).toEqual(data);
   expect((await readGraphSnapshot('b'))?.data).toEqual(data);
+});
+
+it('keeps a recently stale snapshot available for background refresh', async () => {
+  const expiresAt = Date.now() - 1;
+  await writeGraphSnapshot('a', data, expiresAt, () => true);
+  expect((await readGraphSnapshot('a'))?.expiresAt).toBe(expiresAt);
 });

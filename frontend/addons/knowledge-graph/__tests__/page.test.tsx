@@ -1,7 +1,7 @@
 import '@/lib/__tests__/test-i18n';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
 import { clusterLayout } from '../cluster-layout';
 import type { GraphData } from '../api';
@@ -47,4 +47,12 @@ describe('Cluster overview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('No knowledge is visible to your account yet.')).toBeTruthy();
   });
+});
+
+it('does not announce unknown totals or render an empty working bar', async () => {
+  api.loadGraph.mockImplementationOnce(() => new Promise(() => {}));
+  render(<Theme><KnowledgeGraphPage /></Theme>);
+  await waitFor(() => expect(api.loadGraph).toHaveBeenCalled());
+  expect(screen.queryByRole('progressbar')).toBeNull();
+  expect(screen.queryByText(/Loading records: 0 \/ 0/)).toBeNull();
 });

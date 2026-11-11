@@ -6033,6 +6033,8 @@
     "controls3d": "Trascina per ruotare · Scorri per ingrandire · Trascina con il tasto destro per spostare. Su touch: un dito ruota, due dita ingrandiscono o spostano.",
     "connectionHint": "Seleziona un nodo per vedere i suoi collegamenti.",
     "visibleNodes": "Visualizzati {{shown}} nodi su {{total}} · Avvicinati per più dettagli.",
-    "cacheHint": "Layout in cache per 5 minuti. Aggiorna per caricare i dati più recenti."
+    "cacheHint": "I layout recenti vengono riutilizzati durante la verifica degli aggiornamenti. Aggiorna per cercare nuovi dati.",
+    "updating": "Verifica degli aggiornamenti del grafo…",
+    "refreshError": "Aggiornamento non riuscito. È ancora visibile il grafo salvato."
   }
 }
