@@ -5960,6 +5960,8 @@
     "controls3d": "Drag to rotate · Scroll to zoom · Right-drag to pan. On touch: one finger rotates, two fingers zoom or pan.",
     "connectionHint": "Select a node to see its connections.",
     "visibleNodes": "Showing {{shown}} of {{total}} nodes · Zoom in for more detail.",
-    "cacheHint": "Layout cached for 5 minutes. Refresh to fetch the latest data."
+    "cacheHint": "Recent layouts are reused while checking for updates. Refresh checks for new data.",
+    "updating": "Checking for graph updates…",
+    "refreshError": "Could not refresh. The saved graph is still shown."
   }
 }

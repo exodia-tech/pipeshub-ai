@@ -5960,6 +5960,8 @@
     "controls3d": "Ziehen zum Drehen · Scrollen zum Zoomen · Mit rechter Maustaste ziehen zum Verschieben. Touch: Ein Finger dreht, zwei Finger zoomen oder verschieben.",
     "connectionHint": "Wähle einen Knoten, um seine Verbindungen zu sehen.",
     "visibleNodes": "{{shown}} von {{total}} Knoten sichtbar · Für mehr Details hineinzoomen.",
-    "cacheHint": "Layout für 5 Minuten zwischengespeichert. Aktualisieren lädt die neuesten Daten."
+    "cacheHint": "Aktuelle Layouts werden während der Aktualisierungssuche wiederverwendet. Aktualisieren sucht nach neuen Daten.",
+    "updating": "Graph wird auf Aktualisierungen geprüft…",
+    "refreshError": "Aktualisierung fehlgeschlagen. Der gespeicherte Graph bleibt sichtbar."
   }
 }

@@ -38,11 +38,13 @@ export const GraphCanvas = forwardRef<GraphCamera, {
       let transition: ReturnType<typeof setTimeout>;
       const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 650;
       const byId = new Map(data.nodes.map(n => [n.id, n]));
-      cleanup = () => { graph._destructor(); host.replaceChildren(); camera.current = null; };
+      const lineMaterial = new THREE.LineBasicMaterial({ color: dark ? '#9db5db' : '#687e9f', transparent: true, opacity: 0.22, depthWrite: false });
+      const lineBatch = new THREE.LineSegments(new THREE.BufferGeometry(), lineMaterial);
+      graph.scene().add(lineBatch);
+      cleanup = () => { graph.scene().remove(lineBatch); lineBatch.geometry.dispose(); lineMaterial.dispose(); graph._destructor(); host.replaceChildren(); camera.current = null; };
       graph.backgroundColor('#00000000').showNavInfo(false).enableNodeDrag(false)
         .nodeRelSize(1).nodeVal(node => Math.pow((node as ViewNode).radius, 3)).nodeColor('color').nodeOpacity(1).nodeResolution(10)
         .cooldownTicks(0).onEngineStop(() => { if (initial) { initial = false; fit(undefined, 0); } callbacks.current.onReady(); })
-        .linkColor(() => dark ? '#9db5db' : '#687e9f').linkOpacity(0.08)
         .nodeLabel(node => {
           const n = node as ViewNode, label = document.createElement('span');
           // Indexed names are text, never HTML interpreted by the viewer.
@@ -65,8 +67,18 @@ export const GraphCanvas = forwardRef<GraphCamera, {
           const source = `cluster:${e.source}`, target = `cluster:${e.target}`;
           if (ids.has(source) && ids.has(target)) links.push({ source, target });
         }
-        // The library mutates its input; protect the shared cached layout with fresh objects.
-        graph.graphData({ nodes, links });
+        // Fixed-coordinate links share one draw call, so dense views keep every visible connection.
+        const positions = new Map(nodes.map(n => [n.id, n]));
+        const vertices: number[] = [];
+        for (const link of links) {
+          const a = positions.get(link.source), b = positions.get(link.target);
+          if (a && b) vertices.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        }
+        lineBatch.geometry.dispose();
+        lineBatch.geometry = new THREE.BufferGeometry();
+        lineBatch.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        // The library owns nodes, picking and navigation; it must not mutate the shared cache.
+        graph.graphData({ nodes, links: [] });
         callbacks.current.onDetailChange?.(expanded ?? null, view.nodes.length);
       }
       function move(position: InstanceType<typeof THREE.Vector3>, target: InstanceType<typeof THREE.Vector3>, ms: number) {

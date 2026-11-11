@@ -1,12 +1,12 @@
 import '@/lib/__tests__/test-i18n';
 import React from 'react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { Vector3 } from 'three';
 import type { GraphCamera } from '../graph-canvas';
 import type { ClusteredGraph } from '../cluster-layout';
 
-const state = vi.hoisted(() => ({ graph: null, label: null, move: vi.fn() }));
+const state = vi.hoisted(() => ({ graph: null, label: null, move: vi.fn(), scene: { add: vi.fn(), remove: vi.fn() } }));
 vi.mock('3d-force-graph', () => ({ default: class {
   constructor() {
     const graph = { data: { nodes: [], links: [] }, destroy: vi.fn() };
@@ -15,7 +15,7 @@ vi.mock('3d-force-graph', () => ({ default: class {
       if (key === 'destroy') return graph.destroy;
       if (key === '_destructor') return graph.destroy;
       if (key === 'controls') return () => ({ target: new Vector3(), addEventListener: vi.fn(), removeEventListener: vi.fn() });
-      if (key === 'scene') return () => ({ updateMatrixWorld: vi.fn() });
+      if (key === 'scene') return () => state.scene;
       if (key === 'cameraPosition') return state.move;
       if (key === 'camera') return () => ({ position: new Vector3(100, 100, 100) });
       if (key === 'renderer') return () => ({ domElement: document.createElement('canvas'), setPixelRatio: vi.fn() });
@@ -27,6 +27,7 @@ vi.mock('3d-force-graph', () => ({ default: class {
   }
 }}));
 import { GraphCanvas } from '../graph-canvas';
+beforeEach(() => { state.graph = null; state.label = null; vi.clearAllMocks(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 it('adapts fixed positions without mutating cached data, escapes hover labels and cleans up the library', async () => {
@@ -61,4 +62,16 @@ it('respects reduced-motion preferences for cluster navigation', async () => {
   await waitFor(() => expect(state.graph?.data.nodes.some(n => n.id === 'cluster:0')).toBe(true));
   ref.current.cluster(0);
   expect(state.move.mock.calls.at(-1)[2]).toBe(0);
+});
+
+it('batches every visible edge and disposes its geometry when leaving', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  const nodes = ['a', 'b'].map((id, i) => ({ id, name: id, kind: 'record', community: 0, x: i, y: 0, z: 0, size: 2, color: '#538bff', degree: 1 }));
+  const data: ClusteredGraph = { nodes, edges: [{ source: 'a', target: 'b' }], clusters: [], clusterEdges: [] };
+  const view = render(<GraphCanvas data={data} dark label="Graph" onSelect={vi.fn()} onCluster={vi.fn()} onReady={vi.fn()} onError={vi.fn()} />);
+  await waitFor(() => expect(state.graph?.data.nodes).toHaveLength(2));
+  const lines = state.scene.add.mock.calls[0][0];
+  expect(lines.geometry.getAttribute('position').count).toBe(2);
+  const dispose = vi.spyOn(lines.geometry, 'dispose');
+  view.unmount(); expect(dispose).toHaveBeenCalledOnce();
 });

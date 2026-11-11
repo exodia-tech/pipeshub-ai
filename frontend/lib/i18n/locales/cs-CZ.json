@@ -6106,6 +6106,8 @@
     "controls3d": "Tažením otáčíte · Kolečkem přibližujete · Pravým tlačítkem posouváte. Dotyk: jeden prst otáčí, dva přibližují nebo posouvají.",
     "connectionHint": "Vyberte uzel a zobrazte jeho spojení.",
     "visibleNodes": "Zobrazeno {{shown}} z {{total}} uzlů · Přibližte pro více podrobností.",
-    "cacheHint": "Rozložení je uloženo v mezipaměti na 5 minut. Obnovením načtete aktuální data."
+    "cacheHint": "Při kontrole aktualizací se použije nedávné rozložení. Obnovením vyhledáte nová data.",
+    "updating": "Kontrola aktualizací grafu…",
+    "refreshError": "Aktualizace se nezdařila. Uložený graf zůstává zobrazen."
   }
 }

@@ -1,6 +1,7 @@
 import type { ClusteredGraph } from '@/addons/knowledge-graph/cluster-layout';
 
 const CACHE_NAME = 'exodia-graph-layout-v1';
+const STALE_RETENTION_MS = 25 * 60 * 1000;
 const NONCE_KEY = 'exodia-graph-session';
 let queue: Promise<unknown> = Promise.resolve();
 
@@ -19,7 +20,7 @@ export async function readGraphSnapshot(scope: string): Promise<{ data: Clustere
     const cache = await caches.open(CACHE_NAME), response = await cache.match(snapshotUrl(owner));
     if (!response) return null;
     const entry = await response.json();
-    if (entry.identity !== owner || !(entry.expiresAt > Date.now()) || !Array.isArray(entry.data?.nodes) || !Array.isArray(entry.data?.edges) || !Array.isArray(entry.data?.clusters) || !Array.isArray(entry.data?.clusterEdges)
+    if (entry.identity !== owner || !((entry.retainUntil ?? entry.expiresAt) > Date.now()) || !Array.isArray(entry.data?.nodes) || !Array.isArray(entry.data?.edges) || !Array.isArray(entry.data?.clusters) || !Array.isArray(entry.data?.clusterEdges)
       || !entry.data.nodes.every(n => typeof n.id === 'string' && typeof n.name === 'string' && typeof n.kind === 'string' && typeof n.color === 'string' && [n.x, n.y, n.z, n.size, n.community, n.degree].every(Number.isFinite))
       || !entry.data.clusters.every(c => typeof c.name === 'string' && typeof c.color === 'string' && [c.id, c.x, c.y, c.z, c.radius, c.count].every(Number.isFinite))
       || !entry.data.edges.every(e => typeof e.source === 'string' && typeof e.target === 'string')
@@ -39,7 +40,8 @@ export function writeGraphSnapshot(scope: string, data: ClusteredGraph, expiresA
       const saved = await cache.match(key);
       if (Number(saved?.headers.get('X-Graph-Expires-At')) <= Date.now()) await cache.delete(key);
     }
-    if (current()) await cache.put(snapshotUrl(owner), new Response(JSON.stringify({ identity: owner, expiresAt, data }), { headers: { 'Content-Type': 'application/json', 'X-Graph-Expires-At': String(expiresAt) } }));
+    const retainUntil = expiresAt + STALE_RETENTION_MS;
+    if (current()) await cache.put(snapshotUrl(owner), new Response(JSON.stringify({ identity: owner, expiresAt, retainUntil, data }), { headers: { 'Content-Type': 'application/json', 'X-Graph-Expires-At': String(retainUntil) } }));
   }).catch(() => {});
   return queue;
 }

@@ -6033,6 +6033,8 @@
     "controls3d": "Arrastra para girar · Desplaza para ampliar · Arrastra con el botón derecho para mover. Pantalla táctil: un dedo gira, dos amplían o mueven.",
     "connectionHint": "Selecciona un nodo para ver sus conexiones.",
     "visibleNodes": "Mostrando {{shown}} de {{total}} nodos · Acerca para ver más detalles.",
-    "cacheHint": "Diseño en caché durante 5 minutos. Actualiza para obtener los datos más recientes."
+    "cacheHint": "Se reutilizan diseños recientes mientras se buscan actualizaciones. Actualiza para buscar nuevos datos.",
+    "updating": "Buscando actualizaciones del grafo…",
+    "refreshError": "No se pudo actualizar. Se sigue mostrando el grafo guardado."
   }
 }
