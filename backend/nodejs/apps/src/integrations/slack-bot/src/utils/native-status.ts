@@ -1,5 +1,12 @@
 /** Slack's native status rotates while the model is working and clears on reply. */
-const THINKING_MESSAGES = ['Thinking through your request…', 'Working on your response…'];
+const THINKING_MESSAGES = [
+  'Connecting the dots…',
+  'Warming up the brain cells…',
+  'Following a promising thought…',
+  'Making the pieces fit…',
+  'Brewing an answer…',
+  'Giving the gears a spin…',
+];
 
 export class SlackNativeStatus {
   private active = false;

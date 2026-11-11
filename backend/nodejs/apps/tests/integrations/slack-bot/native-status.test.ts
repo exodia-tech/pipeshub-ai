@@ -10,7 +10,8 @@ describe('Slack native activity status', () => {
     const status = new SlackNativeStatus(api, 'C123', '123.456');
     expect(await status.start()).to.equal(true);
     expect(api.firstCall.args[1]).to.include({ channel_id: 'C123', thread_ts: '123.456' });
-    expect(api.firstCall.args[1].loading_messages).to.have.length.greaterThan(1);
+    expect(api.firstCall.args[1].loading_messages).to.have.length(6);
+    expect(api.firstCall.args[1].loading_messages).to.include('Connecting the dots…');
     expect(await status.update('Searching... 3/10')).to.equal(true);
     expect(api.secondCall.args[1].status).to.equal('is searching... 3/10');
     await status.update('Thinking...');
