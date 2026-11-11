@@ -46,6 +46,8 @@ def _flexible_base_connector_init(self, *args: Any, **kwargs: Any) -> None:
     self.connector_id = cid
     self.app = app
     self.connector_name = app.get_app_name()
+    self._resilience_loaded = True
+    self._resilience = None
     self.scope = scope
     self.created_by = created_by
     self.creator_email = None
@@ -75,6 +77,8 @@ def _make_connector() -> Any:
     c.data_store_provider = data_store
     c.config_service = config_svc
     c.connector_id = "conn-abc"
+    c._resilience_loaded = True
+    c._resilience = None
     c.external_client = MagicMock()
     client = MagicMock()
     client.get_token = MagicMock(return_value="xoxp-test-token")
