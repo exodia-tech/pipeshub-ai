@@ -5924,6 +5924,8 @@
     "rotateLeft": "向左旋转",
     "rotateRight": "向右旋转",
     "controls3d": "拖动旋转 · 滚动缩放 · 右键拖动平移。触屏：单指旋转，双指缩放或平移。",
-    "connectionHint": "选择节点以查看其连接。"
+    "connectionHint": "选择节点以查看其连接。",
+    "visibleNodes": "显示 {{total}} 个节点中的 {{shown}} 个 · 放大查看更多细节。",
+    "cacheHint": "布局缓存 5 分钟。刷新可获取最新数据。"
   }
 }

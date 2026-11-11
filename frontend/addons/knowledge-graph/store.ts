@@ -1,9 +1,13 @@
 import { create } from 'zustand';
 import { captureSession, failOnSessionEnd, onSessionEnd } from '@/lib/api/session-cache';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { decodeJwtPayload } from '@/lib/api/token-refresh';
+import { getApiBaseUrl } from '@/lib/utils/api-base-url';
+import { readGraphSnapshot, writeGraphSnapshot, clearGraphSnapshots } from '@/lib/storage/graph-snapshot';
 import { loadGraph } from './api';
 import type { ClusteredGraph } from './cluster-layout';
 
-const CACHE_TTL_MS = 2 * 60 * 1000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 let pending: Promise<void> | undefined;
 let activeController: AbortController | undefined;
 let activeWorker: Worker | undefined;
@@ -28,6 +32,13 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     let worker: Worker | undefined;
     set({ data: null, phase: 'loading', progress: { loaded: 0, total: 0 }, layoutProgress: { done: 0, total: 0 } });
     const work = async () => {
+      const claims = decodeJwtPayload(useAuthStore.getState().accessToken);
+      const scope = typeof claims?.userId === 'string' && typeof claims?.orgId === 'string' ? JSON.stringify([getApiBaseUrl(), claims.userId, claims.orgId]) : '';
+      if (force) await clearGraphSnapshots();
+      const saved = force ? null : await readGraphSnapshot(scope);
+      if (!current()) return;
+      if (saved) { set({ data: saved.data, expiresAt: saved.expiresAt, phase: 'ready' }); return; }
+
       const graph = await loadGraph(controller.signal, (loaded, total) => { if (current()) set({ progress: { loaded, total } }); });
       if (!current()) return;
       set({ phase: 'layout' });
@@ -43,7 +54,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         worker.onerror = () => reject(new Error('Layout failed'));
         worker.postMessage(graph);
       });
-      if (current()) set({ data, phase: 'ready', expiresAt: Date.now() + CACHE_TTL_MS });
+      if (current()) {
+        const expiresAt = Date.now() + CACHE_TTL_MS;
+        set({ data, phase: 'ready', expiresAt });
+        await writeGraphSnapshot(scope, data, expiresAt, current);
+      }
     };
     const task = failOnSessionEnd(work()).catch(() => {
       if (current()) set({ data: null, phase: 'error', expiresAt: 0 });
@@ -60,6 +75,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
 // Private graph data and in-flight work never cross logout, account or workspace changes.
 onSessionEnd(() => {
+  void clearGraphSnapshots();
   activeController?.abort(); activeWorker?.terminate(); pending = undefined;
   activeController = undefined; activeWorker = undefined;
   useGraphStore.setState(useGraphStore.getInitialState(), true);

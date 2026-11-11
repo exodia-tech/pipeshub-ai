@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { visibleGraph } from '../graph-view';
+import { visibleGraph, graphDetail, detailBudget } from '../graph-view';
 import type { ClusteredGraph } from '../cluster-layout';
 
 describe('3D graph detail', () => {
@@ -21,9 +21,23 @@ describe('3D graph detail', () => {
   it('shows all edges in small focused clusters', () => {
     expect(visibleGraph({ ...data, nodes: nodes.slice(0, 3), edges: edges.slice(0, 2) }, 0).edges).toHaveLength(2);
   });
-  it('isolates a selected recordâ€™s neighborhood instead of retaining unrelated cluster members', () => {
+  it('isolates a selected recordÃ¢â‚¬â„¢s neighborhood instead of retaining unrelated cluster members', () => {
     const view = visibleGraph(data, 0, '1');
     expect(view.nodes.map(n => n.id)).toEqual(['0', '1']);
     expect(view.edges).toEqual([{ source: '0', target: '1' }]);
   });
+});
+
+it('increases detail as the camera approaches without changing cached data', () => {
+  const nodes = Array.from({ length: 2000 }, (_, i) => ({ id: String(i), name: `Node ${i}`, kind: 'record', community: i < 1500 ? 0 : 1, x: i, y: 0, z: 0, size: 2, color: '#538bff', degree: i % 10 }));
+  const data: ClusteredGraph = { nodes, edges: [], clusters: [], clusterEdges: [] };
+  const original = JSON.stringify(data);
+  expect(graphDetail(data).nodes.length).toBeLessThanOrEqual(48);
+  expect(graphDetail(data, 0, undefined, 240).nodes.filter(n => n.community === 0)).toHaveLength(240);
+  expect(graphDetail(data, 0, undefined, 6000).nodes.filter(n => n.community === 0)).toHaveLength(1500);
+  expect(graphDetail(data, 0).nodes.some(n => n.community === 1)).toBe(true);
+  expect(detailBudget(100, 1000)).toBe(240);
+  expect(detailBudget(100, 300)).toBe(1200);
+  expect(detailBudget(100, 150)).toBe(6000);
+  expect(JSON.stringify(data)).toBe(original);
 });

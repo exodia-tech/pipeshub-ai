@@ -6104,6 +6104,8 @@
     "rotateLeft": "Otočit doleva",
     "rotateRight": "Otočit doprava",
     "controls3d": "Tažením otáčíte · Kolečkem přibližujete · Pravým tlačítkem posouváte. Dotyk: jeden prst otáčí, dva přibližují nebo posouvají.",
-    "connectionHint": "Vyberte uzel a zobrazte jeho spojení."
+    "connectionHint": "Vyberte uzel a zobrazte jeho spojení.",
+    "visibleNodes": "Zobrazeno {{shown}} z {{total}} uzlů · Přibližte pro více podrobností.",
+    "cacheHint": "Rozložení je uloženo v mezipaměti na 5 minut. Obnovením načtete aktuální data."
   }
 }

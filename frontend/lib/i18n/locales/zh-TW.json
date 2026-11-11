@@ -5924,6 +5924,8 @@
     "rotateLeft": "向左旋轉",
     "rotateRight": "向右旋轉",
     "controls3d": "拖曳旋轉 · 捲動縮放 · 右鍵拖曳平移。觸控：單指旋轉，雙指縮放或平移。",
-    "connectionHint": "選取節點以查看其連線。"
+    "connectionHint": "選取節點以查看其連線。",
+    "visibleNodes": "顯示 {{total}} 個節點中的 {{shown}} 個 · 放大查看更多細節。",
+    "cacheHint": "配置快取 5 分鐘。重新整理以取得最新資料。"
   }
 }

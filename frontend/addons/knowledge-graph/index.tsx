@@ -22,6 +22,7 @@ export default function KnowledgeGraphPage() {
   const inspector = useRef<HTMLDivElement>(null);
   const { data, phase, progress, layoutProgress, load } = useGraphStore();
   const [renderPhase, setRenderPhase] = useState<'drawing' | 'ready' | 'error'>('drawing');
+  const [visibleNodes, setVisibleNodes] = useState(0);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<PositionedNode | null>(null);
   const [cluster, setCluster] = useState<number | null>(null);
@@ -54,7 +55,7 @@ export default function KnowledgeGraphPage() {
       </Flex>
       {!data.nodes.length ? <Text>{t('graph.empty')}</Text> : <div className="graph-addon-layout">
         <Box className="graph-addon-canvas" style={{ minWidth: 0, position: 'relative', border: '1px solid var(--gray-6)', borderRadius: 'var(--radius-4)', overflow: 'hidden', background: 'var(--gray-2)' }}>
-          {renderPhase !== 'error' && <GraphCanvas ref={camera} data={data} dark={appearance === 'dark'} label={t('graph.canvasLabel')} onCluster={focusCluster} onSelect={n => { setSelected(n); setCluster(n.community); }} onReady={() => setRenderPhase('ready')} onError={() => setRenderPhase('error')} />}
+          {renderPhase !== 'error' && <GraphCanvas ref={camera} data={data} dark={appearance === 'dark'} label={t('graph.canvasLabel')} onCluster={focusCluster} onDetailChange={(id, count) => { setCluster(id); setVisibleNodes(count); }} onSelect={n => { setSelected(n); setCluster(n.community); }} onReady={() => setRenderPhase('ready')} onError={() => setRenderPhase('error')} />}
           {renderPhase === 'drawing' && <Flex style={{ position: 'absolute', inset: 0, background: 'var(--gray-2)' }}><GraphLoading description={t('graph.rendering')} /></Flex>}
           <Flex gap="1" style={{ position: 'absolute', right: 12, bottom: 12, padding: 4, borderRadius: 'var(--radius-3)', background: 'var(--color-panel-solid)', border: '1px solid var(--gray-6)' }}>
             <Button variant="soft" aria-label={t('graph.rotateLeft')} title={t('graph.rotateLeft')} style={{ width: 44, height: 44, padding: 0 }} onClick={() => camera.current?.rotate(-Math.PI / 6)}><MaterialIcon name="rotate_left" size={20} /></Button>
@@ -82,8 +83,8 @@ export default function KnowledgeGraphPage() {
           <Text size="1" color="gray">{t('graph.connectionHint')}</Text>
         </Flex>
       </div>}
-      {data.nodes.length > 0 && <Text size="1" color="gray">{t('graph.controls3d')}</Text>}
-      <Text as="p" size="1" color="gray">{t('graph.coverage')}</Text>
+      {data.nodes.length > 0 && <><Text size="1" color="gray">{t('graph.visibleNodes', { shown: visibleNodes.toLocaleString(), total: data.nodes.length.toLocaleString() })}</Text><Text size="1" color="gray">{t('graph.controls3d')}</Text></>}
+      <Text as="p" size="1" color="gray">{t('graph.coverage')} {t('graph.cacheHint')}</Text>
     </>}
   </Flex>;
 }
