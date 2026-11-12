@@ -5,6 +5,25 @@ import { SlackNativeStatus } from '../../../src/integrations/slack-bot/src/utils
 import { createSlackAGUIEventHandler } from '../../../src/integrations/slack-bot/src/utils/agui-stream';
 
 describe('Slack native activity status', () => {
+  it('keeps rotation running through duplicate snapshots and late thinking while writing', async () => {
+    const api = sinon.stub().resolves({ ok: true });
+    const status = new SlackNativeStatus(api, 'C123', '123.456');
+    await status.start();
+    await status.update('Thinking...');
+    await status.update('Thinking...');
+    expect(api.callCount).to.equal(1);
+    await status.update('Writing reply...');
+    expect(api.lastCall.args[1].loading_messages).to.include('Adding the finishing touches…');
+    await status.update('Thinking...');
+    await status.update('Writing reply...');
+    expect(api.callCount).to.equal(2);
+    await status.update('Searching... 3/10');
+    expect(api.lastCall.args[1].status).to.equal('is searching... 3/10');
+    await status.update('Thinking...');
+    expect(api.callCount).to.equal(4);
+    await status.clear();
+    expect(api.lastCall.args[1].status).to.equal('');
+  });
   it('starts rotating status in the correct thread, updates with real progress and clears', async () => {
     const api = sinon.stub().resolves({ ok: true });
     const status = new SlackNativeStatus(api, 'C123', '123.456');
