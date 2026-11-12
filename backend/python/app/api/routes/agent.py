@@ -24,6 +24,7 @@ from app.agents.agent_loop.protocol import resolve_protocol
 from app.agents.agent_loop.protocol.agui import AGUIEventType
 from app.agents.agent_loop.protocol.stream_collector import collect_stream_outcome
 from app.agents.agent_loop.stream_bridge import run_agent_loop_stream
+from app.agents.agent_loop.turn_log import log_turn_end
 from app.agents.chat_modes.custom_instructions import resolve_custom_instructions
 from app.agents.chat_modes.policy import AgentCapabilities, resolve_agent_policy
 from app.agents.openapi import attachments as api_toolset_attachments
@@ -3089,7 +3090,7 @@ async def create_agent(request: Request) -> JSONResponse:
             # The helper rolls back on any BaseException, so a cancelled request
             # does not leave the transaction holding its locks until it times out.
             await GraphDataStore(logger, graph_provider).execute_in_transaction(write_agent, explicit=True)
-            logger.info(f"✅ Successfully created agent {agent_key}")
+            logger.info(f"Successfully created agent {agent_key}")
 
         except Exception as e:
             logger.error(f"Failed to create agent {agent_key}: {e}", exc_info=True)
@@ -4050,7 +4051,7 @@ async def delete_agent(request: Request, agent_id: str) -> JSONResponse:
                 CollectionNames.PERMISSION.value,
             ],
         )
-        services["logger"].debug(f"🔄 Started transaction {txn_id} for agent deletion")
+        services["logger"].debug(f"Started transaction {txn_id} for agent deletion")
 
         # Soft-delete: marks the agent instance deleted; related toolsets/tools/knowledge remain.
         result = await services["graph_provider"].delete_agent(
@@ -4063,7 +4064,7 @@ async def delete_agent(request: Request, agent_id: str) -> JSONResponse:
 
         # Commit transaction on success
         await services["graph_provider"].commit_transaction(txn_id)
-        services["logger"].info(f"✅ Successfully soft-deleted agent {agent_id} in transaction {txn_id}")
+        services["logger"].info(f"Successfully soft-deleted agent {agent_id} in transaction {txn_id}")
 
         # A service-account agent's own MCP credentials go with it (agents can't be restored),
         # so nothing keeps refreshing their tokens.
@@ -4121,18 +4122,18 @@ async def delete_agent(request: Request, agent_id: str) -> JSONResponse:
         if txn_id is not None and services is not None:
             try:
                 await services["graph_provider"].rollback_transaction(txn_id)
-                services["logger"].debug(f"🔄 Rolled back transaction {txn_id} due to HTTPException")
+                services["logger"].debug(f"Rolled back transaction {txn_id} due to HTTPException")
             except Exception as rb_err:
                 if services is not None:
-                    services["logger"].warning(f"⚠️ Failed to rollback transaction {txn_id}: {rb_err}")
+                    services["logger"].warning(f"Failed to rollback transaction {txn_id}: {rb_err}")
         raise
     except Exception as e:
         if txn_id is not None and services is not None:
             try:
                 await services["graph_provider"].rollback_transaction(txn_id)
-                services["logger"].debug(f"🔄 Rolled back transaction {txn_id} due to error")
+                services["logger"].debug(f"Rolled back transaction {txn_id} due to error")
             except Exception as rb_err:
-                services["logger"].warning(f"⚠️ Failed to rollback transaction {txn_id}: {rb_err}")
+                services["logger"].warning(f"Failed to rollback transaction {txn_id}: {rb_err}")
         if services is not None:
             services["logger"].error(f"Error deleting agent: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=action_failed("delete this agent")) from e
@@ -4335,7 +4336,11 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                     user_context, graph_provider, org_key,
                 )
                 perm = {"can_edit": False, "can_share": False, "role": "viewer"}
-                logger.debug(f"loaded service account agent. enriched_user_info: {enriched_user_info}")
+                logger.debug(
+                    "Loaded service account agent %s (retrieval runs as user %s)",
+                    agent_id,
+                    enriched_user_info.get("userId"),
+                )
             else:
                 # Standard user path: look up the user document and verify permissions.
                 user_doc = await _get_user_document(user_context["userId"], services["graph_provider"], logger)
@@ -4593,12 +4598,12 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                                 f"{'; '.join(problem_parts)}. "
                                 "Please connect your actions in Workspace → Actions before using this agent."
                             )
-                        logger.info(
-                            f"Blocking agent {agent_id} execution "
-                            f"({'service account' if is_service_account else f'user {executing_user_id!r}'}): "
-                            f"action issue(s) — {'; '.join(problem_parts)}"
+                        log_turn_end(
+                            logger, "error", error_class="bad_request", code="toolset_config_missing",
+                            run_id=chat_query.runId, duration_ms=round(timer.total_ms),
+                            missing=len(missing_toolset_display_names),
+                            unauthenticated=len(unauthenticated_toolset_display_names),
                         )
-
                         yield _stream_error_frame(protocol, error_message, code="toolset_config_missing")
                         return
 
@@ -4709,12 +4714,12 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                                 f"{'; '.join(problem_parts)}. "
                                 "Please connect them in Workspace → MCP Servers before using this agent."
                             )
-                        logger.info(
-                            f"Blocking agent {agent_id} execution "
-                            f"({'service account' if is_service_account else f'user {executing_user_id!r}'}): "
-                            f"MCP server issue(s) — {'; '.join(problem_parts)}"
+                        log_turn_end(
+                            logger, "error", error_class="bad_request", code="mcp_server_config_missing",
+                            run_id=chat_query.runId, duration_ms=round(timer.total_ms),
+                            missing=len(missing_mcp_server_display_names),
+                            unauthenticated=len(unauthenticated_mcp_server_display_names),
                         )
-
                         yield _stream_error_frame(
                             protocol, error_message, code="mcp_server_config_missing",
                             details={
@@ -4750,6 +4755,10 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                         exc,
                         agent_limit=agent_id != "agentIdPlaceholder" and not has_selection(chat_query.filters),
                     )
+                    log_turn_end(
+                        logger, "error", error_class="bad_request", code=code,
+                        run_id=chat_query.runId, duration_ms=round(timer.total_ms),
+                    )
                     yield _stream_error_frame(protocol, message, code=code)
                     return
 
@@ -4782,6 +4791,10 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                         connection_limit(getattr(request.state, "user", None)) if caps.internal_search else None,
                     )
                 except SelectionTooLargeError:
+                    log_turn_end(
+                        logger, "error", error_class="bad_request", code="selection_too_large",
+                        run_id=chat_query.runId, duration_ms=round(timer.total_ms),
+                    )
                     yield _stream_error_frame(
                         protocol, CONNECTION_LIMIT_TOO_LARGE_MESSAGE, code="selection_too_large",
                     )
@@ -4798,8 +4811,6 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                             logger=logger,
                         ),
                     ]
-
-                logger.info(f"Filters: {filters}")
 
                 _stream_conn_ids = [
                     k["connectorId"] for k in agent_knowledge
@@ -4961,8 +4972,11 @@ async def chat_stream(request: Request, agent_id: str) -> StreamingResponse:
                     async for _evt in generator:
                         yield _evt
             except Exception as exc:
-                logger.error(f"Error in chat_stream body: {exc}", exc_info=True)
                 error_code, user_message = classify_exception(exc)
+                log_turn_end(
+                    logger, "error", exc=exc, code=error_code,
+                    run_id=chat_query.runId, duration_ms=round(timer.total_ms),
+                )
                 yield _stream_error_frame(protocol, user_message, error_code)
 
         async def _run() -> AsyncGenerator[str, None]:

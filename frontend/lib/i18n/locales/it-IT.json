@@ -767,7 +767,10 @@
       "skipped": "Ignorato",
       "pending": "In sospeso",
       "emptyFileZeroBytes": "File vuoto: nulla da indicizzare (0 byte)",
-      "emptyNoContent": "Vuoto: nessun testo trovato da indicizzare"
+      "emptyNoContent": "Vuoto: nessun testo trovato da indicizzare",
+      "embeddingProgress_one": "Embedding di {{done, number}} / {{total, number}} segmento",
+      "embeddingProgress_other": "Embedding di {{done, number}} / {{total, number}} segmenti",
+      "embeddingProgress_many": "Embedding di {{done, number}} / {{total, number}} segmenti"
     },
     "allRecordsBusy_one": "Questa vista è occupata. Nuovo tentativo tra {{count}} secondo.",
     "allRecordsBusy_other": "Questa vista è occupata. Nuovo tentativo tra {{count}} secondi.",
@@ -1643,7 +1646,17 @@
     "companion": {
       "sayHello": "Saluta",
       "hello": "Ciao!"
-    }
+    },
+    "answerHidden": {
+      "lost": "Questa risposta utilizzava contenuti a cui non puoi più accedere.",
+      "unconfirmed": "Non siamo riusciti a verificare il tuo accesso. Riprova.",
+      "askAgain": "Chiedi di nuovo"
+    },
+    "quoteSelection": "Cita",
+    "quoteSelectionHint": "Fai una domanda su questo testo",
+    "quotedExcerpt": "Citazione",
+    "quotedExcerptTruncated": "Citazione (abbreviata)",
+    "dismissQuote": "Rimuovi citazione"
   },
   "workspaceMenu": {
     "appearance": "Aspetto",
@@ -3509,6 +3522,106 @@
         "cancel": "Annulla",
         "continueTeam": "Continua con il connettore di team",
         "goToPersonal": "Configura connettore personale"
+      },
+      "accessCheck": {
+        "open": "Verifica l'accesso di una persona",
+        "title": "Verifica l'accesso di una persona",
+        "description": "Scopri se una persona può leggere un record di questo connettore e, in caso contrario, perché.",
+        "personLabel": "Persona",
+        "personPlaceholder": "Scegli una persona",
+        "peopleLoading": "Caricamento delle persone...",
+        "peopleFailed": "Non siamo riusciti a caricare l'elenco delle persone.",
+        "recordLabel": "ID del record",
+        "recordHint": "Apri il record e copia il suo ID.",
+        "check": "Verifica",
+        "checking": "Verifica in corso...",
+        "close": "Chiudi",
+        "resultHeading": "Risultato",
+        "restrictedArea": "un'area riservata",
+        "theyFallback": "Questa persona",
+        "pathLabel": "Percorso: {{path}}",
+        "reference": "Riferimento: {{ref}} (comunicalo all'assistenza se il motivo sembra errato)",
+        "verdict": {
+          "granted": "{{name}} può vedere questo record.",
+          "denied": "{{name}} non può vedere questo record."
+        },
+        "reason": {
+          "granted": "Se non compare nella ricerca, potrebbe non essere ancora indicizzato oppure il connettore potrebbe essere ancora in fase di sincronizzazione.",
+          "not_linked": "{{name}} non ha un account collegato a questo connettore.",
+          "no_grant": "Nessun elemento in {{container}} concede l'accesso a {{name}}.",
+          "restricted_container": "{{container}} è riservato ad altre persone.",
+          "item_restricted": "Questo record ha una restrizione specifica che esclude {{name}}.",
+          "parent_not_readable": "{{name}} non può aprire un elemento superiore necessario per questo record.",
+          "pending_rewrite": "La cartella che contiene questo record è in fase di aggiornamento.",
+          "syncing": "Il connettore non ha ancora terminato la sincronizzazione di questa parte.",
+          "scheme_unreadable": "Il connettore non può leggere le regole di accesso di quest'area, che viene quindi nascosta a tutti.",
+          "deleted_at_source": "Questo record è stato eliminato all'origine.",
+          "unexplained": "Non possiamo mostrare il motivo."
+        },
+        "next": {
+          "not_linked": "Correggi l'account all'origine, poi esegui la sincronizzazione.",
+          "no_grant": "Aggiungi {{name}} all'origine.",
+          "restricted_container": "Chiedi al proprietario di aggiungere {{name}}.",
+          "item_restricted": "Chiedi al proprietario di aggiungere {{name}}.",
+          "parent_not_readable": "Condividi l'elemento superiore con {{name}}.",
+          "pending_rewrite": "Attendi qualche minuto, poi verifica di nuovo.",
+          "syncing": "Attendi il completamento della sincronizzazione.",
+          "scheme_unreadable": "Correggi le autorizzazioni dell'account di sincronizzazione all'origine.",
+          "deleted_at_source": "Nessuna azione necessaria.",
+          "unexplained": "Contatta l'assistenza e comunica il riferimento."
+        },
+        "errors": {
+          "failed": "Non siamo riusciti a eseguire la verifica. Riprova.",
+          "notFound": "Non abbiamo trovato questa persona o questo record nel connettore.",
+          "rateLimited": "Troppe verifiche. Riprova tra un minuto."
+        },
+        "peopleRetry": "Riprova",
+        "askedAbout": "Record {{record}}"
+      },
+      "access": {
+        "title": "Accesso",
+        "loading": "Caricamento dei dettagli di accesso…",
+        "loadError": "Non siamo riusciti a caricare i dettagli di accesso.",
+        "retry": "Riprova",
+        "reach": "Le modifiche in {{connector}} vengono recepite da EXODIA Brain entro {{interval}}.",
+        "reachUnknown": "Le modifiche in {{connector}} vengono recepite da EXODIA Brain alla sincronizzazione successiva.",
+        "syncNow": "Sincronizza le autorizzazioni ora",
+        "span": {
+          "minutes": "{{count, number(style: unit; unit: minute; unitDisplay: long)}}",
+          "hours": "{{count, number(style: unit; unit: hour; unitDisplay: long)}}",
+          "days": "{{count, number(style: unit; unit: day; unitDisplay: long)}}"
+        },
+        "refresh": {
+          "label": "Autorizzazioni",
+          "succeeded": "Ultimo aggiornamento: {{when}}.",
+          "failed": "L'ultimo aggiornamento delle autorizzazioni non è riuscito, quindi le modifiche recenti all'origine potrebbero non essere ancora applicate. Seleziona Sincronizza le autorizzazioni ora per riprovare.",
+          "never": "Le autorizzazioni non sono ancora state aggiornate. I contenuti di questo connettore restano nascosti fino al completamento della prima sincronizzazione.",
+          "running": "Aggiornamento delle autorizzazioni in corso.",
+          "incomplete": "L'ultimo aggiornamento delle autorizzazioni non è stato completato."
+        },
+        "pending": {
+          "label": "In attesa di applicazione",
+          "none": "Nessun elemento in attesa.",
+          "some_one": "{{count}} cartella è in fase di aggiornamento. Resta nascosta a tutti fino al completamento, in genere per pochi minuti.",
+          "some_other": "{{count}} cartelle sono in fase di aggiornamento. Restano nascoste a tutti fino al completamento, in genere per pochi minuti.",
+          "overflow": "Una modifica ha interessato l'intero connettore, quindi il suo indice delle autorizzazioni deve essere ricostruito completamente. Nel frattempo la ricerca verifica ogni risultato, senza nasconderne nessuno per questo motivo.",
+          "unknown": "Stato sconosciuto: impossibile leggere l'elenco delle cartelle in attesa di aggiornamento. Consulta Richiede attenzione.",
+          "some_many": "{{count}} cartelle sono in fase di aggiornamento. Restano nascoste a tutti fino al completamento, in genere per pochi minuti."
+        },
+        "attention": {
+          "label": "Richiede attenzione ({{count}})",
+          "none": "Nessun elemento richiede attenzione.",
+          "warning": "{{items}} elementi in {{container}} sono nascosti. L'account di sincronizzazione non può leggere le autorizzazioni di questo contenitore.",
+          "fix": "Soluzione: concedi all'account di sincronizzazione l'autorizzazione {{permission}} in {{vendor}}, poi seleziona Sincronizza le autorizzazioni ora.",
+          "showAll": "Mostra altri {{count}}",
+          "warningNoContainer": "Alcuni elementi sono nascosti perché l'account di sincronizzazione non può leggerne le autorizzazioni.",
+          "rebuild": "L'indice delle autorizzazioni di questo connettore deve essere ricostruito completamente. Nel frattempo la ricerca verifica ogni risultato, senza nasconderne nessuno per questo motivo.",
+          "unfinished": "Una modifica alle autorizzazioni non è stata completata correttamente. Chiedi all'amministratore di EXODIA Brain di verificare l'indice delle autorizzazioni di questo connettore.",
+          "stale": "Alcuni elementi non sono stati verificati dalla ricerca rapida e vengono trovati dalla ricerca classica.",
+          "sweep": "Gli aggiornamenti delle autorizzazioni di questo connettore continuano a non riuscire. Chiedi all'amministratore di EXODIA Brain di verificarne i log.",
+          "other": "Le autorizzazioni di questo connettore richiedono una verifica manuale.",
+          "unreadable": "Impossibile leggere l'elenco delle cartelle in attesa di aggiornamento. Chiedi all'amministratore di EXODIA Brain di ricostruire l'indice delle autorizzazioni di questo connettore. Nel frattempo la ricerca verifica ogni risultato."
+        }
       }
     },
     "mcpServers": {
@@ -5983,60 +6096,6 @@
     "inheritModel": "Eredita dal modello",
     "priority": "Priorità: scelta del messaggio → agente → modello → Basso."
   },
-  "graph": {
-    "title": "Grafo della conoscenza",
-    "overviewIntro": "Esplora la conoscenza in gruppi collegati. Ingrandisci per scoprire documenti e concetti.",
-    "arranging": "Individuazione dei gruppi e disposizione del grafo…",
-    "progress": "Caricamento documenti: {{loaded}} / {{total}}",
-    "counts": "{{nodes}} nodi · {{edges}} collegamenti · {{clusters}} gruppi",
-    "findNode": "Cerca un nodo…",
-    "empty": "Non ci sono ancora contenuti visibili al tuo account.",
-    "retry": "Riprova",
-    "error": "Impossibile caricare il grafo. Riprova.",
-    "rendererError": "Questo browser non riesce a visualizzare il grafo. Abilita WebGL o prova un altro browser. Puoi comunque cercare i nodi ed esplorare i gruppi qui sotto.",
-    "canvasLabel": "Grafo della conoscenza 3D. Ruota, ingrandisci e seleziona un gruppo per esplorarne i nodi.",
-    "zoomIn": "Ingrandisci",
-    "zoomOut": "Riduci",
-    "fit": "Mostra tutto il grafo",
-    "openRecord": "Apri documento",
-    "searchResults": "Nodi corrispondenti",
-    "noResults": "Nessun nodo corrispondente.",
-    "clusters": "Gruppi",
-    "unconnected": "Nodi non collegati",
-    "clusterHint": "Seleziona un gruppo per ingrandirlo. Seleziona un nodo per esaminarlo.",
-    "coverage": "Tutti i documenti accessibili e i loro collegamenti salvati. I gruppi rispettano i tuoi permessi. Aggiorna dopo la sincronizzazione.",
-    "entity": "Entità",
-    "kinds": {
-      "record": "Documento",
-      "folder": "Cartella",
-      "kb": "Raccolta",
-      "app": "Fonte",
-      "recordGroup": "Gruppo di documenti",
-      "department": "Reparto",
-      "category": "Categoria",
-      "subcategory": "Sottocategoria",
-      "topic": "Argomento",
-      "language": "Lingua",
-      "named_entity": "Entità nominata"
-    },
-    "preparing": "Preparazione del grafo della conoscenza",
-    "rendering": "Visualizzazione della mappa…",
-    "metricLegend": "Dimensione dei gruppi: nodi · Dimensione dei punti: collegamenti",
-    "refresh": "Aggiorna grafo",
-    "connections": "Collegamenti: {{value}}",
-    "layout": {
-      "progress": "Disposizione dei nodi: {{done}} / {{total}}"
-    },
-    "view3d": "3D",
-    "rotateLeft": "Ruota a sinistra",
-    "rotateRight": "Ruota a destra",
-    "controls3d": "Trascina per ruotare · Scorri per ingrandire · Trascina con il tasto destro per spostare. Su touch: un dito ruota, due dita ingrandiscono o spostano.",
-    "connectionHint": "Seleziona un nodo per vedere i suoi collegamenti.",
-    "visibleNodes": "Visualizzati {{shown}} nodi su {{total}} · Avvicinati per più dettagli.",
-    "cacheHint": "I layout recenti vengono riutilizzati durante la verifica degli aggiornamenti. Aggiorna per cercare nuovi dati.",
-    "updating": "Verifica degli aggiornamenti del grafo…",
-    "refreshError": "Aggiornamento non riuscito. È ancora visibile il grafo salvato."
-  },
   "groupAccess": {
     "currentAccess": "Lettori attuali",
     "empty": "Nessuna risorsa accessibile qui.",
@@ -6121,5 +6180,176 @@
     "time": "Ora",
     "previousMonth": "Mese precedente",
     "nextMonth": "Mese successivo"
+  },
+  "knowledgeGraph": {
+    "title": "Grafo della conoscenza",
+    "overviewIntro": "Esplora la conoscenza in gruppi collegati. Ingrandisci per scoprire documenti e concetti.",
+    "arranging": "Individuazione dei gruppi e disposizione del grafo…",
+    "progress": "Caricamento documenti: {{loaded}} / {{total}}",
+    "counts": "{{nodes}} nodi · {{edges}} collegamenti · {{clusters}} gruppi",
+    "findNode": "Cerca un nodo…",
+    "empty": "Non ci sono ancora contenuti visibili al tuo account.",
+    "retry": "Riprova",
+    "error": "Impossibile caricare il grafo. Riprova.",
+    "rendererError": "Questo browser non riesce a visualizzare il grafo. Abilita WebGL o prova un altro browser. Puoi comunque cercare i nodi ed esplorare i gruppi qui sotto.",
+    "canvasLabel": "Grafo della conoscenza 3D. Ruota, ingrandisci e seleziona un gruppo per esplorarne i nodi.",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "fit": "Mostra tutto il grafo",
+    "openRecord": "Apri documento",
+    "searchResults": "Nodi corrispondenti",
+    "noResults": "Nessun nodo corrispondente.",
+    "clusters": "Gruppi",
+    "unconnected": "Nodi non collegati",
+    "clusterHint": "Seleziona un gruppo per ingrandirlo. Seleziona un nodo per esaminarlo.",
+    "coverage": "Tutti i documenti accessibili e i loro collegamenti salvati. I gruppi rispettano i tuoi permessi. Aggiorna dopo la sincronizzazione.",
+    "entity": "Entità",
+    "kinds": {
+      "record": "Documento",
+      "folder": "Cartella",
+      "kb": "Raccolta",
+      "app": "Fonte",
+      "recordGroup": "Gruppo di documenti",
+      "department": "Reparto",
+      "category": "Categoria",
+      "subcategory": "Sottocategoria",
+      "topic": "Argomento",
+      "language": "Lingua",
+      "named_entity": "Entità nominata"
+    },
+    "preparing": "Preparazione del grafo della conoscenza",
+    "rendering": "Visualizzazione della mappa…",
+    "metricLegend": "Dimensione dei gruppi: nodi · Dimensione dei punti: collegamenti",
+    "refresh": "Aggiorna grafo",
+    "connections": "Collegamenti: {{value}}",
+    "layout": {
+      "progress": "Disposizione dei nodi: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Ruota a sinistra",
+    "rotateRight": "Ruota a destra",
+    "controls3d": "Trascina per ruotare · Scorri per ingrandire · Trascina con il tasto destro per spostare. Su touch: un dito ruota, due dita ingrandiscono o spostano.",
+    "connectionHint": "Seleziona un nodo per vedere i suoi collegamenti.",
+    "visibleNodes": "Visualizzati {{shown}} nodi su {{total}} · Avvicinati per più dettagli.",
+    "cacheHint": "I layout recenti vengono riutilizzati durante la verifica degli aggiornamenti. Aggiorna per cercare nuovi dati.",
+    "updating": "Verifica degli aggiornamenti del grafo…",
+    "refreshError": "Aggiornamento non riuscito. È ancora visibile il grafo salvato."
+  },
+  "accessNotice": {
+    "permissions_updating": "Alcune fonti stanno aggiornando le autorizzazioni, quindi alcuni risultati potrebbero mancare per qualche minuto.",
+    "connector_syncing": "La sincronizzazione di {{name}} è ancora in corso, quindi i relativi risultati potrebbero essere incompleti.",
+    "connector_syncing_unnamed": "Una fonte è ancora in fase di sincronizzazione, quindi i relativi risultati potrebbero essere incompleti.",
+    "check_unavailable": "Al momento non siamo riusciti a verificare a quali documenti hai accesso, quindi non viene mostrato alcun risultato. Riprova tra un minuto.",
+    "emptySyncing": "Non c'è ancora nulla da cercare. La sincronizzazione di {{name}} è in corso.",
+    "emptySyncing_unnamed": "Non c'è ancora nulla da cercare. Una fonte è ancora in fase di sincronizzazione.",
+    "noAccess": {
+      "title": "Non hai accesso a questo elemento",
+      "body": "Potrebbe essere stato spostato, eliminato o reso riservato. Chiedi al proprietario oppure aprilo all'origine se hai il link.",
+      "justGotAccess": "Hai appena ottenuto l'accesso all'origine? Il nuovo accesso sarà disponibile dopo la sincronizzazione successiva.",
+      "copyDetails": "Copia i dettagli per un amministratore",
+      "copied": "Dettagli copiati"
+    }
+  },
+  "graph": {
+    "status": {
+      "stale": "Il grafo è in fase di aggiornamento; le modifiche recenti potrebbero non essere visibili.",
+      "building": "Il grafo è in fase di creazione, quindi la vista potrebbe essere incompleta.",
+      "retrying": "La creazione del grafo ha riscontrato un problema ed è in corso un nuovo tentativo.",
+      "failed": "L'ultima creazione del grafo non è riuscita, quindi questa vista potrebbe non essere aggiornata.",
+      "unknown": "Impossibile leggere lo stato di questo grafo."
+    },
+    "empty": {
+      "neverBuilt": "Questo repository non ha ancora un grafo del codice.",
+      "tooLarge": "Questo repository è troppo grande per creare il grafo."
+    },
+    "incomplete": "Alcuni collegamenti potrebbero mancare. Restringi la vista per tipo di relazione o direzione.",
+    "simplified": "Vista semplificata per movimenti fluidi.",
+    "verify": {
+      "degraded": "Impossibile verificare l'accesso al momento. Vengono mostrati gli ultimi dati confermati.",
+      "blank": "Non è stato possibile verificare l'accesso per diversi minuti, quindi il grafo è stato svuotato. Riconnessione…"
+    },
+    "error": {
+      "unavailable": "Impossibile caricare il contenuto al momento. Riprova.",
+      "notAvailable": "Questo elemento non è disponibile.",
+      "unexpected": "Si è verificato un errore.",
+      "ambiguous": "Più repository hanno questo nome. Scegli il repository nella casella di ricerca.",
+      "full": "Questa vista è piena. Apri un nodo per avviarne una nuova.",
+      "revoked": "L'elemento che stavi visualizzando non è più disponibile."
+    },
+    "title": "Grafo del codice",
+    "ui": {
+      "back": "Indietro",
+      "forward": "Avanti",
+      "fit": "Adatta alla vista",
+      "showTable": "Mostra come tabella",
+      "showGraph": "Mostra come grafo",
+      "direction": {
+        "any": "Entrambe",
+        "inbound": "Chiamanti",
+        "outbound": "Chiamati"
+      },
+      "includeTests": "Includi i test",
+      "showMore": "Mostra altro",
+      "expand": "Espandi",
+      "open": "Apri",
+      "nothingSelected": "Seleziona un nodo per visualizzarne i dettagli.",
+      "details": "Dettagli",
+      "links": "Collegamenti: {{n}}",
+      "table": {
+        "caption": "Nodi in questa vista",
+        "name": "Nome",
+        "kind": "Tipo",
+        "file": "File",
+        "actions": "Azioni",
+        "moreRows": "Mostra altre righe",
+        "callersShown": "Chiamanti mostrati",
+        "calleesShown": "Chiamati mostrati",
+        "focus": "Centra"
+      },
+      "emptyPrompt": "Cerca una funzione, un metodo o una classe qui sopra per vedere chi lo chiama e cosa chiama.",
+      "disclosure": "Mostra solo i contenuti a cui puoi accedere.",
+      "legendInferred": "Le linee tratteggiate indicano collegamenti dedotti dal nome.",
+      "disabled": "Il grafo del codice non è abilitato.",
+      "search": {
+        "repo": "Repository",
+        "repoPlaceholder": "Scegli un repository",
+        "placeholder": "Trova una funzione, un metodo o una classe per nome",
+        "label": "Cerca nel codice",
+        "results": "Risultati della ricerca",
+        "noRepos": "Nessun repository di codice accessibile.",
+        "noMatches": "Nessun risultato.",
+        "chooseFirst": "Scegli prima un repository",
+        "minChars": "Digita almeno 2 caratteri.",
+        "more": "Vengono mostrati i primi risultati. Digita altro testo per restringere la ricerca."
+      },
+      "action": {
+        "retry": "Riprova",
+        "restore": "Usa la qualità completa"
+      },
+      "loading": "Caricamento…",
+      "legend": {
+        "functions": "Funzioni e metodi",
+        "classes": "Classi e interfacce",
+        "focus": "Centro di questa vista"
+      },
+      "openHint": "Apri: usa questo elemento come centro di una nuova vista.",
+      "expandHint": "Espandi: mostra i nodi vicini qui, mantenendo gli elementi già presenti sullo schermo.",
+      "announce": {
+        "opened": "Visualizzazione di {{n}} elementi.",
+        "added": "{{n}} elementi aggiunti."
+      },
+      "canvasHint": "L'immagine del grafo non è accessibile agli screen reader. Usa il pulsante Mostra come tabella per leggere e usare ogni nodo.",
+      "selectionGone": "L'elemento selezionato non è più disponibile.",
+      "viewGraph": "Visualizza grafo",
+      "viewGraphOf": "Visualizza il grafo di {{repo}}",
+      "fillerNode": "{{kind}} in {{file}}"
+    },
+    "capped": "L'immagine mostra solo parte di questa vista. La tabella elenca tutti gli elementi.",
+    "crowded": "Questa vista sta diventando affollata. Restringila con i filtri.",
+    "hint": {
+      "testsOff": "I file di test sono nascosti. Se l'elemento è nel codice di test, attiva Includi i test."
+    },
+    "nothingNew": "Non c'è altro da mostrare per questo nodo.",
+    "tableOnly": "Viene mostrata solo la tabella per mantenere una buona reattività."
   }
 }

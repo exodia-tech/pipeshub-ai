@@ -60,7 +60,7 @@ export const GraphCanvas = forwardRef<GraphCamera, {
         const nodes: ViewNode[] = view.nodes.map(n => ({ id: n.id, name: n.name, record: n, color: n.id === selected ? dark ? '#ffffff' : '#1859d6' : expanded === undefined || n.community === expanded ? n.color : '#' + new THREE.Color(n.color).multiplyScalar(dark ? 0.35 : 0.65).getHexString(), radius: n.id === selected ? Math.max(9, n.size * 2) : Math.max(expanded === undefined ? 6 : 2, n.size), x: n.x, y: n.y, z: n.z, fx: n.x, fy: n.y, fz: n.z }));
         for (const c of data.clusters) {
           if (c.id === expanded) continue;
-          nodes.push({ id: `cluster:${c.id}`, name: c.isolated ? t('graph.unconnected') : c.name, cluster: c.id, count: c.count, color: expanded === undefined ? c.color : '#' + new THREE.Color(c.color).multiplyScalar(dark ? 0.35 : 0.65).getHexString(), radius: Math.min(24, Math.max(8, Math.cbrt(c.count) * 1.5)), x: c.x, y: c.y, z: c.z, fx: c.x, fy: c.y, fz: c.z });
+          nodes.push({ id: `cluster:${c.id}`, name: c.isolated ? t('knowledgeGraph.unconnected') : c.name, cluster: c.id, count: c.count, color: expanded === undefined ? c.color : '#' + new THREE.Color(c.color).multiplyScalar(dark ? 0.35 : 0.65).getHexString(), radius: Math.min(24, Math.max(8, Math.cbrt(c.count) * 1.5)), x: c.x, y: c.y, z: c.z, fx: c.x, fy: c.y, fz: c.z });
         }
         const ids = new Set(nodes.map(n => n.id)), links = view.edges.map(e => ({ ...e }));
         if (expanded === undefined) for (const e of data.clusterEdges) {

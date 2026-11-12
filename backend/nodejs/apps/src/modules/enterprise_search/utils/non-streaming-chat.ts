@@ -1,6 +1,4 @@
 import { AIServiceCommand } from '../../../libs/commands/ai_service/ai.service.command';
-import type { AppConfig } from '../../tokens_manager/config/config';
-import { redactMessagesFor } from './viewer-redaction';
 import { HttpMethod } from '../../../libs/enums/http-methods.enum';
 import { unansweredCallError } from '../../../libs/errors/backend-error';
 import {
@@ -8,6 +6,12 @@ import {
   InternalServerError,
   NotFoundError,
 } from '../../../libs/errors/http.errors';
+import type { AppConfig } from '../../tokens_manager/config/config';
+import {
+  historyForModel,
+  newReadable,
+  type Readable,
+} from './viewer-redaction';
 import { Logger } from '../../../libs/services/logger.service';
 import { CONVERSATION_STATUS } from '../constants/constants';
 import {
@@ -76,6 +80,8 @@ export interface ContinuedConversation {
   conversation: ChatSessionDto;
   /** History before this turn, in the shape the AI backend expects. */
   previousConversations: ReturnType<typeof formatPreviousConversations>;
+  /** What this turn's history check settled, so the response check does not ask again. */
+  access: Readable;
 }
 
 /** Who is asking. */
@@ -120,16 +126,18 @@ export const continueConversation = async (
     );
     return { conversation: saved ?? found, rows };
   });
+  const access = newReadable();
   return {
     conversation,
     previousConversations: formatPreviousConversations(
-      await redactMessagesFor(
+      await historyForModel(
         appConfig,
         viewer,
         rows as unknown as IMessage[],
-        () => conversation.initiator,
+        access,
       ),
     ),
+    access,
   };
 };
 
@@ -161,7 +169,7 @@ const rejectionFor = (statusCode: number, failReason: string): HttpError =>
  * (504 on a timeout); anything else carries only the user-facing reason.
  */
 const clientErrorFor = (error: unknown, failReason: string): HttpError => {
-  const unanswered = unansweredCallError(error, 'chat');
+  const unanswered = unansweredCallError(error);
   if (unanswered) {
     return unanswered;
   }
@@ -199,6 +207,7 @@ export interface CompletedTurn {
   recordsUsed: number;
   /** The answer's search was served with less than the full search (see `searchDegradedMeta`). */
   searchDegraded?: true;
+  accessNotices?: NonNullable<IAIResponse['accessNotices']>;
 }
 
 /** Phases 2 and 3. Throws the error the client should see once the failure is saved. */

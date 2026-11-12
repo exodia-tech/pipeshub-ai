@@ -1,6 +1,9 @@
 {
   "name": "pipeshub",
   "version": "0.1.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "description": "PipesHub Desktop App",
   "author": "PipesHub",
   "homepage": "https://github.com/pipeshub-ai/pipeshub-ai",
@@ -39,8 +42,9 @@
     "electron:build:win": "node scripts/electron/build.mjs win",
     "electron:build:linux": "node scripts/electron/build.mjs linux",
     "electron:build:all": "node scripts/electron/build.mjs all",
-    "_comment:test:electron": "Two things here are load-bearing. --test-concurrency=1: the local-sync tests drive real fs watchers against real temp directories, and node --test runs files in parallel by default, which makes them interfere and hang. Unquoted, single-star patterns: the shell has to expand them, because CI runs Node 20, whose test runner does not glob and would treat a quoted pattern or a ** as a literal path.",
-    "test:electron": "npm run build:electron:typescript && node --test --test-concurrency=1 electron/compile/__tests__/*.test.js electron/compile/local-sync/__tests__/*.test.js"
+    "_comment:test:electron": "Two things here are load-bearing. --test-concurrency=1: the local-sync tests drive real fs watchers against real temp directories, and node --test runs files in parallel by default, which makes them interfere and hang. Unquoted, single-star patterns: the shell has to expand them, because older Node test runners (before 21) do not glob and would treat a quoted pattern or a ** as a literal path.",
+    "test:electron": "npm run build:electron:typescript && node --test --test-concurrency=1 electron/compile/__tests__/*.test.js electron/compile/local-sync/__tests__/*.test.js",
+    "test:graph-e2e": "playwright test -c playwright.graph.config.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.30",
@@ -59,21 +63,17 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@vis.gl/react-google-maps": "^1.10.1",
     "@xyflow/react": "^12.12.0",
-    "3d-force-graph": "1.80.2",
     "axios": "^1.20.0",
     "chokidar": "^3.6.0",
-    "d3-force-3d": "3.0.6",
+    "cytoscape": "3.34.4",
     "dayjs": "^1.11.23",
     "docx-preview": "^0.4.1",
     "dompurify": "^3.4.17",
-    "graphology": "^0.26.0",
-    "graphology-communities-louvain": "^2.0.2",
     "i18next": "^26.5.7",
     "i18next-browser-languagedetector": "^8.2.1",
     "immer": "^11.2.7",
     "katex": "^0.19.0",
     "lottie-react": "^3.1.2",
-    "lucide-react": "1.70.0",
     "mermaid": "^12.2.0",
     "nanoid": "^6.0.2",
     "next": "^15.5.28",
@@ -93,10 +93,15 @@
     "remark-math": "^6.0.0",
     "socket.io-client": "^4.8.4",
     "swr": "^2.5.1",
-    "three": "0.187.0",
     "tiptap-markdown": "^0.9.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "3d-force-graph": "1.80.2",
+    "d3-force-3d": "3.0.6",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
+    "lucide-react": "1.70.0",
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

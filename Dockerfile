@@ -19,8 +19,11 @@ WORKDIR /app/python
 # Slow CDN transfers must not fail the entire application build after 30 seconds.
 ENV PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=180000
 COPY backend/python/pyproject.toml ./
+# A base image published before the fork was excluded still carries unclecode-litellm. Removing it
+# deletes litellm/ files the real package also owns, so litellm is reinstalled right after.
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
-    uv pip install --system -e . && \
+    uv pip uninstall --system unclecode-litellm && \
+    uv pip install --system --reinstall-package litellm -e . && \
     crawl4ai-setup && \
     playwright install chromium
 
@@ -40,7 +43,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # -----------------------------------------------------------------------------
 # Stage 1: Node.js Backend Build
 # -----------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS nodejs-backend
+FROM node:24-bookworm-slim AS nodejs-backend
 WORKDIR /app/backend
 
 COPY backend/nodejs/apps/package*.json ./
@@ -76,7 +79,7 @@ RUN mkdir -p /app/templates && cd src && find . -name '*.hbs' -exec cp --parents
 # Stage 2: Frontend Build (Next.js in `frontend/`)
 # -----------------------------------------------------------------------------
 # Static export so the Node.js API can serve files from `backend/dist/public`.
-FROM node:22-bookworm-slim AS frontend-build
+FROM node:24-bookworm-slim AS frontend-build
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
@@ -110,6 +113,8 @@ RUN groupadd --gid 1000 pipeshub && \
     install -d -o 1000 -g 1000 /root/.cache /root/.local && \
     chown 1000:1000 /root
 ENV HOME=/root
+# Repositories pushed by `pipeshub index` are mirrored on the data volume, so they survive the container being replaced.
+ENV PIPESHUB_LOCAL_REPO_STORE=/data/pipeshub/local-repos
 # Pinned so the baked models are still found when HOME is overridden (the
 # Helm chart sets HOME=/home/user).
 ENV HF_HOME=/root/.cache/huggingface \
