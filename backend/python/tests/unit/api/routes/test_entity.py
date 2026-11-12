@@ -1193,7 +1193,7 @@ class TestUpdateTeam:
         )
 
     @pytest.mark.asyncio
-    async def test_remove_users_reports_storage_failure(self):
+    async def test_remove_users_reports_storage_failure(self) -> None:
         body = {"name": "T", "removeUserIds": [MEMBER_MONGO_ID_2]}
         req, gp = self._setup_authorized_request(body)
         gp.get_team_owner_removal_info.return_value = {
