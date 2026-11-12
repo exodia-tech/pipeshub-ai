@@ -2,6 +2,7 @@
 
 import asyncio
 import socket
+import threading
 
 import httpx
 import pytest
@@ -16,13 +17,24 @@ _real_sleep = asyncio.sleep
 def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     """Any attempt to reach a real host fails the test instead of leaving the machine."""
     real_connect = socket.socket.connect
+    real_socketpair = socket.socketpair
+    internal = threading.local()
+
+    def _socketpair(*args: object, **kwargs: object) -> tuple[socket.socket, socket.socket]:
+        # Windows implements asyncio's internal socketpair using a loopback connect.
+        internal.socketpair = True
+        try:
+            return real_socketpair(*args, **kwargs)
+        finally:
+            internal.socketpair = False
 
     def _guarded(self: socket.socket, address: object) -> None:
-        if self.family in (socket.AF_INET, socket.AF_INET6):
+        if self.family in (socket.AF_INET, socket.AF_INET6) and not getattr(internal, "socketpair", False):
             raise AssertionError(f"test tried to reach the network: {address!r}")
         real_connect(self, address)
 
     monkeypatch.setattr(socket.socket, "connect", _guarded)
+    monkeypatch.setattr(socket, "socketpair", _socketpair)
 
 
 @pytest.fixture

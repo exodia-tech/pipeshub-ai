@@ -120,6 +120,12 @@ from app.connectors.sources.slack.common.token_renewal import (
     RenewingSlackDataSource,
     SlackTokenRenewal,
 )
+from app.connectors.sources.slack.common.voice import (
+    is_voice_file,
+    parse_voice_id,
+    stream_voice,
+    sync_voice_notes,
+)
 from app.models.blocks import (
     Block,
     BlockGroup,
@@ -902,6 +908,16 @@ class SlackConnector(BaseConnector):
             except Exception as exc:
                 self._full_sync_read_failed = True
                 self.logger.warning("Huddle sync failed: %s", exc)
+
+            try:
+                await sync_voice_notes(
+                    self, getattr(self, "_huddle_channel_permissions", {}), personal=False,
+                    unknown_channels=getattr(self, "_huddle_unknown_channels", set()),
+                    channels_complete=not self._channel_list_failed,
+                )
+            except Exception as exc:
+                self._full_sync_read_failed = True
+                self.logger.warning("Voice-note sync failed: %s", exc)
 
             await self._report_unreadable_channels()
             if self._channel_list_failed:
@@ -3065,7 +3081,7 @@ class SlackConnector(BaseConnector):
         the parent record has been created.
         """
         fid = fd.get("id")
-        if not fid or fd.get("is_huddle_canvas") is True or fd.get("filetype") in ("canvas", "quip"):
+        if not fid or is_voice_file(fd) or fd.get("is_huddle_canvas") is True or fd.get("filetype") in ("canvas", "quip"):
             return None
 
         file_hash: Optional[str] = None
@@ -4876,6 +4892,10 @@ class SlackConnector(BaseConnector):
         fid = record.external_record_id
         if not fid:
             raise HTTPException(400, f"No file ID for {record.id}")
+        voice = parse_voice_id(fid)
+        if voice:
+            yield await stream_voice(self, *voice)
+            return
         huddle = parse_huddle_id(fid)
         if huddle:
             yield await stream_huddle(self, *huddle)
@@ -5042,6 +5062,8 @@ class SlackConnector(BaseConnector):
         self, rec: FileRecord
     ) -> Optional[tuple[Record, list[Permission]]]:
         fid = rec.external_record_id
+        if fid and parse_voice_id(fid):
+            return None  # Streaming revalidates sharing and fetches the current transcript.
         if not fid:
             return None
 
