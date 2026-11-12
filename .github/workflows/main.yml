@@ -247,6 +247,9 @@ jobs:
           uv pip install --system -e . 2>&1 || true
 
       - name: Run pyright on changed Python files
+        # The upstream import graph exceeds Node's 2 GiB default; the worker is capped at 8 GiB.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
           pyright --version
           MERGE_BASE=$(git merge-base origin/main HEAD)
