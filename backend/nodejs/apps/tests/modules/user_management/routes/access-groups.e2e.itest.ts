@@ -104,7 +104,7 @@ describe('access groups across authenticated services', function () {
       getRecordBuffer(testServer),
     );
     app.use((error: any, _req: any, res: any, _next: any) => {
-      void _next;
+      if (res.headersSent) return _next(error);
       return res.status(error.statusCode || 500).json({ error: error.message });
     });
     server = await new Promise<Server>((resolve) => {

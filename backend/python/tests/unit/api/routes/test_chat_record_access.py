@@ -1,6 +1,7 @@
 """A shared chat is rendered per viewer: Node asks which of the records it shows
 the viewer (named in the service token) may read."""
 
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,7 +14,7 @@ VIEWER = {"orgId": "org-1", "userId": "viewer"}
 
 
 @pytest.fixture(autouse=True)
-def unrestricted_viewer():
+def unrestricted_viewer() -> Iterator[None]:
     with patch("app.services.group_resource_policy.GroupResourceAccess.user_has_restrictions", AsyncMock(return_value=False)):
         yield
 

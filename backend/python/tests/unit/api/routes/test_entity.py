@@ -85,7 +85,7 @@ def _graph_provider(request):
     return request.app.state.graph_provider
 
 
-def _logger(request):
+def _logger(request) -> MagicMock:
     return request.app.container.logger()
 
 

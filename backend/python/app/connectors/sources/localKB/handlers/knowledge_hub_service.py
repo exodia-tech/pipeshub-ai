@@ -492,7 +492,7 @@ class KnowledgeHubService:
                 "direction": page_cursor.direction if page_cursor else "next",
                 "include_ids": want_counts and not reuse_total,
             }
-            async def fetch_raw(boundary):
+            async def fetch_raw(boundary: dict | None) -> dict[str, Any]:
                 nonlocal scope
                 common["after"] = boundary
                 if parent_id is None:

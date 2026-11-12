@@ -17,13 +17,17 @@ from app.core.org_context import (
     SystemContextNotAllowed,
     current_org_id,
 )
+from app.services.access_groups import AccessGroups
 from app.services.cache.invalidation_hooks import (
     notify_connector_sync_completed,
     notify_principals_changed,
 )
-from app.services.access_groups import AccessGroups
-from app.services.group_resource_policy import GroupResourceAccess, ResourcePolicy, ResourcePolicyConflict
 from app.services.graph_db.user_email_identity import GraphUserEmailConflictError
+from app.services.group_resource_policy import (
+    GroupResourceAccess,
+    ResourcePolicy,
+    ResourcePolicyConflict,
+)
 from app.utils.logger import create_logger
 from app.utils.time_conversion import get_epoch_timestamp_in_ms
 from app.utils.user_lookup import get_user_or_503

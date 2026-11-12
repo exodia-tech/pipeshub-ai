@@ -2,6 +2,7 @@
 
 import logging
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -10,8 +11,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 from app.api.middlewares.auth import authMiddleware, require_service_token
-from app.config.constants.service import TokenScopes
 from app.api.routes.entity import router
+from app.config.constants.service import TokenScopes
 from app.services.graph_db.neo4j.neo4j_provider import Neo4jProvider
 
 logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
@@ -21,7 +22,7 @@ if os.environ.get("EXODIA_TEST_NEO4J") != "bolt://127.0.0.1:52413":
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     os.environ["NEO4J_URI"] = "bolt://127.0.0.1:52413"
     os.environ["NEO4J_USERNAME"] = "neo4j"
     os.environ["NEO4J_PASSWORD"] = "localtestpass"

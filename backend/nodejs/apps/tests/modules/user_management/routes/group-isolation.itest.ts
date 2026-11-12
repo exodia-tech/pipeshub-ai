@@ -173,7 +173,7 @@ describe('group membership API isolation', function () {
       ),
     );
     app.use((err: any, _req: any, res: any, _next: any) => {
-      void _next;
+      if (res.headersSent) return _next(err);
       return res.status(err.statusCode || 500).json({ error: err.message });
     });
     server = await new Promise<Server>((resolve) => {

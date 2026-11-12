@@ -119,10 +119,7 @@ export function fixtureChat(auth: AuthMiddleware, backend: string): Router {
             row.userId === String(req.user!.userId) &&
             row.orgId === String(req.user!.orgId),
         )
-        .map(({ messages, ...row }) => {
-          void messages;
-          return row;
-        }),
+        .map((row) => ({ ...row, messages: undefined })),
       pagination: { totalCount: conversations.size, hasNextPage: false },
     }),
   );

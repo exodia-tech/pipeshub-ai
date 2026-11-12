@@ -283,7 +283,7 @@ async def _run(
     own_grants = {} if grants_read is None else {"user_key": user_key, "grants_out": grants_read}
 
     async def run(app_id: str) -> dict[str, Any]:
-        async def call_page(boundary) -> dict[str, Any]:
+        async def call_page(boundary: dict | None) -> dict[str, Any]:
             return await provider.get_knowledge_hub_connector_page_v3(
                 app_id=app_id,
                 org_id=org_id,
