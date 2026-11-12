@@ -42,10 +42,10 @@ https://coolify.exodia.ws/server/fnbahuvghsbyyoewxacg1dho/github-runners
 Native runner documentation:
 https://coolify.io/docs/core/infrastructure/servers/github-actions-runners
 
-The large Node test stream is saved as a compressed seven-day log
-artifact. The console prints summaries and a bounded failure tail; the original
-test exit status still gates the job. This avoids repeated 30-second results-log
-upload timeouts while retaining the full diagnostics.
+Large Node test and Pyright streams are saved as compressed seven-day log
+artifacts. The console prints bounded summaries; the original exit-status
+policies still gate the jobs. This avoids repeated 30-second results-log upload
+timeouts and truncated diagnostics.
 
 Pyright startup must succeed before analysis. Its existing nonblocking type
 diagnostics policy is retained; runtime/configuration failures fail the job.

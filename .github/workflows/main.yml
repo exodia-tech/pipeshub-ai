@@ -223,12 +223,23 @@ jobs:
             echo "---"
             cd backend/python
             status=0
-            printf '%s\n' "$CHANGED_FILES" | pyright - || status=$?
+            printf '%s\n' "$CHANGED_FILES" | pyright - > "$RUNNER_TEMP/pyright.log" 2>&1 || status=$?
+            tail -n 12 "$RUNNER_TEMP/pyright.log"
             if ((status > 1)); then exit "$status"; fi
             if ((status)); then echo "::warning::Pyright found type errors (non-fatal)"; fi
           else
             echo "No Python files changed in backend/python, skipping pyright."
           fi
+
+      - name: Retain full Python type diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pyright-diagnostics
+          path: ${{ runner.temp }}/pyright.log
+          compression-level: 9
+          retention-days: 7
+          if-no-files-found: ignore
 
   validate-docker-compose:
     runs-on: [self-hosted, linux, exodia-brain]
