@@ -1249,7 +1249,8 @@ async def test_every_folder_is_rewritten_to_text_directory_and_no_file_is_touche
     assert (await backend.provider.normalize_folder_mime_types())["normalized"] == 0
 
 
-async def test_slack_huddle_direct_grants_are_independent_and_revocable(backend) -> None:
+@pytest.mark.parametrize("external_prefix", ["slack-huddle:", "slack-voice:"])
+async def test_slack_huddle_direct_grants_are_independent_and_revocable(backend, external_prefix) -> None:
     """A Huddle shared in two channels must not inherit either channel's blanket ACL."""
     processor, _ = build_processor(backend.provider, ORG)
     connector_id = f"huddle-{_suffix()}"
@@ -1266,7 +1267,7 @@ async def test_slack_huddle_direct_grants_are_independent_and_revocable(backend)
             "syncState": "COMPLETED", "lastSyncUpdate": TS,
         }], collection=CollectionNames.USER_APP_RELATION.value)
     record = FileRecord(
-        org_id=ORG, record_name="Huddle.md", external_record_id=f"slack-huddle:C1:F{_suffix()}",
+        org_id=ORG, record_name="Transcript.md", external_record_id=f"{external_prefix}C1:F{_suffix()}",
         record_type=RecordType.FILE, connector_id=connector_id,
         connector_name=Connectors.SLACK_WORKSPACE, origin=OriginTypes.CONNECTOR,
         version=0, mime_type="text/markdown", is_file=True, inherit_permissions=False,
