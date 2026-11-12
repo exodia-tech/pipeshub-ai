@@ -737,6 +737,8 @@
     "indexingStatus": {
       "completed": "已完成",
       "inProgress": "進行中",
+      "embeddingProgress_one": "正在嵌入 {{done, number}} / {{total, number}} 個區塊",
+      "embeddingProgress_other": "正在嵌入 {{done, number}} / {{total, number}} 個區塊",
       "failed": "失敗",
       "fileTypeNotSupported": "不支援的檔案類型",
       "notStarted": "尚未開始",
@@ -935,6 +937,11 @@
     "fork": "分叉對話",
     "forkFromHere": "從此處分叉",
     "regenerate": "重新產生",
+    "answerHidden": {
+      "lost": "此回答使用了您已無權存取的內容。",
+      "unconfirmed": "無法確認您的存取權限，請重試。",
+      "askAgain": "重新提問"
+    },
     "readAloud": "朗讀",
     "stopReading": "停止朗讀",
     "ttsNotSupported": "此瀏覽器不支援文字轉語音",
@@ -1466,6 +1473,11 @@
     "stopListening": "停止聆聽",
     "voiceInput": "語音輸入",
     "regenerateResponse": "重新產生回覆",
+    "quoteSelection": "引用",
+    "quoteSelectionHint": "針對這段提問",
+    "quotedExcerpt": "已引用",
+    "quotedExcerptTruncated": "已引用（已截斷）",
+    "dismissQuote": "移除引用",
     "editQuery": "編輯提問",
     "queryOptions": "提問選項",
     "models": "模型",
@@ -3440,6 +3452,104 @@
         "cancel": "取消",
         "continueTeam": "繼續使用團隊連接器",
         "goToPersonal": "設定個人連接器"
+      },
+      "accessCheck": {
+        "open": "檢查某人的存取權限",
+        "title": "檢查某人的存取權限",
+        "description": "查看某人能否讀取此連接器中的記錄，以及無法讀取的原因。",
+        "personLabel": "人員",
+        "personPlaceholder": "選擇人員",
+        "peopleLoading": "正在載入人員...",
+        "peopleFailed": "無法載入人員清單。",
+        "recordLabel": "記錄 ID",
+        "recordHint": "開啟記錄並複製其 ID。",
+        "check": "檢查",
+        "checking": "正在檢查...",
+        "close": "關閉",
+        "resultHeading": "結果",
+        "restrictedArea": "受限區域",
+        "theyFallback": "此人",
+        "pathLabel": "位置：{{path}}",
+        "reference": "參考編號：{{ref}}（如果原因看起來不對，請提供給支援人員）",
+        "verdict": {
+          "granted": "{{name}} 可以檢視此記錄。",
+          "denied": "{{name}} 無法檢視此記錄。"
+        },
+        "reason": {
+          "granted": "如果它在搜尋中缺失，可能是尚未建立索引，或連接器仍在同步。",
+          "not_linked": "{{name}} 沒有連結到此連接器的帳戶。",
+          "no_grant": "{{container}} 中沒有任何內容授予 {{name}} 存取權限。",
+          "restricted_container": "{{container}} 僅限其他人存取。",
+          "item_restricted": "此記錄有自己的限制，{{name}} 不在其中。",
+          "parent_not_readable": "{{name}} 無法開啟此記錄所需的上層項目。",
+          "pending_rewrite": "此記錄所在的資料夾正在更新。",
+          "syncing": "連接器尚未完成此部分的同步。",
+          "scheme_unreadable": "連接器無法讀取此區域的存取規則，因此對所有人隱藏。",
+          "deleted_at_source": "此記錄已在來源端刪除。",
+          "unexplained": "我們無法顯示原因。"
+        },
+        "next": {
+          "not_linked": "請在來源端修復帳戶，然後同步。",
+          "no_grant": "請在來源端新增 {{name}}。",
+          "restricted_container": "請讓擁有者新增 {{name}}。",
+          "item_restricted": "請讓擁有者新增 {{name}}。",
+          "parent_not_readable": "請將上層項目共用給 {{name}}。",
+          "pending_rewrite": "請等待幾分鐘後再檢查。",
+          "syncing": "請等待同步完成。",
+          "scheme_unreadable": "請在來源端修復同步帳戶的權限。",
+          "deleted_at_source": "無需操作。",
+          "unexplained": "請聯絡支援人員並提供參考編號。"
+        },
+        "errors": {
+          "failed": "無法完成檢查。請再試一次。",
+          "notFound": "在此連接器中找不到該人員或記錄。",
+          "rateLimited": "檢查次數過多。請一分鐘後再試。"
+        },
+        "peopleRetry": "重試",
+        "askedAbout": "關於記錄 {{record}}"
+      },
+      "access": {
+        "title": "存取",
+        "loading": "正在載入存取詳細資料…",
+        "loadError": "無法載入存取詳細資料。",
+        "retry": "重試",
+        "reach": "{{connector}} 中的變更會在{{interval}}內同步到 EXODIA Brain。",
+        "reachUnknown": "{{connector}} 中的變更會在下次同步時送達 EXODIA Brain。",
+        "syncNow": "立即同步權限",
+        "span": {
+          "minutes": "{{count, number(style: unit; unit: minute; unitDisplay: long)}}",
+          "hours": "{{count, number(style: unit; unit: hour; unitDisplay: long)}}",
+          "days": "{{count, number(style: unit; unit: day; unitDisplay: long)}}"
+        },
+        "refresh": {
+          "label": "權限",
+          "succeeded": "上次重新整理：{{when}}。",
+          "failed": "上次權限重新整理失敗，因此來源中的最新變更可能尚未生效。請選擇「立即同步權限」重試。",
+          "never": "權限尚未重新整理。在首次同步完成之前，此連接器的內容將保持隱藏。",
+          "running": "正在重新整理權限。",
+          "incomplete": "上一次權限重新整理沒有執行到結束。"
+        },
+        "pending": {
+          "label": "等待套用",
+          "none": "沒有等待中的項目。",
+          "some_other": "{{count}} 個資料夾正在更新。更新完成前，所有人都看不到它們，通常需要幾分鐘。",
+          "overflow": "某項變更涉及整個連接器，因此需要完整重建其權限索引。在此之前，搜尋會逐筆檢查結果，因此不會因此隱藏任何內容。",
+          "unknown": "未知：無法讀取等待更新的資料夾清單。請參閱「需要關注」。"
+        },
+        "attention": {
+          "label": "需要處理（{{count}}）",
+          "none": "沒有需要處理的事項。",
+          "warning": "{{container}} 中有 {{items}} 個項目被隱藏。同步帳戶無法讀取此容器的權限。",
+          "fix": "解決方式：在 {{vendor}} 中為同步帳戶授予 {{permission}} 權限，然後選擇「立即同步權限」。",
+          "showAll": "再顯示 {{count}} 項",
+          "warningNoContainer": "同步帳戶無法讀取部分項目的權限，因此這些項目被隱藏。",
+          "rebuild": "此連接器的權限索引需要完整重建。在此之前，搜尋會逐筆檢查結果，因此不會因此隱藏任何內容。",
+          "unfinished": "某項權限變更沒有順利完成。請執行 EXODIA Brain 的人員檢查此連接器的權限索引。",
+          "stale": "部分項目無法由較快的搜尋檢查，會改由經典搜尋尋找。",
+          "sweep": "此連接器的權限更新持續失敗。請執行 EXODIA Brain 的人員檢查其記錄。",
+          "other": "此連接器的權限需要有人查看。",
+          "unreadable": "無法讀取等待更新的資料夾清單。請讓執行 EXODIA Brain 的人員重建此連接器的權限索引。在此期間，搜尋會逐筆檢查結果。"
+        }
       }
     },
     "mcpServers": {
@@ -5728,6 +5838,21 @@
       "errorTitle": "無法為所有人變更示範資料"
     }
   },
+  "accessNotice": {
+    "permissions_updating": "部分來源正在更新權限，因此幾分鐘內可能缺少一些結果。",
+    "connector_syncing": "{{name}} 仍在同步，因此來自它的結果可能不完整。",
+    "connector_syncing_unnamed": "有來源仍在同步，因此來自它的結果可能不完整。",
+    "check_unavailable": "我們暫時無法檢查您有權存取哪些文件，因此不顯示結果。請一分鐘後再試。",
+    "emptySyncing": "暫時沒有可搜尋的內容。{{name}} 仍在同步。",
+    "emptySyncing_unnamed": "暫時沒有可搜尋的內容。有來源仍在同步。",
+    "noAccess": {
+      "title": "您無權存取此項目",
+      "body": "它可能已被移動、刪除或受到限制。請詢問擁有者，或在您有連結時從原處開啟。",
+      "justGotAccess": "剛在來源端取得存取權限？新的存取權限會在下次同步後顯示。",
+      "copyDetails": "複製詳細資料給管理員",
+      "copied": "詳細資料已複製"
+    }
+  },
   "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "usage": {
     "title": "用量與費用",
@@ -5876,7 +6001,92 @@
     "inheritModel": "繼承模型預設值",
     "priority": "優先順序：訊息選擇 → 代理 → 模型 → 低。"
   },
-  "graph": {
+  "groupAccess": {
+    "currentAccess": "目前可讀人數",
+    "empty": "此處沒有可存取的資源。",
+    "expand": "展開",
+    "allow": "允許",
+    "allowed": "已允許",
+    "blocked": "已封鎖",
+    "inherited": "繼承",
+    "reset": "使用繼承權限",
+    "description": "這些規則限制成員在 Brain 中可讀取的內容。Slack 和 Drive 的權限仍然適用。每位成員都受到其所有群組限制的約束。",
+    "all": "來源允許的所有資源",
+    "selected": "僅選定資源",
+    "manage": "管理存取",
+    "allWithExceptions": "來源系統允許的所有資源（有例外）",
+    "partial": "部分存取",
+    "noReaders": "目前無人可讀",
+    "countsHint": "可讀人數反映已儲存的規則、來源系統權限及其他群組限制。— 表示未驗證。"
+  },
+  "accessGroups": {
+    "title": "存取群組",
+    "adminOnly": "只有管理員可以管理存取群組。",
+    "help": "新增成員後，在存取權限中管理其連接器、頻道及資料夾存取權限。集合共用權限仍然適用。",
+    "error": "無法確認操作。請重新整理並檢查目前狀態後再試。",
+    "name": "群組名稱",
+    "create": "建立群組",
+    "previous": "上一頁",
+    "next": "下一頁",
+    "rename": "重新命名",
+    "delete": "刪除",
+    "confirmDelete": "刪除此群組並撤銷其存取權限？",
+    "members": "成員",
+    "remove": "移除",
+    "search": "搜尋人員",
+    "add": "新增"
+  },
+  "audit": {
+    "agentId": "代理程式 ID",
+    "runId": "執行 ID",
+    "traceId": "追蹤 ID",
+    "parentRunId": "父執行 ID",
+    "tool": "工具",
+    "toolCallId": "工具呼叫 ID",
+    "model": "模型",
+    "agentCoverage": "也會記錄代理程式執行結果及工具發出的活動事件，包括拒絕和待核准狀態。不儲存參數或結果。稽核儲存空間故障時代理程式會繼續執行，未儲存的事件會記錄於伺服器日誌。",
+    "subtitle": "檢視工作區活動及權限變更。",
+    "coverageTitle": "稽核涵蓋範圍",
+    "title": "稽核日誌",
+    "adminOnly": "只有管理員可以檢視稽核日誌。",
+    "coverage": "目前記錄成功登入、群組管理、集合權限變更、部分文件下載開始與稽核日誌存取，其他平台活動尚未包含。沒有成功記錄的操作結果可能未知。",
+    "loginWarning": "稽核儲存可用時會記錄成功登入。稽核儲存故障期間仍允許登入，因此記錄可能缺漏。",
+    "action": "操作",
+    "outcome": "結果",
+    "actorId": "執行者 ID",
+    "groupId": "群組 ID",
+    "members": "成員 ID",
+    "operation": "操作 ID",
+    "resource": "資源 ID",
+    "role": "角色",
+    "invalidFilters": "請輸入完整 ID 和有效的日期範圍。",
+    "from": "開始（UTC）",
+    "to": "結束（UTC）",
+    "all": "全部",
+    "loading": "正在載入稽核日誌…",
+    "error": "無法載入稽核日誌。請檢查篩選條件後重試。",
+    "empty": "找不到事件。",
+    "time": "時間",
+    "previous": "上一頁",
+    "next": "下一頁",
+    "exportPage": "將此頁匯出為 JSON"
+  },
+  "datePicker": {
+    "on": "當天",
+    "between": "日期範圍",
+    "before": "早於",
+    "after": "晚於",
+    "pickDate": "選擇日期",
+    "chooseRange": "開始日期 — 結束日期",
+    "endDate": "結束日期",
+    "apply": "套用",
+    "startTime": "開始時間",
+    "endTime": "結束時間",
+    "time": "時間",
+    "previousMonth": "上個月",
+    "nextMonth": "下個月"
+  },
+  "knowledgeGraph": {
     "title": "知識圖譜",
     "overviewIntro": "以互相連接的群組探索知識，放大查看其中的文件與概念。",
     "arranging": "正在尋找群組並排列圖譜…",
@@ -5929,5 +6139,107 @@
     "cacheHint": "檢查更新時會重用近期配置。重新整理可檢查新資料。",
     "updating": "正在檢查圖譜更新…",
     "refreshError": "無法重新整理。仍顯示已儲存的圖譜。"
+  },
+  "graph": {
+    "status": {
+      "stale": "圖譜正在更新，最近的變更可能尚未顯示。",
+      "building": "圖譜正在建置，目前顯示的內容可能不完整。",
+      "retrying": "圖譜建置發生問題，正在重試。",
+      "failed": "上一次圖譜建置失敗，此檢視可能已過時。",
+      "unknown": "無法讀取此圖譜的狀態。"
+    },
+    "empty": {
+      "neverBuilt": "此儲存庫尚無程式碼圖譜。",
+      "tooLarge": "此儲存庫過大，無法產生圖譜。"
+    },
+    "incomplete": "部分連結可能遺失。請依邊類型或方向縮小範圍。",
+    "simplified": "為維持流暢移動，已簡化檢視。",
+    "verify": {
+      "degraded": "目前無法驗證存取權限，正在顯示上次確認的內容。",
+      "blank": "已有數分鐘無法驗證存取權限，因此已清除圖譜。正在重新連線…"
+    },
+    "error": {
+      "unavailable": "目前無法載入，請再試一次。",
+      "notAvailable": "此項目無法使用。",
+      "unexpected": "發生了一些問題。",
+      "ambiguous": "有多個儲存庫同名。請在搜尋框中選擇儲存庫。",
+      "full": "此檢視已滿。開啟一個節點以開始新的檢視。",
+      "revoked": "你正在檢視的項目已無法使用。"
+    },
+    "title": "程式碼圖譜",
+    "ui": {
+      "back": "上一步",
+      "forward": "下一步",
+      "fit": "符合檢視大小",
+      "showTable": "以表格顯示",
+      "showGraph": "以圖譜顯示",
+      "direction": {
+        "any": "兩者",
+        "inbound": "呼叫端",
+        "outbound": "被呼叫端"
+      },
+      "includeTests": "包含測試",
+      "showMore": "顯示更多",
+      "expand": "展開",
+      "open": "開啟",
+      "nothingSelected": "選取節點以檢視詳細資料。",
+      "details": "詳細資料",
+      "links": "連結：{{n}}",
+      "table": {
+        "caption": "此檢視中的節點",
+        "name": "名稱",
+        "kind": "類型",
+        "file": "檔案",
+        "actions": "動作",
+        "moreRows": "顯示更多列",
+        "callersShown": "已顯示的呼叫端",
+        "calleesShown": "已顯示的被呼叫端",
+        "focus": "中心"
+      },
+      "emptyPrompt": "在上方搜尋函式、方法或類別，查看誰呼叫它以及它呼叫了誰。",
+      "disclosure": "僅顯示你有權存取的內容。",
+      "legendInferred": "虛線表示依名稱推斷的連結。",
+      "disabled": "程式碼圖譜未啟用。",
+      "search": {
+        "repo": "儲存庫",
+        "repoPlaceholder": "選擇儲存庫",
+        "placeholder": "依名稱尋找函式、方法或類別",
+        "label": "搜尋程式碼",
+        "results": "搜尋結果",
+        "noRepos": "沒有你可以讀取的程式碼儲存庫。",
+        "noMatches": "沒有相符項目。",
+        "chooseFirst": "請先選擇儲存庫",
+        "minChars": "請至少輸入 2 個字元。",
+        "more": "僅顯示前幾個相符項目。請輸入更多內容以縮小搜尋範圍。"
+      },
+      "action": {
+        "retry": "重試",
+        "restore": "使用完整畫質"
+      },
+      "loading": "正在載入…",
+      "legend": {
+        "functions": "函式和方法",
+        "classes": "類別和介面",
+        "focus": "此檢視的中心"
+      },
+      "openHint": "開啟：將其設為新檢視的中心。",
+      "expandHint": "展開：在此顯示其相鄰項，並保留目前內容。",
+      "announce": {
+        "opened": "正在顯示 {{n}} 項。",
+        "added": "已新增 {{n}} 項。"
+      },
+      "canvasHint": "圖譜圖像無法供螢幕閱讀器使用。請使用「以表格顯示」按鈕來閱讀和操作每個節點。",
+      "selectionGone": "你選取的項目已無法使用。",
+      "viewGraph": "檢視圖譜",
+      "viewGraphOf": "檢視圖譜：{{repo}}",
+      "fillerNode": "{{file}} 中的 {{kind}}"
+    },
+    "capped": "圖中只顯示此檢視的一部分，表格列出全部內容。",
+    "crowded": "此檢視越來越擁擠。請用篩選器縮小範圍。",
+    "hint": {
+      "testsOff": "測試檔案已隱藏。如果該項目在測試程式碼中，請開啟「包含測試」。"
+    },
+    "nothingNew": "此節點沒有更多內容可顯示。",
+    "tableOnly": "為保持流暢，僅顯示表格。"
   }
 }

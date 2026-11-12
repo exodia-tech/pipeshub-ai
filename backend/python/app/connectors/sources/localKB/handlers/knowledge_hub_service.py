@@ -3,6 +3,7 @@
 import asyncio
 import inspect
 import logging
+import math
 import re
 import traceback
 from collections import Counter
@@ -86,6 +87,30 @@ _START_TYPES = {
     "app": "app", "kb": "app", "recordGroup": "recordGroup",
     "folder": "record", "record": "record",
 }
+
+
+_MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def _embed_progress(doc: dict[str, Any]) -> dict[str, int | None]:
+    """The embedding progress of a record row, or none.
+
+    Only an ``IN_PROGRESS`` record has any: the indexer does not clear the
+    counts when a record is queued, paused or switched to manual indexing, so
+    they can be stale. Both counts are plain numbers read back as stored, so a
+    missing, negative, non-finite, boolean or beyond-JSON-safe pair is dropped
+    rather than shown, and a count that ran ahead of the total is held at it.
+    """
+    none: dict[str, int | None] = {"embedDone": None, "embedTotal": None}
+    if doc.get("indexingStatus") != "IN_PROGRESS":
+        return none
+    done, total = doc.get("embedDone"), doc.get("embedTotal")
+    for value in (done, total):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            return none
+    if total < 1 or done < 0 or total > _MAX_SAFE_INTEGER or done > _MAX_SAFE_INTEGER:
+        return none
+    return {"embedDone": min(int(done), int(total)), "embedTotal": int(total)}
 
 
 def _start_type(parent_type: str | None) -> str:
@@ -492,52 +517,62 @@ class KnowledgeHubService:
                 "direction": page_cursor.direction if page_cursor else "next",
                 "include_ids": want_counts and not reuse_total,
             }
-            if parent_id is None:
-                envelope = await self.graph_provider.get_knowledge_hub_root_nodes_v2(
-                    user_app_ids=access["gated_app_ids"],
-                    # Apps are in no record group, and this filter only narrows
-                    # collection-origin groups.
-                    **{k: v for k, v in active.items() if k != "record_group_ids"},
-                    **common,
-                )
-            else:
-                start_type = _start_type(parent_type)
-                page = await self.graph_provider.get_knowledge_hub_connector_page_v3(
-                    app_id=parent_id if start_type == "app" else "",
-                    org_id=org_id,
-                    grantee_ids=access["grantee_ids"],
-                    gated_app_ids=access["gated_app_ids"],
-                    # Browsing stays inside one connector: the page reads that
-                    # connector's grants, not every grant the user holds.
-                    granted_ids=None,
-                    user_key=user_key,
-                    limit=limit,
-                    flatten=flatten,
-                    sort_field=field,
-                    sort_dir=order,
-                    after=page_cursor.boundary.as_after() if page_cursor else None,
-                    direction=page_cursor.direction if page_cursor else "next",
-                    filters=active,
-                    include_total=not reuse_total,
-                    start_id=parent_id,
-                    start_type=start_type,
-                    include_scope=True,
-                    via_parent_id=page_cursor.via_parent_id if page_cursor else None,
-                    max_depth=max_depth,
-                )
-                envelope = {
-                    "partitions": [{
-                        "rows": page["rows"],
-                        "hasMore": page["hasMore"],
-                        "total": page["total"],
-                        "ids": [],
-                        "counts": page.get("counts"),
-                    }],
-                    "scope": page.get("scope"),
-                }
-            scope = envelope.get("scope")
+            async def fetch_raw(boundary: dict | None) -> dict[str, Any]:
+                nonlocal scope
+                common["after"] = boundary
+                if parent_id is None:
+                    envelope = await self.graph_provider.get_knowledge_hub_root_nodes_v2(
+                        user_app_ids=access["gated_app_ids"],
+                        # Apps are in no record group, and this filter only narrows
+                        # collection-origin groups.
+                        **{k: v for k, v in active.items() if k != "record_group_ids"},
+                        **common,
+                    )
+                else:
+                    start_type = _start_type(parent_type)
+                    page = await self.graph_provider.get_knowledge_hub_connector_page_v3(
+                        app_id=parent_id if start_type == "app" else "",
+                        org_id=org_id,
+                        grantee_ids=access["grantee_ids"],
+                        gated_app_ids=access["gated_app_ids"],
+                        # Browsing stays inside one connector: the page reads that
+                        # connector's grants, not every grant the user holds.
+                        granted_ids=None,
+                        user_key=user_key,
+                        limit=limit,
+                        flatten=flatten,
+                        sort_field=field,
+                        sort_dir=order,
+                        after=boundary,
+                        direction=page_cursor.direction if page_cursor else "next",
+                        filters=active,
+                        include_total=not reuse_total,
+                        start_id=parent_id,
+                        start_type=start_type,
+                        include_scope=True,
+                        via_parent_id=page_cursor.via_parent_id if page_cursor else None,
+                        max_depth=max_depth,
+                    )
+                    envelope = {
+                        "partitions": [{
+                            "rows": page["rows"],
+                            "hasMore": page["hasMore"],
+                            "total": page["total"],
+                            "ids": [],
+                            "counts": page.get("counts"),
+                        }],
+                        "scope": page.get("scope"),
+                    }
+                scope = envelope.get("scope")
+                return envelope["partitions"][0]
+
+            from app.services.group_resource_policy import GroupResourceAccess
+            filtered = await GroupResourceAccess(self.graph_provider).filtered_page(
+                org_id, user_key, fetch_raw, after=common["after"],
+                direction=page_cursor.direction if page_cursor else "next", limit=limit,
+            )
             return self._page_from_partition(
-                envelope["partitions"][0], page_cursor, secret,
+                filtered, page_cursor, secret,
                 filters=active, sort_field=field, sort_dir=order,
                 parent_id=parent_id, parent_type=parent_type, mode=mode,
                 user_id=user_id, org_id=org_id, want_counts=want_counts, limit_apps=limit_apps,
@@ -755,6 +790,16 @@ class KnowledgeHubService:
                 ),
                 excluded,
             )
+            from app.services.group_resource_policy import GroupResourceAccess
+
+            group_access = GroupResourceAccess(self.graph_provider)
+            group_restricted = bool(await group_access.policies_for_user(org_id, user_key))
+            if group_restricted:
+                app_rows = await group_access.restrict_rows(org_id, user_key, [{"id": app_id} for app_id in access["gated_app_ids"]], navigation=True)
+                allowed_apps = {row["id"] for row in app_rows}
+                policy_excluded = frozenset(set(access["gated_app_ids"]) - allowed_apps)
+                access = _without_apps(access, policy_excluded)
+                excluded = excluded | policy_excluded
             within: frozenset[str] | None = None
             limit_apps: list[str] | None = None
             if parent_id is None and within_app_ids is not None:
@@ -835,6 +880,10 @@ class KnowledgeHubService:
             page_result = self._only_signed_cursors(page_result, await self._get_cursor_secret())
 
             await self._stamp_collection_roles(page_result.rows, user_key)
+            if group_restricted:
+                if parent_id and not await group_access.restrict_rows(org_id, user_key, [{"id": parent_id}], navigation=True):
+                    raise BrowseRequestError("Node not found", 404)
+                page_result = replace(page_result, total=None, counts_by_type=None)
             items = [self._doc_to_node_item(row) for row in page_result.rows]
             user_email = user.get('email')
             for item in items:
@@ -1189,6 +1238,8 @@ class KnowledgeHubService:
                 "recordType": doc.get("recordType"),
                 "recordGroupType": doc.get("groupType"),
                 "indexingStatus": doc.get("indexingStatus"),
+                "embedDone": doc.get("embedDone"),
+                "embedTotal": doc.get("embedTotal"),
                 "createdAt": node.created_at or 0,
                 "updatedAt": node.updated_at or 0,
                 "sizeInBytes": doc.get("sizeInBytes"),
@@ -1268,6 +1319,7 @@ class KnowledgeHubService:
             recordGroupType=doc.get('recordGroupType'),
             indexingStatus=doc.get('indexingStatus'),
             reason=doc.get('reason'),
+            **_embed_progress(doc),
             createdAt=doc.get('createdAt', 0),
             updatedAt=doc.get('updatedAt', 0),
             sizeInBytes=doc.get('sizeInBytes'),

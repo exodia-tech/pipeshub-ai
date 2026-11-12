@@ -52,7 +52,7 @@ export type SmtpProblem = 'auth' | 'unreachable';
 export const SMTP_PROBLEM_MESSAGES: Record<SmtpProblem, string> = {
   auth: "The email wasn't sent because the mail (SMTP) server rejected the username or password. An admin can update them in Workspace settings > Mail.",
   unreachable:
-    "The email wasn't sent because PipesHub couldn't reach the mail (SMTP) server. An admin can check the host and port in Workspace settings > Mail.",
+    "The email wasn't sent because EXODIA Brain couldn't reach the mail (SMTP) server. An admin can check the host and port in Workspace settings > Mail.",
 };
 
 export const SMTP_DEADLINE_ERROR_CODE = 'ESMTPDEADLINE';
@@ -81,11 +81,7 @@ export const SMTP_CONNECTION_ERROR_CODES = new Set([
   SMTP_DEADLINE_ERROR_CODE,
 ]);
 
-const PERMANENT_ERROR_CODES = new Set([
-  'EAUTH',
-  'EENVELOPE',
-  'EMESSAGE',
-]);
+const PERMANENT_ERROR_CODES = new Set(['EAUTH', 'EENVELOPE', 'EMESSAGE']);
 
 /**
  * An error with no usable signal counts as transient: dropping a real email is

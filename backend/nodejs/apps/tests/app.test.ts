@@ -39,14 +39,18 @@ import { StoreType } from '../src/libs/keyValueStore/constants/KeyValueStoreType
 
 // Route factory modules — stubbed so configureRoutes() doesn't resolve real DI services
 import * as healthRoutes from '../src/modules/tokens_manager/routes/health.routes';
+import * as usageRoutes from '../src/modules/tokens_manager/routes/usage.routes';
 import * as userRoutes from '../src/modules/user_management/routes/users.routes';
 import * as userGroupRoutes from '../src/modules/user_management/routes/userGroups.routes';
+import * as accessGroupRoutes from '../src/modules/user_management/routes/accessGroups.routes';
+import * as auditRoutes from '../src/modules/audit/audit.routes';
 import * as orgRoutes from '../src/modules/user_management/routes/org.routes';
 import * as userAccountRoutes from '../src/modules/auth/routes/userAccount.routes';
 import * as orgAuthConfigRoutes from '../src/modules/auth/routes/orgAuthConfig.routes';
 import * as storageRoutes from '../src/modules/storage/routes/storage.routes';
 import * as esRoutes from '../src/modules/enterprise_search/routes/es.routes';
 import * as codeGraphRoutes from '../src/modules/enterprise_search/routes/code-graph.routes';
+import * as graphViewRoutes from '../src/modules/enterprise_search/routes/graph-view.routes';
 import * as connectorRoutes from '../src/modules/tokens_manager/routes/connectors.routes';
 import * as oauthRoutes from '../src/modules/tokens_manager/routes/oauth.routes';
 import * as kbRoutes from '../src/modules/knowledge_base/routes/kb.routes';
@@ -72,6 +76,7 @@ import * as teamsRoutes from '../src/modules/user_management/routes/teams.routes
 import * as serviceAccountsRoutes from '../src/modules/user_management/routes/service-accounts.routes';
 import * as serviceTokenRoutes from '../src/modules/oauth_provider/routes/service-token.routes';
 import * as delegationRoutes from '../src/modules/oauth_provider/routes/delegation.routes';
+import * as localReposRoutes from '../src/modules/local_repos/routes/local_repos.routes';
 import { MailConsumer } from '../src/modules/mail/services/mail.consumer';
 import { MailSenderService } from '../src/modules/mail/services/mail.sender.service';
 import { BrokerTopic } from '../src/libs/types/messaging.types';
@@ -167,8 +172,11 @@ function stubAllRouteFactories(sandbox: sinon.SinonSandbox) {
   const dummyRouter = express.Router();
 
   sandbox.stub(healthRoutes, 'createHealthRouter').returns(dummyRouter);
+  sandbox.stub(usageRoutes, 'createUsageRouter').returns(dummyRouter);
   sandbox.stub(userRoutes, 'createUserRouter').returns(dummyRouter);
   sandbox.stub(userGroupRoutes, 'createUserGroupRouter').returns(dummyRouter);
+  sandbox.stub(accessGroupRoutes, 'createAccessGroupsRouter').returns(dummyRouter);
+  sandbox.stub(auditRoutes, 'createAuditRouter').returns(dummyRouter);
   sandbox.stub(orgRoutes, 'createOrgRouter').returns(dummyRouter);
   sandbox.stub(userAccountRoutes, 'createUserAccountRouter').returns(dummyRouter);
   sandbox.stub(orgAuthConfigRoutes, 'createOrgAuthConfigRouter').returns(dummyRouter);
@@ -179,6 +187,7 @@ function stubAllRouteFactories(sandbox: sinon.SinonSandbox) {
   sandbox.stub(esRoutes, 'createAgentConversationalRouter').returns(dummyRouter);
   sandbox.stub(esRoutes, 'createChatSpeechRouter').returns(dummyRouter);
   sandbox.stub(codeGraphRoutes, 'createCodeGraphRouter').returns(dummyRouter);
+  sandbox.stub(graphViewRoutes, 'createGraphViewRouter').returns(dummyRouter);
   sandbox.stub(connectorRoutes, 'createConnectorRouter').returns(dummyRouter);
   sandbox.stub(oauthRoutes, 'createOAuthRouter').returns(dummyRouter);
   sandbox.stub(kbRoutes, 'createKnowledgeBaseRouter').returns(dummyRouter);
@@ -202,6 +211,7 @@ function stubAllRouteFactories(sandbox: sinon.SinonSandbox) {
   sandbox.stub(serviceAccountsRoutes, 'createServiceAccountsRouter').returns(dummyRouter);
   sandbox.stub(serviceTokenRoutes, 'createServiceTokenRouter').returns(dummyRouter);
   sandbox.stub(delegationRoutes, 'createDelegationRouter').returns(dummyRouter);
+  sandbox.stub(localReposRoutes, 'createLocalReposRouter').returns(dummyRouter);
 }
 
 /**
@@ -215,6 +225,7 @@ function stubAllContainers(sandbox: sinon.SinonSandbox) {
   // Telemetry — never start the real push loop / Mongo-backed gauge refresh
   sandbox.stub(telemetryModule, 'startTelemetry');
   sandbox.stub(metricsRefreshModule, 'startOrgMetricsRefresh');
+  sandbox.stub(EnterpriseSearchAgentContainer, 'startSchedules');
   sandbox.stub(KeyValueStoreService, 'getInstance').returns({} as any);
 
   const containers: Record<string, Container> = {};
@@ -747,12 +758,16 @@ describe('Application', () => {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }
 
-      const accessLines = (Logger.prototype.info as sinon.SinonStub).getCalls()
-        .map((call) => String(call.args[0]))
-        .filter((line) => line.includes('access-log-probe'));
-      expect(accessLines.some((line) => line.includes('GET /api/v1/access-log-probe '))).to.equal(true);
-      expect(accessLines.some((line) => line.includes('GET /API/v1/access-log-probe-upper '))).to.equal(true);
-      expect(accessLines.some((line) => line.includes('/access-log-probe-page'))).to.equal(false);
+      const accessLines = (mockLogger.info as sinon.SinonStub).getCalls()
+        .filter((call) => call.args[0] === 'http.request.end')
+        .map((call) => call.args[1])
+      // Two API requests (any case), none for the page; the raw path is never on the line.
+      expect(accessLines).to.have.length(2)
+      for (const fields of accessLines) {
+        // The app's catch-all API 404 route answers them.
+        expect(fields).to.include({ method: 'GET', route: '*', status: 404, error_class: 'not_found' })
+        expect(JSON.stringify(fields)).to.not.include('access-log-probe')
+      }
     });
 
     it('writes an access-log line for an API request a mounted router answers', async () => {
@@ -784,11 +799,14 @@ describe('Application', () => {
       }
 
       expect(status).to.equal(200);
-      const accessLines = (Logger.prototype.info as sinon.SinonStub).getCalls()
-        .map((call) => String(call.args[0]))
-        .filter((line) => line.includes('probe=mounted-router'));
+      // A health poll is a debug line, with the mount kept and the query left out.
+      const accessLines = (mockLogger.debug as sinon.SinonStub).getCalls()
+        .filter((call) => call.args[0] === 'http.request.end')
+        .map((call) => call.args[1])
       expect(accessLines).to.have.length(1);
-      expect(accessLines[0]).to.include('"GET /api/v1/health?probe=mounted-router HTTP/1.1" 200');
+      expect(accessLines[0]).to.include({ method: 'GET', route: '/api/v1/health/', status: 200, outcome: 'success' });
+      expect(JSON.stringify(accessLines[0])).to.not.include('mounted-router');
+      expect((mockLogger.info as sinon.SinonStub).getCalls().some((call) => call.args[0] === 'http.request.end')).to.equal(false);
     });
   });
 
@@ -1037,6 +1055,9 @@ describe('Application', () => {
   // start()
   // =========================================================================
   describe('start()', () => {
+    beforeEach(() => {
+      sandbox.stub(EnterpriseSearchAgentContainer, 'startSchedules');
+    });
     it('should start the server on the configured port', async () => {
       const app = new Application();
       // Stub the logger on the instance

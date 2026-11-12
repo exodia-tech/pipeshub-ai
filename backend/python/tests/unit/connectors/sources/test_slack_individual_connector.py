@@ -84,6 +84,8 @@ def _make_connector() -> Any:
     client.get_token = MagicMock(return_value="xoxp-test-token")
     c.external_client.get_client = MagicMock(return_value=client)
     c.data_source = MagicMock()
+    c._resilience_loaded = True
+    c._resilience = None
     c.workspace_domain = "myworkspace"
     c.team_id = "T12345"
     c.authenticated_user_id = "U111"

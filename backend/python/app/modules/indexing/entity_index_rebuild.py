@@ -29,6 +29,7 @@ resumable cursor on the document, bounded attempts, backoff on failure.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import re
 from dataclasses import dataclass
@@ -42,6 +43,7 @@ from app.connectors.services.entity_cleanup_intents import (
     record_pending_entity_cleanup,
     reschedule_pending_entity_cleanup,
 )
+from app.core.org_context import for_org, system
 from app.models.entities import EntityRecord, EntityType
 from app.modules.entity_resolution.models import KINDS_BY_COLLECTION
 from app.modules.indexing.entity_projection import project_taxonomy_nodes
@@ -179,14 +181,17 @@ class EntityIndexState:
 
 
 def entity_index_marker(
-    fingerprint: str, stamp: str = "", *, version: int = ENTITY_INDEX_VERSION,
+    fingerprint: str, stamp: str = "", *, version: int = ENTITY_INDEX_VERSION, order: str = "",
 ) -> str:
     """``stamp`` is ``EntityVectorStore.collection_stamp``: a document done
-    under another stamp was projected into a collection that is gone."""
-    return f"v{version}{'@' + stamp if stamp else ''}:{fingerprint}"
+    under another stamp was projected into a collection that is gone.
+    ``order`` is the graph store's page order (``IGraphDBProvider.ENTITY_INDEX_PAGE_ORDER``):
+    a cursor saved under another order may skip rows, so its pass starts over.
+    Empty for a store that pages as it always has, so its marker is unchanged."""
+    return f"v{version}{'@' + stamp if stamp else ''}{'.' + order if order else ''}:{fingerprint}"
 
 
-_MARKER = re.compile(r"v\d+(?:@[0-9a-z]+)?:(.+)", re.DOTALL)
+_MARKER = re.compile(r"v\d+(?:@[0-9a-z]+)?(?:\.[0-9a-z]+)?:(.+)", re.DOTALL)
 
 
 def fingerprint_of(marker: object) -> str | None:
@@ -254,6 +259,11 @@ class _Pass:
         return _int(self._progress(EntityIndexState.ERRORS))
 
 
+def _in_org(org_id: str) -> contextlib.AbstractContextManager:
+    """The org a pass runs in; an app that names none keeps the caller's scope (the stores that do not need one)."""
+    return for_org(org_id, job="entity_index_rebuild") if org_id else contextlib.nullcontext()
+
+
 class EntityIndexRebuilder:
     """One tick does one unit of work: a page of a connector's pass, else a
     page of an org's taxonomy pass, else a chunk of an org's sweep."""
@@ -295,24 +305,29 @@ class EntityIndexRebuilder:
         # collection: a collection without its stamp gets a new one, which no
         # document has reached, so every pass runs again.
         stamp = await self.store.collection_stamp()
-        marker = entity_index_marker(fingerprint, stamp)
+        marker = entity_index_marker(fingerprint, stamp, order=getattr(self.graph, "ENTITY_INDEX_PAGE_ORDER", ""))
 
-        app = await self.graph.get_entity_index_candidate(_APPS, marker)
+        # The candidate is read across orgs; the rest of its work runs in the org that owns it.
+        with system("entity_index_rebuild"):
+            app = await self.graph.get_entity_index_candidate(_APPS, marker)
         if app and (key := _key_of(app)):
-            await self._run_page(_Pass(_APPS, key, app, CONNECTOR_SOURCES, marker))
+            with _in_org(_text(app.get("orgId"))):      # the app's stored owner, not the pass key
+                await self._run_page(_Pass(_APPS, key, app, CONNECTOR_SOURCES, marker))
             return "connector"
 
         marker = entity_index_marker(fingerprint, stamp, version=ORG_PASS_VERSION)
         sweep_before = self.now_ms() - SWEEP_INTERVAL_MS
-        org = await self.graph.get_entity_index_candidate(
-            _ORGS, marker, sweep_before=sweep_before,
-        )
+        with system("entity_index_rebuild"):
+            org = await self.graph.get_entity_index_candidate(
+                _ORGS, marker, sweep_before=sweep_before,
+            )
         if not org or not (key := _key_of(org)):
             return "idle"
-        if org.get(EntityIndexState.STATE) != marker:
-            await self._run_page(_Pass(_ORGS, key, org, ENTITY_INDEX_TAXONOMY_SOURCES, marker))
-            return "taxonomy"
-        await self._sweep_chunk(key, org)
+        with _in_org(key):
+            if org.get(EntityIndexState.STATE) != marker:
+                await self._run_page(_Pass(_ORGS, key, org, ENTITY_INDEX_TAXONOMY_SOURCES, marker))
+                return "taxonomy"
+            await self._sweep_chunk(key, org)
         return "sweep"
 
     # ------------------------------------------------------------------

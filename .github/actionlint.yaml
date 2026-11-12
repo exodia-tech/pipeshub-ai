@@ -1,3 +1,6 @@
+self-hosted-runner:
+  labels:
+    - exodia-brain
 paths:
   # actionlint (through 1.7.12) predates the documented `concurrency.queue` key:
   # https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency

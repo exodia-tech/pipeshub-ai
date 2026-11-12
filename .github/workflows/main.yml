@@ -1,6 +1,7 @@
 name: PR Validations
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - 'main'
@@ -17,7 +18,7 @@ jobs:
   # Which of the jobs below this pull request's changes can affect
   # (scripts/pr_changes.py). Every other event runs them all.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -38,7 +39,7 @@ jobs:
   validate-backend:
     needs: changes
     if: needs.changes.outputs.node_build == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,9 +50,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: backend/nodejs/apps/package-lock.json
+          node-version: '24'
+          package-manager-cache: false
 
       - name: Install backend dependencies
         run: |
@@ -71,6 +71,17 @@ jobs:
             echo "No TypeScript files changed in backend, skipping ESLint."
           fi
 
+      # docs/logging.md "Personal data": ids, never emails or names. Fails only on log calls this pull request adds.
+      - name: Fail on new emails or names in Node log calls
+        run: |
+          MERGE_BASE=$(git merge-base origin/main HEAD)
+          mapfile -d '' -t CHANGED_FILES < <(git diff --diff-filter=d --name-only -z "$MERGE_BASE" -- ':(glob)backend/nodejs/apps/src/**/*.ts' || true)
+          if ((${#CHANGED_FILES[@]})); then
+            python3 .github/scripts/new_lint_findings.py log-pii "$MERGE_BASE" "${CHANGED_FILES[@]}"
+          else
+            echo "No backend TypeScript files changed, skipping the personal-data check."
+          fi
+
       - name: Build backend
         run: |
           cd backend/nodejs/apps
@@ -84,7 +95,7 @@ jobs:
   validate-frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -94,9 +105,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          node-version: '24'
+          package-manager-cache: false
 
       - name: Install frontend dependencies
         run: |
@@ -137,7 +147,7 @@ jobs:
           npm run build
 
   ruff-lint-pr:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Checkout code
@@ -170,6 +180,29 @@ jobs:
             echo "No Python files changed, skipping ruff."
           fi
 
+      # The log level already says what an emoji in a log line would (docs/logging.md).
+      # Fails only on emoji log calls this pull request adds to backend/python/app.
+      - name: Fail on new emoji in Python log calls
+        run: |
+          MERGE_BASE=$(git merge-base origin/main HEAD)
+          mapfile -d '' -t CHANGED_FILES < <(git diff --diff-filter=d --name-only -z "$MERGE_BASE" -- ':(glob)backend/python/app/**/*.py' || true)
+          if ((${#CHANGED_FILES[@]})); then
+            python3 .github/scripts/new_lint_findings.py log-emoji "$MERGE_BASE" "${CHANGED_FILES[@]}"
+          else
+            echo "No app Python files changed, skipping the emoji check."
+          fi
+
+      # docs/logging.md "Personal data": ids, never emails or names. Fails only on log calls this pull request adds.
+      - name: Fail on new emails or names in Python log calls
+        run: |
+          MERGE_BASE=$(git merge-base origin/main HEAD)
+          mapfile -d '' -t CHANGED_FILES < <(git diff --diff-filter=d --name-only -z "$MERGE_BASE" -- ':(glob)backend/python/app/**/*.py' || true)
+          if ((${#CHANGED_FILES[@]})); then
+            python3 .github/scripts/new_lint_findings.py log-pii "$MERGE_BASE" "${CHANGED_FILES[@]}"
+          else
+            echo "No app Python files changed, skipping the personal-data check."
+          fi
+
       # A class or function defined twice in one test module replaces the
       # first, and pytest never runs it. This fails on any F811 in a changed
       # test file, including one already on main.
@@ -185,7 +218,7 @@ jobs:
           echo "$CHANGED_TESTS" | xargs ruff check --select F811 --output-format=concise
 
   pyright-type-check-pr:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Checkout code
@@ -202,7 +235,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libmariadb-dev
+          sudo apt-get install -y libmariadb-dev libatomic1
 
       - name: Install uv
         run: pip install uv
@@ -214,7 +247,11 @@ jobs:
           uv pip install --system -e . 2>&1 || true
 
       - name: Run pyright on changed Python files
+        # The upstream import graph exceeds Node's 2 GiB default; the worker is capped at 8 GiB.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
+          pyright --version
           MERGE_BASE=$(git merge-base origin/main HEAD)
           CHANGED_FILES=$(git diff --diff-filter=d --name-only $MERGE_BASE -- ':(glob)backend/python/**/*.py' | grep -v 'code-generator/' | grep -v 'example\.py$' | sed 's|^backend/python/||' || true)
           if [ -n "$CHANGED_FILES" ]; then
@@ -222,13 +259,27 @@ jobs:
             echo "$CHANGED_FILES"
             echo "---"
             cd backend/python
-            echo "$CHANGED_FILES" | xargs pyright || echo "::warning::Pyright found type errors (non-fatal)"
+            status=0
+            printf '%s\n' "$CHANGED_FILES" | pyright - > "$RUNNER_TEMP/pyright.log" 2>&1 || status=$?
+            tail -n 12 "$RUNNER_TEMP/pyright.log"
+            if ((status > 1)); then exit "$status"; fi
+            if ((status)); then echo "::warning::Pyright found type errors (non-fatal)"; fi
           else
             echo "No Python files changed in backend/python, skipping pyright."
           fi
 
+      - name: Retain full Python type diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pyright-diagnostics
+          path: ${{ runner.temp }}/pyright.log
+          compression-level: 9
+          retention-days: 7
+          if-no-files-found: ignore
+
   validate-docker-compose:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Checkout code
@@ -256,6 +307,20 @@ jobs:
             echo "No Docker Compose deployment files changed, skipping validation."
           fi
 
+      - name: Install pinned Compose CLI for config rendering
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          COMPOSE_VERSION: 5.7.0
+          COMPOSE_SHA256: 7758048ad38e580f22559603312874fec8bb638d021a9e64182385fc17cc12a2
+        run: |
+          set -euo pipefail
+          plugin="$HOME/.docker/cli-plugins/docker-compose"
+          mkdir -p "$(dirname "$plugin")"
+          curl -fsSL "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o "$plugin"
+          printf '%s  %s\n' "$COMPOSE_SHA256" "$plugin" | sha256sum -c -
+          chmod 0755 "$plugin"
+          docker compose version
+
       - name: Validate MongoDB compose stability settings
         if: steps.changes.outputs.changed == 'true'
         run: bash deployment/docker-compose/tests/mongodb_stability_test.sh
@@ -281,7 +346,7 @@ jobs:
 
   workflow-lint:
     name: Lint GitHub Actions workflows
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -292,21 +357,13 @@ jobs:
       # errors inside `run:` blocks, bad expressions, and invalid schema before
       # a push discovers them. Pinned to a release tarball rather than an
       # action, because actionlint does not publish one.
-      - name: Install actionlint
-        env:
-          ACTIONLINT_VERSION: 1.7.7
-          # Checksum of the pinned release tarball. Without it this step trusts
-          # whatever the URL returns, which is a release asset a third party can
-          # replace — and it runs on every pull request.
-          ACTIONLINT_SHA256: 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+      - name: Install ShellCheck
         run: |
-          set -euo pipefail
-          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -fsSL "$url" -o /tmp/actionlint.tar.gz
-          echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
-          sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
-          actionlint --version
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Install actionlint
+        uses: ./.github/actions/install-actionlint
 
       - name: Lint workflows
         env:
@@ -319,7 +376,7 @@ jobs:
 
   connector-coverage:
     name: Connector integration coverage
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -335,7 +392,19 @@ jobs:
       - name: Install the scripts' test dependency
         run: python3 -m pip install pyyaml==6.0.3
 
+      # scripts/test_log_pii.py parses TypeScript; it fails, not skips, without the typescript package.
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '20'
+
+      # The version backend/nodejs/apps/package-lock.json locks.
+      - name: Install typescript for the log-pii tests
+        run: npm install --no-save --no-package-lock --prefix "$RUNNER_TEMP/ts" typescript@5.7.2
+
       - name: Test the coverage script
+        env:
+          TS_MODULE: ${{ runner.temp }}/ts/node_modules/typescript
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       # Fails only when a connector is registered without an integration test

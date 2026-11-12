@@ -1,6 +1,12 @@
 name: unit-test
 
 on:
+  workflow_dispatch:
+    inputs:
+      node-only:
+        description: 'Run the full Node gate only (no Docker required); other suites are explicitly skipped'
+        type: boolean
+        default: false
   pull_request:
     branches:
       - 'main'
@@ -53,7 +59,7 @@ jobs:
   # Which of the jobs below this pull request's changes can affect
   # (scripts/pr_changes.py). Every other event runs them all.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -75,24 +81,24 @@ jobs:
   nodejs-unit-tests:
     needs: changes
     if: needs.changes.outputs.node_unit == 'true'
-    runs-on: ${{ matrix.os }}
+    runs-on: [self-hosted, linux, exodia-brain]
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        node-version: [20]
+        node-version: [22, 24]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-          cache-dependency-path: backend/nodejs/apps/package-lock.json
+          package-manager-cache: false
 
       - name: Install dependencies
         run: |
@@ -102,7 +108,22 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           cd backend/nodejs/apps
-          npx cross-env TS_NODE_PROJECT=tsconfig.test.json c8 --check-coverage --lines 89 --functions 90 --branches 80 --statements 89 --reporter=text --reporter=lcov mocha --parallel --jobs 4
+          # Large streamed logs time out in the runner results service; retain the full log as an artifact.
+          status=0
+          npx cross-env TS_NODE_PROJECT=tsconfig.test.json c8 --check-coverage --lines 89 --functions 90 --branches 80 --statements 89 --reporter=text --reporter=lcov mocha --parallel --jobs 4 > "$RUNNER_TEMP/node-tests.log" 2>&1 || status=$?
+          grep -E '[0-9]+ (passing|pending|failing)|All files[[:space:]]+\|' "$RUNNER_TEMP/node-tests.log" | tail -n 20 || true
+          if ((status)); then tail -n 200 "$RUNNER_TEMP/node-tests.log"; fi
+          exit "$status"
+
+      - name: Retain full Node test log
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: node-test-log-${{ matrix.node-version }}
+          path: ${{ runner.temp }}/node-tests.log
+          compression-level: 9
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Generate Node.js coverage reports
         if: ${{ always() && inputs.generate-coverage-reports == true }}
@@ -115,7 +136,7 @@ jobs:
         working-directory: backend/nodejs/apps
         run: |
           if [ -d "coverage" ]; then
-            zip -r coverage-report.zip coverage/
+            python3 -m zipfile -c coverage-report.zip coverage/
           fi
 
       - name: Zip coverage folder (Windows)
@@ -131,7 +152,7 @@ jobs:
         if: ${{ always() && inputs.generate-coverage-reports == true }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nodejs-coverage-report-${{ matrix.os }}
+          name: nodejs-coverage-report-linux-node${{ matrix.node-version }}
           path: backend/nodejs/apps/coverage-report.zip
           retention-days: 7
           if-no-files-found: ignore
@@ -144,8 +165,8 @@ jobs:
   python-unit:
     name: python-unit (${{ matrix.shard }})
     needs: changes
-    if: needs.changes.outputs.python_unit == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.python_unit == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 30
     env:
       # One fixed place for the fastembed model files, so the cache step, the
@@ -285,8 +306,8 @@ jobs:
     needs: [changes, python-unit]
     # Still runs when a shard failed: the coverage result is a separate question,
     # and python-unit-tests fails on the shard either way.
-    if: ${{ !cancelled() && needs.changes.outputs.python_unit == 'true' }}
-    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && needs.changes.outputs.python_unit == 'true' && !inputs.node-only }}
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 15
 
     steps:
@@ -328,7 +349,7 @@ jobs:
         working-directory: backend/python
         run: |
           if [ -d "coverage" ]; then
-            zip -r python-coverage-report.zip coverage/
+            python3 -m zipfile -c python-coverage-report.zip coverage/
           fi
 
       - name: Upload Python coverage artifact
@@ -350,8 +371,8 @@ jobs:
   # change. Structural only — no model call, no network, no API key.
   python-agent-evals:
     needs: changes
-    if: needs.changes.outputs.python_unit == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.python_unit == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 20
 
     steps:
@@ -401,8 +422,8 @@ jobs:
   # pinned packages staying published.
   python-integration-offline:
     needs: changes
-    if: needs.changes.outputs.python_unit == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.python_unit == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 30
 
     steps:
@@ -445,8 +466,8 @@ jobs:
   # required status check keeps one name however the shards change.
   python-unit-tests:
     needs: [changes, python-unit, python-coverage, python-agent-evals, python-integration-offline]
-    if: ${{ always() && needs.changes.outputs.python_unit == 'true' }}
-    runs-on: ubuntu-latest
+    if: ${{ always() && needs.changes.outputs.python_unit == 'true' && !inputs.node-only }}
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Check the Python jobs passed
@@ -463,8 +484,8 @@ jobs:
     # proves the MemoryDB-readiness refactor (R1/R17) against a live cluster on
     # every PR that touches Redis code, not just nightly/manual integration runs.
     needs: changes
-    if: needs.changes.outputs.redis_cluster == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.redis_cluster == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -504,7 +525,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '24'
+          package-manager-cache: false
 
       - name: Install Node dependencies
         working-directory: backend/nodejs/apps

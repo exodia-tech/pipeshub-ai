@@ -26,6 +26,9 @@ describe('UserGroupController', () => {
 
   beforeEach(() => {
     controller = new UserGroupController();
+    sinon
+      .stub(mongoose.model('exodiaAuditEvent'), 'create')
+      .resolves({} as never);
 
     req = {
       user: {
@@ -105,7 +108,9 @@ describe('UserGroupController', () => {
       it(`rejects ${label} with a 400 before any Mongo call`, async () => {
         req.body = body;
         const findOne = sinon.stub(UserGroups, 'findOne').resolves(null);
-        const save = sinon.stub(UserGroups.prototype, 'save').resolves({} as any);
+        const save = sinon
+          .stub(UserGroups.prototype, 'save')
+          .resolves({} as any);
 
         try {
           await controller.createUserGroup(req, res);
@@ -137,7 +142,9 @@ describe('UserGroupController', () => {
         await controller.createUserGroup(req, res);
         expect.fail('Should have thrown an error');
       } catch (error: any) {
-        expect(error.message).to.equal('Group name or type "admin", "everyone", or "standard" cannot be created');
+        expect(error.message).to.equal(
+          'Group name or type "admin", "everyone", or "standard" cannot be created',
+        );
       }
     });
 
@@ -148,7 +155,9 @@ describe('UserGroupController', () => {
         await controller.createUserGroup(req, res);
         expect.fail('Should have thrown an error');
       } catch (error: any) {
-        expect(error.message).to.equal('Group name or type "admin", "everyone", or "standard" cannot be created');
+        expect(error.message).to.equal(
+          'Group name or type "admin", "everyone", or "standard" cannot be created',
+        );
       }
     });
 
@@ -181,24 +190,36 @@ describe('UserGroupController', () => {
 
   describe('createUserGroup duplicate name check', () => {
     const otherOrgId = new mongoose.Types.ObjectId().toString();
-    let stored: Array<{ name: string; orgId: mongoose.Types.ObjectId; isDeleted: boolean }>;
+    let stored: Array<{
+      name: string;
+      orgId: mongoose.Types.ObjectId;
+      isDeleted: boolean;
+    }>;
 
     // Answers findOne the way Mongo would: a key missing from the filter matches every org.
     const stubStore = () =>
-      sinon.stub(UserGroups, 'findOne').callsFake(((filter: Record<string, unknown>) => {
-        const cast = UserGroups.find().cast(UserGroups, { ...filter }) as Record<string, unknown>;
+      sinon.stub(UserGroups, 'findOne').callsFake(((
+        filter: Record<string, unknown>,
+      ) => {
+        const cast = UserGroups.find().cast(UserGroups, {
+          ...filter,
+        }) as Record<string, unknown>;
         const match = stored.find(
           (g) =>
             g.name === cast.name &&
             g.isDeleted === cast.isDeleted &&
-            (!('orgId' in cast) || g.orgId.equals(cast.orgId as mongoose.Types.ObjectId)),
+            (!('orgId' in cast) ||
+              g.orgId.equals(cast.orgId as mongoose.Types.ObjectId)),
         );
         return chain(match ?? null);
       }) as unknown as typeof UserGroups.findOne);
 
     beforeEach(() => {
       stored = [];
-      sinon.stub(UserGroups.prototype, 'save').callsFake(function (this: { name: string; orgId: mongoose.Types.ObjectId }) {
+      sinon.stub(UserGroups.prototype, 'save').callsFake(function (this: {
+        name: string;
+        orgId: mongoose.Types.ObjectId;
+      }) {
         stored.push({ name: this.name, orgId: this.orgId, isDeleted: false });
         return Promise.resolve(this);
       } as unknown as typeof UserGroups.prototype.save);
@@ -206,7 +227,11 @@ describe('UserGroupController', () => {
 
     it('lets two orgs each create a group with the same name', async () => {
       stubStore();
-      stored.push({ name: 'Engineering', orgId: new mongoose.Types.ObjectId(otherOrgId), isDeleted: false });
+      stored.push({
+        name: 'Engineering',
+        orgId: new mongoose.Types.ObjectId(otherOrgId),
+        isDeleted: false,
+      });
       req.body = { name: 'Engineering', type: 'custom' };
 
       await controller.createUserGroup(req, res);
@@ -217,7 +242,11 @@ describe('UserGroupController', () => {
 
     it('still refuses a second group with the same name in the same org, without naming other orgs', async () => {
       stubStore();
-      stored.push({ name: 'Engineering', orgId: new mongoose.Types.ObjectId(otherOrgId), isDeleted: false });
+      stored.push({
+        name: 'Engineering',
+        orgId: new mongoose.Types.ObjectId(otherOrgId),
+        isDeleted: false,
+      });
       req.body = { name: 'Engineering', type: 'custom' };
       await controller.createUserGroup(req, res);
 
@@ -236,8 +265,28 @@ describe('UserGroupController', () => {
   describe('getAllUserGroups', () => {
     it('should return paginated groups with userCount', async () => {
       const mockGroups = [
-        { _id: 'g1', name: 'admin', type: 'admin', orgId, slug: 'g-1', isDeleted: false, users: ['u1', 'u2'], createdAt: '2026-01-01', updatedAt: '2026-01-01' },
-        { _id: 'g2', name: 'everyone', type: 'everyone', orgId, slug: 'g-2', isDeleted: false, users: [], createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+        {
+          _id: 'g1',
+          name: 'admin',
+          type: 'admin',
+          orgId,
+          slug: 'g-1',
+          isDeleted: false,
+          users: ['u1', 'u2'],
+          createdAt: '2026-01-01',
+          updatedAt: '2026-01-01',
+        },
+        {
+          _id: 'g2',
+          name: 'everyone',
+          type: 'everyone',
+          orgId,
+          slug: 'g-2',
+          isDeleted: false,
+          users: [],
+          createdAt: '2026-01-01',
+          updatedAt: '2026-01-01',
+        },
       ];
 
       sinon.stub(UserGroups, 'find').returns({
@@ -256,12 +305,19 @@ describe('UserGroupController', () => {
 
       expect(res.status.calledWith(200)).to.be.true;
       const responseArg = res.json.firstCall.args[0];
-      expect(responseArg).to.have.property('groups').that.is.an('array').with.lengthOf(2);
+      expect(responseArg)
+        .to.have.property('groups')
+        .that.is.an('array')
+        .with.lengthOf(2);
       expect(responseArg.groups[0]).to.have.property('userCount', 2);
       expect(responseArg.groups[1]).to.have.property('userCount', 0);
       expect(responseArg.groups[0]).to.not.have.property('users');
       expect(responseArg).to.have.property('pagination');
-      expect(responseArg.pagination).to.deep.include({ page: 1, limit: 25, totalCount: 2 });
+      expect(responseArg.pagination).to.deep.include({
+        page: 1,
+        limit: 25,
+        totalCount: 2,
+      });
     });
 
     it('should filter groups by search query', async () => {
@@ -352,14 +408,19 @@ describe('UserGroupController', () => {
       sinon.stub(UserGroups, 'findOne').returns({
         lean: sinon.stub().returns({
           exec: sinon.stub().resolves({
-            _id: 'everyone', name: 'everyone', type: 'everyone', orgId,
+            _id: 'everyone',
+            name: 'everyone',
+            type: 'everyone',
+            orgId,
             users: [colleague, account],
           }),
         }),
       } as any);
       sinon.stub(Users, 'find').returns({
         select: sinon.stub().returns({
-          lean: sinon.stub().returns({ exec: sinon.stub().resolves([{ _id: account }]) }),
+          lean: sinon
+            .stub()
+            .returns({ exec: sinon.stub().resolves([{ _id: account }]) }),
         }),
       } as any);
       sinon.stub(userAdminService, 'isUserOrgAdmin').resolves(false);
@@ -367,7 +428,9 @@ describe('UserGroupController', () => {
       await controller.getUserGroupById(req, res);
 
       const sent = res.json.firstCall.args[0];
-      expect(sent.users.map((u: any) => u.toString())).to.deep.equal([colleague.toString()]);
+      expect(sent.users.map((u: any) => u.toString())).to.deep.equal([
+        colleague.toString(),
+      ]);
     });
 
     it('keeps it for an administrator', async () => {
@@ -378,14 +441,19 @@ describe('UserGroupController', () => {
       sinon.stub(UserGroups, 'findOne').returns({
         lean: sinon.stub().returns({
           exec: sinon.stub().resolves({
-            _id: 'everyone', name: 'everyone', type: 'everyone', orgId,
+            _id: 'everyone',
+            name: 'everyone',
+            type: 'everyone',
+            orgId,
             users: [colleague, account],
           }),
         }),
       } as any);
       sinon.stub(Users, 'find').returns({
         select: sinon.stub().returns({
-          lean: sinon.stub().returns({ exec: sinon.stub().resolves([{ _id: account }]) }),
+          lean: sinon
+            .stub()
+            .returns({ exec: sinon.stub().resolves([{ _id: account }]) }),
         }),
       } as any);
       sinon.stub(userAdminService, 'isUserOrgAdmin').resolves(true);
@@ -400,7 +468,10 @@ describe('UserGroupController', () => {
       sinon.stub(UserGroups, 'findOne').returns({
         lean: sinon.stub().returns({
           exec: sinon.stub().resolves({
-            _id: 'g1', name: 'admin', type: 'admin', orgId,
+            _id: 'g1',
+            name: 'admin',
+            type: 'admin',
+            orgId,
             users: [new mongoose.Types.ObjectId()],
           }),
         }),
@@ -410,7 +481,9 @@ describe('UserGroupController', () => {
           lean: sinon.stub().returns({ exec: sinon.stub().resolves([]) }),
         }),
       } as any);
-      const isAdmin = sinon.stub(userAdminService, 'isUserOrgAdmin').resolves(false);
+      const isAdmin = sinon
+        .stub(userAdminService, 'isUserOrgAdmin')
+        .resolves(false);
 
       await controller.getUserGroupById(req, res);
 
@@ -472,14 +545,19 @@ describe('UserGroupController', () => {
             g.orgId.equals(orgFilter) &&
             g.isDeleted === filter.isDeleted &&
             (filter.name === undefined || g.name === filter.name) &&
-            (typeof filter._id === 'string' ? g._id === filter._id : g._id !== filter._id.$ne),
+            (typeof filter._id === 'string'
+              ? g._id === filter._id
+              : g._id !== filter._id.$ne),
         );
         return chain(match ?? null);
       }) as unknown as typeof UserGroups.findOne);
     });
 
     it('refuses a rename to a name another group in the same org already has', async () => {
-      stored.push(group('g1', 'Design', orgId), group('g2', 'Engineering', orgId));
+      stored.push(
+        group('g1', 'Design', orgId),
+        group('g2', 'Engineering', orgId),
+      );
       req.params.groupId = 'g1';
       req.body = { name: 'Engineering' };
 
@@ -497,7 +575,10 @@ describe('UserGroupController', () => {
     });
 
     it('allows a rename to a name used only in another org', async () => {
-      stored.push(group('g1', 'Design', orgId), group('g2', 'Engineering', otherOrgId));
+      stored.push(
+        group('g1', 'Design', orgId),
+        group('g2', 'Engineering', otherOrgId),
+      );
       req.params.groupId = 'g1';
       req.body = { name: 'Engineering' };
 
@@ -545,21 +626,40 @@ describe('UserGroupController', () => {
     let committed: Committed[];
 
     const duplicateKeyError = (name: string) =>
-      Object.assign(new Error(`E11000 duplicate key error collection: userGroups index: orgId_1_name_1_active_unique dup key: { name: "${name}" }`), {
-        code: 11000,
-        keyPattern: { orgId: 1, name: 1 },
-        keyValue: { name },
-      });
+      Object.assign(
+        new Error(
+          `E11000 duplicate key error collection: userGroups index: orgId_1_name_1_active_unique dup key: { name: "${name}" }`,
+        ),
+        {
+          code: 11000,
+          keyPattern: { orgId: 1, name: 1 },
+          keyValue: { name },
+        },
+      );
 
     // Behaves like the partial unique index on (orgId, name) for active groups.
-    const commit = (id: string, name: string, org: mongoose.Types.ObjectId): Promise<void> => {
+    const commit = (
+      id: string,
+      name: string,
+      org: mongoose.Types.ObjectId,
+    ): Promise<void> => {
       const clash = committed.find(
-        (g) => g._id !== id && !g.isDeleted && g.orgId.equals(org) && g.committedName === name,
+        (g) =>
+          g._id !== id &&
+          !g.isDeleted &&
+          g.orgId.equals(org) &&
+          g.committedName === name,
       );
       if (clash) return Promise.reject(duplicateKeyError(name));
       const existing = committed.find((g) => g._id === id);
       if (existing) existing.committedName = name;
-      else committed.push({ _id: id, committedName: name, orgId: org, isDeleted: false });
+      else
+        committed.push({
+          _id: id,
+          committedName: name,
+          orgId: org,
+          isDeleted: false,
+        });
       return Promise.resolve();
     };
 
@@ -573,14 +673,25 @@ describe('UserGroupController', () => {
     });
 
     it('lets one of two simultaneous creates with the same name win and gives the other the duplicate-name message', async () => {
-      sinon.stub(UserGroups, 'findOne').callsFake(((filter: { name: string; orgId: string; isDeleted: boolean }) => {
+      sinon.stub(UserGroups, 'findOne').callsFake(((filter: {
+        name: string;
+        orgId: string;
+        isDeleted: boolean;
+      }) => {
         const org = new mongoose.Types.ObjectId(String(filter.orgId));
         const match = committed.find(
-          (g) => g.orgId.equals(org) && g.isDeleted === filter.isDeleted && g.committedName === filter.name,
+          (g) =>
+            g.orgId.equals(org) &&
+            g.isDeleted === filter.isDeleted &&
+            g.committedName === filter.name,
         );
         return chain(match ?? null);
       }) as unknown as typeof UserGroups.findOne);
-      sinon.stub(UserGroups.prototype, 'save').callsFake(function (this: { _id: mongoose.Types.ObjectId; name: string; orgId: mongoose.Types.ObjectId }) {
+      sinon.stub(UserGroups.prototype, 'save').callsFake(function (this: {
+        _id: mongoose.Types.ObjectId;
+        name: string;
+        orgId: mongoose.Types.ObjectId;
+      }) {
         return commit(String(this._id), this.name, this.orgId).then(() => this);
       } as unknown as typeof UserGroups.prototype.save);
 
@@ -595,13 +706,17 @@ describe('UserGroupController', () => {
       ]);
 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
-      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
       expect(fulfilled).to.have.length(1);
       expect(rejected).to.have.length(1);
       expect(rejected[0]!.reason).to.be.instanceOf(BadRequestError);
       expect(rejected[0]!.reason.message).to.equal('Group already exists');
       expect(rejected[0]!.reason.statusCode).to.equal(400);
-      expect(committed.filter((g) => g.committedName === 'Engineering')).to.have.length(1);
+      expect(
+        committed.filter((g) => g.committedName === 'Engineering'),
+      ).to.have.length(1);
     });
 
     it('lets one of two simultaneous renames to the same name win and leaves the other group unchanged', async () => {
@@ -630,31 +745,49 @@ describe('UserGroupController', () => {
         if (typeof filter._id === 'string') return chain(load(filter._id));
         const excluded = filter._id.$ne;
         const match = committed.find(
-          (g) => g._id !== excluded && g.isDeleted === filter.isDeleted && g.committedName === filter.name,
+          (g) =>
+            g._id !== excluded &&
+            g.isDeleted === filter.isDeleted &&
+            g.committedName === filter.name,
         );
         return chain(match ?? null);
       }) as unknown as typeof UserGroups.findOne);
 
       const results = await Promise.allSettled([
-        controller.updateGroup({ ...req, params: { groupId: 'g1' }, body: { name: 'Engineering' } }, newRes() as any),
-        controller.updateGroup({ ...req, params: { groupId: 'g2' }, body: { name: 'Engineering' } }, newRes() as any),
+        controller.updateGroup(
+          { ...req, params: { groupId: 'g1' }, body: { name: 'Engineering' } },
+          newRes() as any,
+        ),
+        controller.updateGroup(
+          { ...req, params: { groupId: 'g2' }, body: { name: 'Engineering' } },
+          newRes() as any,
+        ),
       ]);
 
-      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
       expect(rejected).to.have.length(1);
       expect(rejected[0]!.reason).to.be.instanceOf(BadRequestError);
       expect(rejected[0]!.reason.message).to.equal('Group already exists');
-      expect(committed.filter((g) => g.committedName === 'Engineering')).to.have.length(1);
+      expect(
+        committed.filter((g) => g.committedName === 'Engineering'),
+      ).to.have.length(1);
       const loser = committed.find((g) => g.committedName !== 'Engineering')!;
-      expect(loser.committedName).to.equal(loser._id === 'g1' ? 'Design' : 'Ops');
+      expect(loser.committedName).to.equal(
+        loser._id === 'g1' ? 'Design' : 'Ops',
+      );
     });
 
     it('passes through a duplicate-key error on another index untouched', async () => {
       sinon.stub(UserGroups, 'findOne').resolves(null);
-      const slugClash = Object.assign(new Error('E11000 duplicate key error index: slug_1'), {
-        code: 11000,
-        keyPattern: { slug: 1 },
-      });
+      const slugClash = Object.assign(
+        new Error('E11000 duplicate key error index: slug_1'),
+        {
+          code: 11000,
+          keyPattern: { slug: 1 },
+        },
+      );
       sinon.stub(UserGroups.prototype, 'save').rejects(slugClash);
       req.body = { name: 'Engineering', type: 'custom' };
 
@@ -763,10 +896,11 @@ describe('UserGroupController', () => {
       req.params.groupId = 'g1';
       req.body = { name: 'New Name' };
 
-      sinon.stub(UserGroups, 'findOne').callsFake((() => chain({
-        type: 'admin',
-        isDeleted: false,
-      })) as any);
+      sinon.stub(UserGroups, 'findOne').callsFake((() =>
+        chain({
+          type: 'admin',
+          isDeleted: false,
+        })) as any);
 
       try {
         await controller.updateGroup(req, res);
@@ -780,10 +914,11 @@ describe('UserGroupController', () => {
       req.params.groupId = 'g1';
       req.body = { name: 'New Name' };
 
-      sinon.stub(UserGroups, 'findOne').callsFake((() => chain({
-        type: 'everyone',
-        isDeleted: false,
-      })) as any);
+      sinon.stub(UserGroups, 'findOne').callsFake((() =>
+        chain({
+          type: 'everyone',
+          isDeleted: false,
+        })) as any);
 
       try {
         await controller.updateGroup(req, res);
@@ -805,7 +940,9 @@ describe('UserGroupController', () => {
         save: sinon.stub().resolves(),
       };
 
-      sinon.stub(UserGroups, 'findOne').callsFake((() => chain(mockGroup)) as any);
+      sinon
+        .stub(UserGroups, 'findOne')
+        .callsFake((() => chain(mockGroup)) as any);
 
       await controller.deleteGroup(req, res);
 
@@ -830,7 +967,8 @@ describe('UserGroupController', () => {
     it('should throw ForbiddenError when deleting non-custom group', async () => {
       req.params.groupId = 'g1';
 
-      sinon.stub(UserGroups, 'findOne').callsFake((() => chain({
+      sinon.stub(UserGroups, 'findOne').callsFake((() =>
+        chain({
           type: 'admin',
           isDeleted: false,
         })) as any);
@@ -854,7 +992,9 @@ describe('UserGroupController', () => {
         save: sinon.stub().resolves(),
       };
 
-      sinon.stub(UserGroups, 'findOne').callsFake((() => chain(mockGroup)) as any);
+      sinon
+        .stub(UserGroups, 'findOne')
+        .callsFake((() => chain(mockGroup)) as any);
 
       await controller.deleteGroup(req, res);
 
@@ -869,6 +1009,13 @@ describe('UserGroupController', () => {
         groupIds: ['g1', 'g2'],
       };
 
+      sinon
+        .stub(UserGroups, 'findOne')
+        .callsFake((() => chain({ _id: 'g1' })) as any);
+      sinon
+        .stub(Users, 'findOne')
+        .callsFake((() => chain({ _id: 'u1' })) as any);
+
       sinon.stub(UserGroups, 'updateMany').resolves({
         modifiedCount: 2,
       } as any);
@@ -876,7 +1023,9 @@ describe('UserGroupController', () => {
       await controller.addUsersToGroups(req, res);
 
       expect(res.status.calledWith(200)).to.be.true;
-      expect(res.json.calledWith({ message: 'Users added to groups successfully' })).to.be.true;
+      expect(
+        res.json.calledWith({ message: 'Users added to groups successfully' }),
+      ).to.be.true;
     });
 
     it('should throw BadRequestError when userIds is empty', async () => {
@@ -918,6 +1067,13 @@ describe('UserGroupController', () => {
         groupIds: ['nonexistent'],
       };
 
+      sinon
+        .stub(UserGroups, 'findOne')
+        .callsFake((() => chain({ _id: 'nonexistent' })) as any);
+      sinon
+        .stub(Users, 'findOne')
+        .callsFake((() => chain({ _id: 'u1' })) as any);
+
       sinon.stub(UserGroups, 'updateMany').resolves({
         modifiedCount: 0,
       } as any);
@@ -945,7 +1101,11 @@ describe('UserGroupController', () => {
       await controller.removeUsersFromGroups(req, res);
 
       expect(res.status.calledWith(200)).to.be.true;
-      expect(res.json.calledWith({ message: 'Users removed from groups successfully' })).to.be.true;
+      expect(
+        res.json.calledWith({
+          message: 'Users removed from groups successfully',
+        }),
+      ).to.be.true;
     });
 
     it('should throw BadRequestError when userIds is empty', async () => {
@@ -1004,7 +1164,11 @@ describe('UserGroupController', () => {
             limit: sinon.stub().returns({
               lean: sinon.stub().returns({
                 exec: sinon.stub().resolves([
-                  { _id: userId1, fullName: 'Alice', email: 'alice@test.com' },
+                  {
+                    _id: userId1,
+                    fullName: 'Alice',
+                    email: 'alice@test.com',
+                  },
                 ]),
               }),
             }),
@@ -1017,9 +1181,11 @@ describe('UserGroupController', () => {
 
       sinon.stub(UserDisplayPicture, 'find').returns({
         lean: sinon.stub().returns({
-          exec: sinon.stub().resolves([
-            { userId: userId1, pic: 'b64pic', mimeType: 'image/jpeg' },
-          ]),
+          exec: sinon
+            .stub()
+            .resolves([
+              { userId: userId1, pic: 'b64pic', mimeType: 'image/jpeg' },
+            ]),
         }),
       } as any);
 
@@ -1027,7 +1193,10 @@ describe('UserGroupController', () => {
 
       expect(res.status.calledWith(200)).to.be.true;
       const responseArg = res.json.firstCall.args[0];
-      expect(responseArg).to.have.property('users').that.is.an('array').with.lengthOf(1);
+      expect(responseArg)
+        .to.have.property('users')
+        .that.is.an('array')
+        .with.lengthOf(1);
       expect(responseArg.users[0]).to.deep.include({
         _id: userId1.toString(),
         fullName: 'Alice',
@@ -1035,7 +1204,10 @@ describe('UserGroupController', () => {
         profilePicture: 'data:image/jpeg;base64,b64pic',
       });
       expect(responseArg).to.have.property('pagination');
-      expect(responseArg.pagination).to.deep.include({ page: 1, totalCount: 1 });
+      expect(responseArg.pagination).to.deep.include({
+        page: 1,
+        totalCount: 1,
+      });
     });
 
     // This page carries each member's id, name and address, so a service
@@ -1046,7 +1218,10 @@ describe('UserGroupController', () => {
 
       sinon.stub(UserGroups, 'findOne').returns({
         lean: sinon.stub().returns({
-          exec: sinon.stub().resolves({ _id: 'everyone', users: [new mongoose.Types.ObjectId()] }),
+          exec: sinon.stub().resolves({
+            _id: 'everyone',
+            users: [new mongoose.Types.ObjectId()],
+          }),
         }),
       } as any);
       const find = sinon.stub(Users, 'find').returns({
@@ -1066,8 +1241,12 @@ describe('UserGroupController', () => {
 
       await controller.getUsersInGroup(req, res);
 
-      expect((find.firstCall.args[0] as any).kind).to.deep.equal({ $ne: 'service' });
-      expect((count.firstCall.args[0] as any).kind).to.deep.equal({ $ne: 'service' });
+      expect((find.firstCall.args[0] as any).kind).to.deep.equal({
+        $ne: 'service',
+      });
+      expect((count.firstCall.args[0] as any).kind).to.deep.equal({
+        $ne: 'service',
+      });
     });
 
     it('keeps them for an administrator', async () => {
@@ -1076,7 +1255,10 @@ describe('UserGroupController', () => {
 
       sinon.stub(UserGroups, 'findOne').returns({
         lean: sinon.stub().returns({
-          exec: sinon.stub().resolves({ _id: 'everyone', users: [new mongoose.Types.ObjectId()] }),
+          exec: sinon.stub().resolves({
+            _id: 'everyone',
+            users: [new mongoose.Types.ObjectId()],
+          }),
         }),
       } as any);
       const find = sinon.stub(Users, 'find').returns({

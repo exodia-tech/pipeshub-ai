@@ -17,11 +17,17 @@ from app.core.org_context import (
     SystemContextNotAllowed,
     current_org_id,
 )
+from app.services.access_groups import AccessGroups
 from app.services.cache.invalidation_hooks import (
     notify_connector_sync_completed,
     notify_principals_changed,
 )
 from app.services.graph_db.user_email_identity import GraphUserEmailConflictError
+from app.services.group_resource_policy import (
+    GroupResourceAccess,
+    ResourcePolicy,
+    ResourcePolicyConflict,
+)
 from app.utils.logger import create_logger
 from app.utils.time_conversion import get_epoch_timestamp_in_ms
 from app.utils.user_lookup import get_user_or_503
@@ -52,6 +58,138 @@ class UserEmailUpdateRequest(BaseModel):
         if not _GRAPH_EMAIL.fullmatch(email):
             raise ValueError("Invalid email")
         return email
+
+
+class AccessGroupCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class AccessGroupMembersRequest(BaseModel):
+    userIds: list[str] = Field(min_length=1, max_length=500)
+
+
+@router.get("/access-groups/{group_id}/access", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def get_group_resource_access(request: Request, group_id: uuid.UUID) -> JSONResponse:
+    org_id = request.state.user.get("orgId")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Service token missing organization")
+    graph = (await get_services(request))["graph_provider"]
+    try:
+        policy = await GroupResourceAccess(graph).read(org_id, str(group_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group not found") from exc
+    return JSONResponse(content={"policy": policy.model_dump()})
+
+
+@router.put("/access-groups/{group_id}/access", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def save_group_resource_access(request: Request, group_id: uuid.UUID, body: ResourcePolicy) -> JSONResponse:
+    org_id = request.state.user.get("orgId")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Service token missing organization")
+    graph = (await get_services(request))["graph_provider"]
+    try:
+        await GroupResourceAccess(graph).save(org_id, str(group_id), body)
+    except ResourcePolicyConflict as exc:
+        raise HTTPException(status_code=409, detail="Policy changed; reload before saving") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group or resource not found") from exc
+    return JSONResponse(content={"success": True})
+
+
+@router.get("/access-groups/{group_id}/resources", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def list_group_resources(request: Request, group_id: uuid.UUID, parent: str | None = None, skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)) -> JSONResponse:
+    org_id = request.state.user.get("orgId")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Service token missing organization")
+    graph = (await get_services(request))["graph_provider"]
+    try:
+        actor_id = request.state.user.get("userId")
+        if not actor_id:
+            raise HTTPException(status_code=401, detail="Service token missing identity")
+        result = await GroupResourceAccess(graph).resources(org_id, str(group_id), parent, skip, limit, actor_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group or resource not found") from exc
+    return JSONResponse(content=result)
+
+
+@router.post("/access-groups", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def create_access_group(request: Request, body: AccessGroupCreateRequest) -> JSONResponse:
+    claims = request.state.user
+    org_id, actor_id = claims.get("orgId"), claims.get("userId")
+    if not org_id or not actor_id:
+        raise HTTPException(status_code=401, detail="Service token missing identity")
+    graph = (await get_services(request))["graph_provider"]
+    try:
+        group_id = await AccessGroups(graph).create(org_id, actor_id, body.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid group") from exc
+    return JSONResponse(status_code=201, content={"id": group_id})
+
+
+@router.get("/access-groups", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def list_access_groups(request: Request, skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)) -> JSONResponse:
+    org_id = request.state.user.get("orgId")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Service token missing organization")
+    graph = (await get_services(request))["graph_provider"]
+    groups = await AccessGroups(graph).list(org_id, skip, limit)
+    return JSONResponse(content={"groups": groups})
+
+
+@router.post("/access-groups/{group_id}/members", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def change_access_group_members(request: Request, group_id: uuid.UUID, body: AccessGroupMembersRequest, *, remove: bool = False) -> JSONResponse:
+    org_id = request.state.user.get("orgId")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Service token missing organization")
+    graph = (await get_services(request))["graph_provider"]
+    groups = AccessGroups(graph)
+    try:
+        if remove:
+            await groups.remove_members(org_id, str(group_id), body.userIds)
+        else:
+            await groups.add_members(org_id, str(group_id), body.userIds)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group or members not found") from exc
+    return JSONResponse(content={"success": True})
+
+
+@router.get("/access-groups/{group_id}/members", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def get_access_group_members(request: Request, group_id: uuid.UUID, page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=100)) -> JSONResponse:
+    org_id, actor_id = request.state.user.get("orgId"), request.state.user.get("userId")
+    if not org_id or not actor_id:
+        raise HTTPException(status_code=401, detail="Service token missing identity")
+    graph = (await get_services(request))["graph_provider"]
+    try:
+        result = await AccessGroups(graph).members(org_id, str(group_id), actor_id, page, limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group not found") from exc
+    return JSONResponse(content=result)
+
+
+@router.put("/access-groups/{group_id}", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def rename_access_group(request: Request, group_id: uuid.UUID, body: AccessGroupCreateRequest) -> JSONResponse:
+    org_id = request.state.user.get("orgId")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Service token missing organization")
+    graph = (await get_services(request))["graph_provider"]
+    try:
+        await AccessGroups(graph).rename(org_id, str(group_id), body.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group not found or name invalid") from exc
+    return JSONResponse(content={"success": True})
+
+
+@router.delete("/access-groups/{group_id}", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def delete_access_group(request: Request, group_id: uuid.UUID) -> JSONResponse:
+    org_id = request.state.user.get("orgId")
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Service token missing organization")
+    graph = (await get_services(request))["graph_provider"]
+    try:
+        await AccessGroups(graph).delete(org_id, str(group_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group not found") from exc
+    return JSONResponse(content={"success": True})
 
 
 async def get_services(request: Request) -> Dict[str, Any]:
@@ -119,6 +257,10 @@ async def _authorize_team_change(
     their own: the team document is not org-scoped, so its orgId is checked.
     """
     team = await graph_provider.get_document(team_id, CollectionNames.TEAMS.value)
+    if not team or not org_id or team.get("orgId") != org_id:
+        raise HTTPException(status_code=404, detail=not_found("This team"))
+    if team.get("exodiaAccessGroup") is True:
+        raise HTTPException(status_code=403, detail="Access groups must be managed through the group API")
     permission = await graph_provider.get_edge(
         user_key,
         CollectionNames.USERS.value,
@@ -126,8 +268,8 @@ async def _authorize_team_change(
         CollectionNames.TEAMS.value,
         CollectionNames.PERMISSION.value
     )
-    admin_of_team_org = is_org_admin and bool(team) and bool(org_id) and team.get("orgId") == org_id
-    if not team or not (permission or admin_of_team_org):
+    admin_of_team_org = is_org_admin
+    if not (permission or admin_of_team_org):
         raise HTTPException(status_code=404, detail=not_found("This team"))
     if admin_of_team_org:
         return permission

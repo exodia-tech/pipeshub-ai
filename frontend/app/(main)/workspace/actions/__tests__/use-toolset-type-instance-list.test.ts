@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { BuilderSidebarToolset } from '@/app/(main)/toolsets/api';
 import '@/lib/__tests__/test-i18n';
 
@@ -36,6 +36,7 @@ function setup() {
 }
 
 afterEach(() => {
+  cleanup();
   api.getMyToolsets.mockReset();
 });
 

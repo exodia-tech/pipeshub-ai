@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import axios from 'axios';
 import nock from 'nock';
-import { LoginTicket, OAuth2Client } from 'google-auth-library';
+import { LoginTicket } from 'google-auth-library';
 import type { NextFunction, RequestHandler, Response } from 'express';
 import { Container } from 'inversify';
 import {
@@ -45,6 +45,8 @@ import type { AuthenticatedServiceRequest } from '../../../../src/libs/middlewar
 import { createMockRedisService } from '../../../helpers/mock-redis';
 import { createMockQuery } from '../../../helpers/mock-mongo';
 import { useCommunitySignInLists } from '../../../helpers/sign-in-lists';
+import '../../../../src/modules/audit/audit.store';
+import { stubGoogleIdTokenCheck } from '../../../helpers/google-id-token';
 
 // Drives the real controller and the real SessionService through whole
 // sign-ins, step after step, the way the /initAuth and /authenticate routes do.
@@ -168,6 +170,7 @@ describe('UserAccountController sign-in flow', () => {
   let activities: Array<Record<string, unknown>>;
   let configuredSteps: string[][];
   let disabledUserIds: Set<string>;
+  let auditCreate: sinon.SinonStub;
 
   function orgAuthConfig(steps: string[][]) {
     return {
@@ -230,6 +233,7 @@ describe('UserAccountController sign-in flow', () => {
   }
 
   beforeEach(() => {
+    auditCreate = sinon.stub(mongoose.model('exodiaAuditEvent'), 'create').resolves({} as never);
     redisStore = new Map();
     const redis = createMockRedisService();
     redis.set.callsFake(async (key: string, value: unknown) => {
@@ -395,12 +399,45 @@ describe('UserAccountController sign-in flow', () => {
   }
 
   function googleSignsInAs(email: string | undefined) {
-    return sinon.stub(OAuth2Client.prototype, 'verifyIdToken').resolves({
+    return stubGoogleIdTokenCheck().resolves({
       getPayload: () => (email ? { email, name: 'Someone' } : { name: 'Someone' }),
     } as unknown as LoginTicket);
   }
 
   describe('the sign-in method has to be one the org allows at this step', () => {
+    it('records a successful sign-in without credentials', async () => {
+      await givePassword(alice);
+      const token = await initAuth([['password']]);
+      const { res, error } = await authenticate(token, { method: 'password', credentials: { password: PASSWORD } });
+      expect(error).to.be.undefined;
+      expect(res.body?.message).to.equal('Fully authenticated');
+      const event = auditCreate.firstCall.args[0];
+      expect(event).to.include({ action: 'auth.login', outcome: 'success', org_id: orgId, actor_id: alice._id });
+      expect(JSON.stringify(event)).not.to.contain(PASSWORD);
+      expect(JSON.stringify(event)).not.to.contain(alice.email);
+    });
+
+    it('allows sign-in when the audit store is unavailable', async () => {
+      auditCreate.rejects(new Error('test audit unavailable'));
+      await givePassword(alice);
+      const token = await initAuth([['password']]);
+      const { res, error } = await authenticate(token, { method: 'password', credentials: { password: PASSWORD } });
+      expect(error).to.be.undefined;
+      expect(res.body?.message).to.equal('Fully authenticated');
+      expect(auditCreate.called).to.be.true;
+      expect(logger.error.calledWith('Sign-in audit event could not be recorded')).to.be.true;
+    });
+    it('does not wait indefinitely for an unresponsive audit store', async () => {
+      auditCreate.callsFake(() => new Promise(() => {}));
+      await givePassword(alice);
+      const token = await initAuth([['password']]);
+      const started = Date.now();
+      const { res, error } = await authenticate(token, { method: 'password', credentials: { password: PASSWORD } });
+      expect(error).to.be.undefined;
+      expect(res.body?.message).to.equal('Fully authenticated');
+      expect(Date.now() - started).to.be.lessThan(4000);
+      expect(logger.error.calledWith('Sign-in audit event could not be recorded')).to.be.true;
+    });
     it('refuses password sign-in when the org only allows Google, even with the right password', async () => {
       await givePassword(alice);
       const token = await initAuth([['google']]);
@@ -530,10 +567,8 @@ describe('UserAccountController sign-in flow', () => {
 
       expect(error).to.be.undefined;
       expect(res.body?.message).to.equal('Fully authenticated');
-      expect(verify.firstCall.args[0]).to.deep.include({
-        idToken: 'alice-google-id-token',
-        audience: 'google-client',
-      });
+      expect(verify.firstCall.args[0]).to.equal('alice-google-id-token');
+      expect(verify.firstCall.args[2]).to.equal('google-client');
       expect(
         (jwt.verify(String(res.body?.accessToken), JWT_SECRET) as TokenClaims).userId,
       ).to.equal(alice._id);
@@ -840,7 +875,7 @@ describe('UserAccountController sign-in flow', () => {
     describe('when the account lookup is the real IAM client', () => {
       beforeEach(() => {
         const realIam = new IamService(
-          ...([{ iamBackend: IAM_BACKEND }, logger] as unknown as ConstructorParameters<typeof IamService>),
+          ...([{ iamBackend: IAM_BACKEND }] as unknown as ConstructorParameters<typeof IamService>),
         );
         iamService.getUserById.callsFake((id: string, token: string) =>
           realIam.getUserById(id, token),
@@ -893,7 +928,9 @@ describe('UserAccountController sign-in flow', () => {
         expect(error).to.be.instanceOf(InternalServerError);
         expect(error.message).to.include('refresh your session');
         expect(error.message).to.not.include('ECONNREFUSED');
-        expect(logger.error.calledWithMatch('Looking up the account to refresh a session failed')).to.be.true;
+        // Logged once, by the error middleware, with the network error as the cause.
+        expect((error as { cause?: Error }).cause?.name).to.equal('AxiosError');
+        expect(logger.error.called).to.be.false;
       });
     });
   });
@@ -1143,7 +1180,7 @@ describe('UserAccountController sign-in flow', () => {
 
     beforeEach(() => {
       const realIam = new IamService(
-        ...([{ iamBackend: IAM_BACKEND }, logger] as unknown as ConstructorParameters<typeof IamService>),
+        ...([{ iamBackend: IAM_BACKEND }] as unknown as ConstructorParameters<typeof IamService>),
       );
       iamService.getUserByEmail.callsFake((email: string, token: string) =>
         realIam.getUserByEmail(email, token),

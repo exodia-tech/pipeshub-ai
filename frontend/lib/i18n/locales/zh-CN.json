@@ -737,6 +737,8 @@
     "indexingStatus": {
       "completed": "已完成",
       "inProgress": "进行中",
+      "embeddingProgress_one": "正在嵌入 {{done, number}} / {{total, number}} 个分块",
+      "embeddingProgress_other": "正在嵌入 {{done, number}} / {{total, number}} 个分块",
       "failed": "失败",
       "fileTypeNotSupported": "不支持的文件类型",
       "notStarted": "未开始",
@@ -935,6 +937,11 @@
     "fork": "分叉对话",
     "forkFromHere": "从此处分叉",
     "regenerate": "重新生成",
+    "answerHidden": {
+      "lost": "此回答使用了您已无权访问的内容。",
+      "unconfirmed": "无法确认您的访问权限，请重试。",
+      "askAgain": "重新提问"
+    },
     "readAloud": "朗读",
     "stopReading": "停止朗读",
     "ttsNotSupported": "此浏览器不支持文字转语音",
@@ -1466,6 +1473,11 @@
     "stopListening": "停止聆听",
     "voiceInput": "语音输入",
     "regenerateResponse": "重新生成回答",
+    "quoteSelection": "引用",
+    "quoteSelectionHint": "针对这段提问",
+    "quotedExcerpt": "已引用",
+    "quotedExcerptTruncated": "已引用（已截断）",
+    "dismissQuote": "移除引用",
     "editQuery": "编辑提问",
     "queryOptions": "提问选项",
     "models": "模型",
@@ -3440,6 +3452,104 @@
         "cancel": "取消",
         "continueTeam": "继续使用团队连接器",
         "goToPersonal": "设置个人连接器"
+      },
+      "accessCheck": {
+        "open": "检查某人的访问权限",
+        "title": "检查某人的访问权限",
+        "description": "查看某人能否读取此连接器中的记录，以及无法读取的原因。",
+        "personLabel": "人员",
+        "personPlaceholder": "选择人员",
+        "peopleLoading": "正在加载人员...",
+        "peopleFailed": "无法加载人员列表。",
+        "recordLabel": "记录 ID",
+        "recordHint": "打开记录并复制其 ID。",
+        "check": "检查",
+        "checking": "正在检查...",
+        "close": "关闭",
+        "resultHeading": "结果",
+        "restrictedArea": "受限区域",
+        "theyFallback": "此人",
+        "pathLabel": "位置：{{path}}",
+        "reference": "参考编号：{{ref}}（如果原因看起来不对，请提供给支持人员）",
+        "verdict": {
+          "granted": "{{name}} 可以查看此记录。",
+          "denied": "{{name}} 无法查看此记录。"
+        },
+        "reason": {
+          "granted": "如果它在搜索中缺失，可能是尚未建立索引，或连接器仍在同步。",
+          "not_linked": "{{name}} 没有关联到此连接器的账户。",
+          "no_grant": "{{container}} 中没有任何内容授予 {{name}} 访问权限。",
+          "restricted_container": "{{container}} 仅限其他人访问。",
+          "item_restricted": "此记录有自己的限制，{{name}} 不在其中。",
+          "parent_not_readable": "{{name}} 无法打开此记录所需的上级项目。",
+          "pending_rewrite": "此记录所在的文件夹正在更新。",
+          "syncing": "连接器尚未完成此部分的同步。",
+          "scheme_unreadable": "连接器无法读取此区域的访问规则，因此对所有人隐藏。",
+          "deleted_at_source": "此记录已在源端删除。",
+          "unexplained": "我们无法显示原因。"
+        },
+        "next": {
+          "not_linked": "请在源端修复账户，然后同步。",
+          "no_grant": "请在源端添加 {{name}}。",
+          "restricted_container": "请让所有者添加 {{name}}。",
+          "item_restricted": "请让所有者添加 {{name}}。",
+          "parent_not_readable": "请将上级项目共享给 {{name}}。",
+          "pending_rewrite": "请等待几分钟后再检查。",
+          "syncing": "请等待同步完成。",
+          "scheme_unreadable": "请在源端修复同步账户的权限。",
+          "deleted_at_source": "无需操作。",
+          "unexplained": "请联系支持人员并提供参考编号。"
+        },
+        "errors": {
+          "failed": "无法完成检查。请重试。",
+          "notFound": "在此连接器中找不到该人员或记录。",
+          "rateLimited": "检查次数过多。请一分钟后重试。"
+        },
+        "peopleRetry": "重试",
+        "askedAbout": "关于记录 {{record}}"
+      },
+      "access": {
+        "title": "访问",
+        "loading": "正在加载访问详情…",
+        "loadError": "无法加载访问详情。",
+        "retry": "重试",
+        "reach": "{{connector}} 中的更改会在{{interval}}内同步到 EXODIA Brain。",
+        "reachUnknown": "{{connector}} 中的更改会在下次同步时到达 EXODIA Brain。",
+        "syncNow": "立即同步权限",
+        "span": {
+          "minutes": "{{count, number(style: unit; unit: minute; unitDisplay: long)}}",
+          "hours": "{{count, number(style: unit; unit: hour; unitDisplay: long)}}",
+          "days": "{{count, number(style: unit; unit: day; unitDisplay: long)}}"
+        },
+        "refresh": {
+          "label": "权限",
+          "succeeded": "上次刷新：{{when}}。",
+          "failed": "上次权限刷新失败，因此来源中的最新更改可能尚未生效。请选择“立即同步权限”重试。",
+          "never": "权限尚未刷新。在首次同步完成之前，此连接器的内容将保持隐藏。",
+          "running": "正在刷新权限。",
+          "incomplete": "上一次权限刷新没有运行到结束。"
+        },
+        "pending": {
+          "label": "等待生效",
+          "none": "没有等待中的项目。",
+          "some_other": "{{count}} 个文件夹正在更新。更新完成前，所有人都看不到它们，通常需要几分钟。",
+          "overflow": "某项更改涉及整个连接器，因此需要完整重建其权限索引。在此之前，搜索会逐条检查结果，因此不会因此隐藏任何内容。",
+          "unknown": "未知：无法读取等待更新的文件夹列表。请参阅“需要关注”。"
+        },
+        "attention": {
+          "label": "需要处理（{{count}}）",
+          "none": "没有需要处理的事项。",
+          "warning": "{{container}} 中有 {{items}} 个项目被隐藏。同步账户无法读取此容器的权限。",
+          "fix": "解决办法：在 {{vendor}} 中为同步账户授予 {{permission}} 权限，然后选择“立即同步权限”。",
+          "showAll": "再显示 {{count}} 项",
+          "warningNoContainer": "同步账户无法读取部分项目的权限，因此这些项目被隐藏。",
+          "rebuild": "此连接器的权限索引需要完整重建。在此之前，搜索会逐条检查结果，因此不会因此隐藏任何内容。",
+          "unfinished": "某项权限更改没有顺利完成。请让运行 EXODIA Brain 的人员检查此连接器的权限索引。",
+          "stale": "部分项目无法通过更快的搜索进行检查，会改由经典搜索查找。",
+          "sweep": "此连接器的权限更新持续失败。请让运行 EXODIA Brain 的人员检查其日志。",
+          "other": "此连接器的权限需要有人查看。",
+          "unreadable": "无法读取等待更新的文件夹列表。请让运行 EXODIA Brain 的人员重建此连接器的权限索引。在此期间，搜索会逐条检查结果。"
+        }
       }
     },
     "mcpServers": {
@@ -5728,6 +5838,21 @@
       "errorTitle": "无法为所有人更改演示数据"
     }
   },
+  "accessNotice": {
+    "permissions_updating": "部分来源正在更新权限，因此几分钟内可能缺少一些结果。",
+    "connector_syncing": "{{name}} 仍在同步，因此来自它的结果可能不完整。",
+    "connector_syncing_unnamed": "有来源仍在同步，因此来自它的结果可能不完整。",
+    "check_unavailable": "我们暂时无法检查您有权访问哪些文档，因此不显示结果。请一分钟后重试。",
+    "emptySyncing": "暂时没有可搜索的内容。{{name}} 仍在同步。",
+    "emptySyncing_unnamed": "暂时没有可搜索的内容。有来源仍在同步。",
+    "noAccess": {
+      "title": "您无权访问此项目",
+      "body": "它可能已被移动、删除或受到限制。请询问所有者，或在您有链接时从原处打开。",
+      "justGotAccess": "刚在源端获得访问权限？新的访问权限会在下次同步后显示。",
+      "copyDetails": "复制详细信息给管理员",
+      "copied": "详细信息已复制"
+    }
+  },
   "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "usage": {
     "title": "用量与费用",
@@ -5876,7 +6001,92 @@
     "inheritModel": "继承模型默认值",
     "priority": "优先级：消息选择 → 智能体 → 模型 → 低。"
   },
-  "graph": {
+  "groupAccess": {
+    "currentAccess": "当前可读人数",
+    "empty": "这里没有可访问的资源。",
+    "expand": "展开",
+    "allow": "允许",
+    "allowed": "已允许",
+    "blocked": "已阻止",
+    "inherited": "继承",
+    "reset": "使用继承权限",
+    "description": "这些规则限制成员在 Brain 中可读取的内容。Slack 和 Drive 的权限仍然适用。每位成员都受其所有群组限制的约束。",
+    "all": "来源允许的所有资源",
+    "selected": "仅选定资源",
+    "manage": "管理访问",
+    "allWithExceptions": "源系统允许的所有资源（有例外）",
+    "partial": "部分访问",
+    "noReaders": "当前无人可读",
+    "countsHint": "可读人数反映已保存的规则、源系统权限和其他组的限制。— 表示未验证。"
+  },
+  "accessGroups": {
+    "title": "访问组",
+    "adminOnly": "只有管理员可以管理访问组。",
+    "help": "添加成员后，在访问权限中管理其连接器、频道和文件夹访问权限。集合共享权限仍然适用。",
+    "error": "无法确认操作。请刷新并检查当前状态后再重试。",
+    "name": "组名称",
+    "create": "创建组",
+    "previous": "上一页",
+    "next": "下一页",
+    "rename": "重命名",
+    "delete": "删除",
+    "confirmDelete": "删除此组并撤销其访问权限？",
+    "members": "成员",
+    "remove": "移除",
+    "search": "搜索人员",
+    "add": "添加"
+  },
+  "audit": {
+    "agentId": "智能体 ID",
+    "runId": "运行 ID",
+    "traceId": "追踪 ID",
+    "parentRunId": "父运行 ID",
+    "tool": "工具",
+    "toolCallId": "工具调用 ID",
+    "model": "模型",
+    "agentCoverage": "还会记录智能体运行结果和工具发出的活动事件，包括拒绝和待审批状态。不保存参数或结果。审计存储故障时智能体继续运行，未保存的事件会记录到服务器日志。",
+    "subtitle": "查看工作区活动和权限变更。",
+    "coverageTitle": "审计覆盖范围",
+    "title": "审计日志",
+    "adminOnly": "只有管理员可以查看审计日志。",
+    "coverage": "目前记录成功登录、组管理、集合权限更改、部分文档下载开始和审计日志访问，尚未包含其他平台活动。没有成功记录的操作结果可能未知。",
+    "loginWarning": "审计存储可用时会记录成功登录。审计存储故障期间仍允许登录，因此记录可能缺失。",
+    "action": "操作",
+    "outcome": "结果",
+    "actorId": "操作者 ID",
+    "groupId": "组 ID",
+    "members": "成员 ID",
+    "operation": "操作 ID",
+    "resource": "资源 ID",
+    "role": "角色",
+    "invalidFilters": "请输入完整 ID 和有效的日期范围。",
+    "from": "开始（UTC）",
+    "to": "结束（UTC）",
+    "all": "全部",
+    "loading": "正在加载审计日志…",
+    "error": "无法加载审计日志。请检查筛选条件后重试。",
+    "empty": "未找到事件。",
+    "time": "时间",
+    "previous": "上一页",
+    "next": "下一页",
+    "exportPage": "将此页导出为 JSON"
+  },
+  "datePicker": {
+    "on": "当天",
+    "between": "日期范围",
+    "before": "早于",
+    "after": "晚于",
+    "pickDate": "选择日期",
+    "chooseRange": "开始日期 — 结束日期",
+    "endDate": "结束日期",
+    "apply": "应用",
+    "startTime": "开始时间",
+    "endTime": "结束时间",
+    "time": "时间",
+    "previousMonth": "上个月",
+    "nextMonth": "下个月"
+  },
+  "knowledgeGraph": {
     "title": "知识图谱",
     "overviewIntro": "以相互连接的群组探索知识，放大查看其中的文档和概念。",
     "arranging": "正在发现群组并排列图谱…",
@@ -5929,5 +6139,107 @@
     "cacheHint": "检查更新时会复用近期布局。刷新可检查新数据。",
     "updating": "正在检查图谱更新…",
     "refreshError": "无法刷新。仍在显示已保存的图谱。"
+  },
+  "graph": {
+    "status": {
+      "stale": "图谱正在更新，最近的更改可能尚未显示。",
+      "building": "图谱正在构建，当前显示的内容可能不完整。",
+      "retrying": "图谱构建遇到问题，正在重试。",
+      "failed": "上一次图谱构建失败，此视图可能已过时。",
+      "unknown": "无法读取此图谱的状态。"
+    },
+    "empty": {
+      "neverBuilt": "此仓库尚无代码图谱。",
+      "tooLarge": "此仓库过大，无法生成图谱。"
+    },
+    "incomplete": "部分链接可能缺失。请按边类型或方向缩小范围。",
+    "simplified": "为保证流畅移动，已简化视图。",
+    "verify": {
+      "degraded": "暂时无法验证访问权限，正在显示上次确认的内容。",
+      "blank": "已有数分钟无法验证访问权限，因此已清空图谱。正在重新连接…"
+    },
+    "error": {
+      "unavailable": "暂时无法加载，请重试。",
+      "notAvailable": "此项目不可用。",
+      "unexpected": "出了点问题。",
+      "ambiguous": "有多个仓库同名。请在搜索框中选择仓库。",
+      "full": "此视图已满。打开一个节点以开始新的视图。",
+      "revoked": "你正在查看的项目已不可用。"
+    },
+    "title": "代码图谱",
+    "ui": {
+      "back": "后退",
+      "forward": "前进",
+      "fit": "适应视图",
+      "showTable": "以表格显示",
+      "showGraph": "以图谱显示",
+      "direction": {
+        "any": "两者",
+        "inbound": "调用方",
+        "outbound": "被调用方"
+      },
+      "includeTests": "包含测试",
+      "showMore": "显示更多",
+      "expand": "展开",
+      "open": "打开",
+      "nothingSelected": "选择一个节点以查看详情。",
+      "details": "详情",
+      "links": "链接：{{n}}",
+      "table": {
+        "caption": "此视图中的节点",
+        "name": "名称",
+        "kind": "类型",
+        "file": "文件",
+        "actions": "操作",
+        "moreRows": "显示更多行",
+        "callersShown": "已显示的调用方",
+        "calleesShown": "已显示的被调用方",
+        "focus": "中心"
+      },
+      "emptyPrompt": "在上方搜索函数、方法或类，查看谁调用了它以及它调用了谁。",
+      "disclosure": "仅显示你有权访问的内容。",
+      "legendInferred": "虚线表示按名称推断的链接。",
+      "disabled": "代码图谱未启用。",
+      "search": {
+        "repo": "仓库",
+        "repoPlaceholder": "选择仓库",
+        "placeholder": "按名称查找函数、方法或类",
+        "label": "搜索代码",
+        "results": "搜索结果",
+        "noRepos": "没有你可以读取的代码仓库。",
+        "noMatches": "没有匹配项。",
+        "chooseFirst": "请先选择仓库",
+        "minChars": "请至少输入 2 个字符。",
+        "more": "仅显示前几个匹配项。请输入更多内容以缩小搜索范围。"
+      },
+      "action": {
+        "retry": "重试",
+        "restore": "使用完整画质"
+      },
+      "loading": "正在加载…",
+      "legend": {
+        "functions": "函数和方法",
+        "classes": "类和接口",
+        "focus": "此视图的中心"
+      },
+      "openHint": "打开：将其设为新视图的中心。",
+      "expandHint": "展开：在此显示其相邻项，并保留当前内容。",
+      "announce": {
+        "opened": "正在显示 {{n}} 项。",
+        "added": "已添加 {{n}} 项。"
+      },
+      "canvasHint": "图谱图像无法供屏幕阅读器使用。请使用“以表格显示”按钮来阅读和操作每个节点。",
+      "selectionGone": "你选择的项目已不可用。",
+      "viewGraph": "查看图谱",
+      "viewGraphOf": "查看图谱：{{repo}}",
+      "fillerNode": "{{file}} 中的 {{kind}}"
+    },
+    "capped": "图中只显示此视图的一部分，表格列出全部内容。",
+    "crowded": "此视图越来越拥挤。请用筛选器缩小范围。",
+    "hint": {
+      "testsOff": "测试文件已隐藏。如果该项目在测试代码中，请打开“包含测试”。"
+    },
+    "nothingNew": "此节点没有更多内容可显示。",
+    "tableOnly": "为保持流畅，仅显示表格。"
   }
 }

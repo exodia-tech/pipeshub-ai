@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
 import type { FlowNodeData } from '../../types';
@@ -68,8 +68,17 @@ function renderWithServers(servers: FlowNodeData[]) {
 
 const chip = (label: string) => screen.getByTitle(label);
 
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  });
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   flow.nodes = [];
   flow.edges = [];
 });

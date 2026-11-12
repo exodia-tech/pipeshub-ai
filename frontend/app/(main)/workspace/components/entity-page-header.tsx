@@ -1,15 +1,28 @@
 'use client';
 
 import React from 'react';
-import { Box, Flex, Heading, Text, Button, TextField, Tooltip } from '@radix-ui/themes';
+import {
+  Box,
+  Flex,
+  Heading,
+  Text,
+  Button,
+  TextField,
+  Tooltip,
+} from '@radix-ui/themes';
 import { useCanHover } from '@/lib/hooks/use-can-hover';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
-import { MOBILE_PAGE_PADDING_TOP, PAGE_PADDING_TOP } from './settings-page-container';
+import {
+  MOBILE_PAGE_PADDING_TOP,
+  PAGE_PADDING_TOP,
+} from './settings-page-container';
 import { useIsMobile } from '@/lib/hooks/use-is-mobile';
 
 export interface EntityPageHeaderProps {
   /** Page title (e.g. "Users") */
   title: string;
+  /** Secondary help or status placed beside the title without crowding the action toolbar. */
+  titleAccessory?: React.ReactNode;
   /** Page subtitle */
   subtitle: string;
   /** Search input placeholder */
@@ -42,6 +55,7 @@ export interface EntityPageHeaderProps {
  */
 export function EntityPageHeader({
   title,
+  titleAccessory,
   subtitle,
   searchPlaceholder = 'Search...',
   searchValue,
@@ -56,7 +70,8 @@ export function EntityPageHeader({
 }: EntityPageHeaderProps) {
   // Phones clear the fixed menu button, like every other settings page
   const isMobile = useIsMobile();
-  const paddingTop = paddingTopProp ?? (isMobile ? MOBILE_PAGE_PADDING_TOP : PAGE_PADDING_TOP);
+  const paddingTop =
+    paddingTopProp ?? (isMobile ? MOBILE_PAGE_PADDING_TOP : PAGE_PADDING_TOP);
   const canHover = useCanHover();
   const ctaButton = (
     <Button
@@ -84,16 +99,29 @@ export function EntityPageHeader({
     >
       {/* Left: Title + Subtitle */}
       <Flex direction="column" gap="2">
-        <Heading size="5" weight="medium" style={{ color: 'var(--slate-12)' }}>
-          {title}
-        </Heading>
+        <Flex align="center" gap="2">
+          <Heading
+            size="5"
+            weight="medium"
+            style={{ color: 'var(--slate-12)' }}
+          >
+            {title}
+          </Heading>
+          {titleAccessory}
+        </Flex>
         <Text size="2" style={{ color: 'var(--slate-11)' }}>
           {subtitle}
         </Text>
       </Flex>
 
       {/* Right: Search + CTA */}
-      <Flex align="center" gap="3" wrap="wrap" width={{ initial: '100%', md: 'auto' }} style={{ maxWidth: '100%' }}>
+      <Flex
+        align="center"
+        gap="3"
+        wrap="wrap"
+        width={{ initial: '100%', md: 'auto' }}
+        style={{ maxWidth: '100%' }}
+      >
         <Box width={{ initial: '100%', sm: '224px' }}>
           <TextField.Root
             size="2"

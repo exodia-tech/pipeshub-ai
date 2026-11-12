@@ -9,7 +9,7 @@ question, the citation filters, the choice of one record per virtual record id,
 and failure that raises instead of denying.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -24,6 +24,7 @@ from app.services.graph_db.neo4j.neo4j_provider import Neo4jProvider
 def _provider(rows=(), *, fail=False) -> tuple[Neo4jProvider, dict]:
     provider = Neo4jProvider.__new__(Neo4jProvider)
     provider.logger = MagicMock()
+    provider.get_edges_from_node = AsyncMock(return_value=[])
     calls: dict = {}
 
     async def _rows(user_key, org_id, node_ids, vrids, *, access, transaction) -> list:
