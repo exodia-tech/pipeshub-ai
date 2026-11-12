@@ -46,3 +46,9 @@ The large Node test stream is saved as a compressed seven-day log
 artifact. The console prints summaries and a bounded failure tail; the original
 test exit status still gates the job. This avoids repeated 30-second results-log
 upload timeouts while retaining the full diagnostics.
+
+Pyright startup must succeed before analysis. Its existing nonblocking type
+diagnostics policy is retained; runtime/configuration failures fail the job.
+
+For local lint comparisons, use the workflow's Git pathspecs; shell glob
+expansion can omit files directly under `src/`.
