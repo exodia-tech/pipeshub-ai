@@ -1411,7 +1411,7 @@ class SlackIndividualConnector(BaseConnector):
                 source_created_at=src_ts,
                 source_updated_at=upd_ts,
                 inherit_permissions=True,
-                hide_children=True,
+                hide_children=False,
             )
         except Exception as exc:
             self.logger.error(f"_to_channel_record_group({cid}): {exc}")

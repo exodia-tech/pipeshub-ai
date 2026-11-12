@@ -1676,9 +1676,8 @@ class SlackConnector(BaseConnector):
                 connector_name=Connectors.SLACK_WORKSPACE,
                 connector_id=self.connector_id,
                 group_type=RecordGroupType.SLACK_CHANNEL,
-                # Slack has no per-message ACL, so channel membership is the
-                # whole permission story and search can trust the group.
-                permission_model=PermissionModel.RECORD_GROUP_LEVEL,
+                # Huddle canvases can lose a channel share independently of messages.
+                permission_model=PermissionModel.RECORD_LEVEL,
                 web_url=web_url,
                 created_at=current_ts,
                 updated_at=current_ts,
@@ -1687,7 +1686,7 @@ class SlackConnector(BaseConnector):
                 # A channel is not open to everyone with the workspace app, so it
                 # must not inherit from the App: membership is the grant.
                 inherit_permissions=False,
-                hide_children=True,
+                hide_children=False,
             )
         except Exception as exc:
             self.logger.error(f"_to_channel_record_group({cid}): {exc}")
