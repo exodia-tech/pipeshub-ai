@@ -81,11 +81,7 @@ export const SMTP_CONNECTION_ERROR_CODES = new Set([
   SMTP_DEADLINE_ERROR_CODE,
 ]);
 
-const PERMANENT_ERROR_CODES = new Set([
-  'EAUTH',
-  'EENVELOPE',
-  'EMESSAGE',
-]);
+const PERMANENT_ERROR_CODES = new Set(['EAUTH', 'EENVELOPE', 'EMESSAGE']);
 
 /**
  * An error with no usable signal counts as transient: dropping a real email is

@@ -79,9 +79,19 @@ describe('ConfigurationManagerService', () => {
       const scopedToken = 'my-scoped-token';
       const body = { host: 'smtp.example.com', port: 587 };
 
-      backend.on('POST', `/${configUrlPath}`, { status: 200, body: { saved: true } });
+      backend.on('POST', `/${configUrlPath}`, {
+        status: 200,
+        body: { saved: true },
+      });
       try {
-        expect(await cmService.setConfig(backend.url, configUrlPath, scopedToken, body)).to.deep.equal({ statusCode: 200, data: { saved: true } });
+        expect(
+          await cmService.setConfig(
+            backend.url,
+            configUrlPath,
+            scopedToken,
+            body,
+          ),
+        ).to.deep.equal({ statusCode: 200, data: { saved: true } });
         const [call] = backend.callsTo('POST', `/${configUrlPath}`);
         expect(call.headers.authorization).to.equal(`Bearer ${scopedToken}`);
         expect(call.body).to.deep.equal(body);
@@ -93,12 +103,7 @@ describe('ConfigurationManagerService', () => {
     it('should throw InternalServerError for non-axios errors', async () => {
       // Force a non-axios error by providing invalid args
       try {
-        await cmService.setConfig(
-          null as any,
-          'api/v1/config',
-          'token',
-          {},
-        );
+        await cmService.setConfig(null as any, 'api/v1/config', 'token', {});
         expect.fail('Should have thrown an error');
       } catch (error: any) {
         expect(error).to.be.an('error');

@@ -123,7 +123,12 @@ export const continueConversation = async (
   return {
     conversation,
     previousConversations: formatPreviousConversations(
-      await redactMessagesFor(appConfig,viewer,rows as unknown as IMessage[],() => String(conversation.initiator)),
+      await redactMessagesFor(
+        appConfig,
+        viewer,
+        rows as unknown as IMessage[],
+        () => conversation.initiator,
+      ),
     ),
   };
 };

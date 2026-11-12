@@ -81,12 +81,10 @@ describe('access groups across authenticated services', function () {
           new AuthTokenService(secret, secret),
         ),
       );
-    container
-      .bind('AppConfig')
-      .toConstantValue({
-        connectorBackend: testServer,
-        scopedJwtSecret: secret,
-      });
+    container.bind('AppConfig').toConstantValue({
+      connectorBackend: testServer,
+      scopedJwtSecret: secret,
+    });
     const app = express();
     app.use(express.json());
     app.use(requestContextMiddleware);
@@ -105,9 +103,10 @@ describe('access groups across authenticated services', function () {
       },
       getRecordBuffer(testServer),
     );
-    app.use((error: any, _req: any, res: any, _next: any) =>
-      res.status(error.statusCode || 500).json({ error: error.message }),
-    );
+    app.use((error: any, _req: any, res: any, _next: any) => {
+      void _next;
+      return res.status(error.statusCode || 500).json({ error: error.message });
+    });
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, '127.0.0.1', () => resolve(s));
     });
@@ -211,36 +210,32 @@ describe('access groups across authenticated services', function () {
       member: string;
       group: string;
     };
-    await mongoose.connection
-      .collection('users')
-      .updateOne(
-        { _id: new mongoose.Types.ObjectId(demo.admin) },
-        {
-          $set: {
-            orgId: new mongoose.Types.ObjectId(demo.org),
-            role: 'admin',
-            email: 'fixture@example.invalid',
-            slug: 'fixture-admin',
-            isDeleted: false,
-          },
+    await mongoose.connection.collection('users').updateOne(
+      { _id: new mongoose.Types.ObjectId(demo.admin) },
+      {
+        $set: {
+          orgId: new mongoose.Types.ObjectId(demo.org),
+          role: 'admin',
+          email: 'fixture@example.invalid',
+          slug: 'fixture-admin',
+          isDeleted: false,
         },
-        { upsert: true },
-      );
-    await mongoose.connection
-      .collection('users')
-      .updateOne(
-        { _id: new mongoose.Types.ObjectId(demo.member) },
-        {
-          $set: {
-            orgId: new mongoose.Types.ObjectId(demo.org),
-            role: 'member',
-            email: 'fixture-member@example.invalid',
-            slug: 'fixture-member',
-            isDeleted: false,
-          },
+      },
+      { upsert: true },
+    );
+    await mongoose.connection.collection('users').updateOne(
+      { _id: new mongoose.Types.ObjectId(demo.member) },
+      {
+        $set: {
+          orgId: new mongoose.Types.ObjectId(demo.org),
+          role: 'member',
+          email: 'fixture-member@example.invalid',
+          slug: 'fixture-member',
+          isDeleted: false,
         },
-        { upsert: true },
-      );
+      },
+      { upsert: true },
+    );
     const headers = {
       authorization: `Bearer ${jwt.sign({ userId: demo.admin, orgId: demo.org, role: 'admin' }, secret)}`,
       'content-type': 'application/json',
@@ -483,7 +478,7 @@ describe('access groups across authenticated services', function () {
           event.resource_policy?.rules.some(
             (rule) =>
               rule.resource_ref === 'records/demo-finance-record' &&
-              rule.allow === false,
+              !rule.allow,
           ),
         ),
       );
@@ -502,13 +497,34 @@ describe('access groups across authenticated services', function () {
     }
   });
   it('accepts exactly one simultaneous save for a policy revision', async () => {
-    const demo = await graph('demo', {}) as {org:string;admin:string;group:string};
-    const headers={authorization:`Bearer ${jwt.sign({userId:demo.admin,orgId:demo.org,role:'admin'},secret)}`,'content-type':'application/json'};
-    const path=`${base}/access-groups/${demo.group}/access`;
-    const {policy}=await (await fetch(path,{headers})).json() as {policy:{revision:number;defaultAllow:boolean;rules:unknown[]}};
-    const responses=await Promise.all([0,1].map(()=>fetch(path,{method:'PUT',headers,body:JSON.stringify(policy)})));
-    assert.deepEqual(responses.map(response=>response.status).sort(),[200,409]);
-    const current=await (await fetch(path,{headers})).json() as {policy:typeof policy};
-    assert.deepEqual(current.policy,{...policy,revision:policy.revision+1});
+    const demo = (await graph('demo', {})) as {
+      org: string;
+      admin: string;
+      group: string;
+    };
+    const headers = {
+      authorization: `Bearer ${jwt.sign({ userId: demo.admin, orgId: demo.org, role: 'admin' }, secret)}`,
+      'content-type': 'application/json',
+    };
+    const path = `${base}/access-groups/${demo.group}/access`;
+    const { policy } = (await (await fetch(path, { headers })).json()) as {
+      policy: { revision: number; defaultAllow: boolean; rules: unknown[] };
+    };
+    const responses = await Promise.all(
+      [0, 1].map(() =>
+        fetch(path, { method: 'PUT', headers, body: JSON.stringify(policy) }),
+      ),
+    );
+    assert.deepEqual(
+      responses.map((response) => response.status).sort(),
+      [200, 409],
+    );
+    const current = (await (await fetch(path, { headers })).json()) as {
+      policy: typeof policy;
+    };
+    assert.deepEqual(current.policy, {
+      ...policy,
+      revision: policy.revision + 1,
+    });
   });
 });

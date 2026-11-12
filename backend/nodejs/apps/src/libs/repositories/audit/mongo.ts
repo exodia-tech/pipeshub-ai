@@ -5,10 +5,7 @@ import {
   ServiceUnavailableError,
 } from '../../errors/http.errors';
 import { Logger } from '../../services/logger.service';
-import {
-  docStore,
-  DocStoreNotReady,
-} from '../store-select';
+import { docStore, DocStoreNotReady } from '../store-select';
 
 export const AUDIT_ACTIONS = [
   'group.members.add',

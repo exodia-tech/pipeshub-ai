@@ -38,23 +38,21 @@ async function main() {
     [ids.admin, 'Alex Example', 'admin'],
     [ids.member, 'Sam Example', 'member'],
   ]) {
-    await mongoose.connection
-      .collection('users')
-      .updateOne(
-        { _id: new mongoose.Types.ObjectId(id) },
-        {
-          $set: {
-            orgId: new mongoose.Types.ObjectId(ids.org),
-            fullName: name,
-            email: `${role}@example.invalid`,
-            slug: `local-${role}`,
-            role,
-            isDeleted: false,
-            isActive: true,
-          },
+    await mongoose.connection.collection('users').updateOne(
+      { _id: new mongoose.Types.ObjectId(id) },
+      {
+        $set: {
+          orgId: new mongoose.Types.ObjectId(ids.org),
+          fullName: name,
+          email: `${role}@example.invalid`,
+          slug: `local-${role}`,
+          role,
+          isDeleted: false,
+          isActive: true,
         },
-        { upsert: true },
-      );
+      },
+      { upsert: true },
+    );
   }
   const container = new Container();
   container
@@ -349,10 +347,12 @@ async function main() {
       _req: express.Request,
       res: express.Response,
       _next: express.NextFunction,
-    ) =>
-      res
+    ) => {
+      void _next;
+      return res
         .status(error.statusCode || 500)
-        .json({ error: error.message || 'Fixture service unavailable' }),
+        .json({ error: error.message || 'Fixture service unavailable' });
+    },
   );
   app.listen(4572, '127.0.0.1', () =>
     process.stdout.write(

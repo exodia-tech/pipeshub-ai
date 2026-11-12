@@ -1,14 +1,14 @@
-import 'reflect-metadata'
-import { expect } from 'chai'
-import fs from 'fs'
-import path from 'path'
-import sinon from 'sinon'
-import { Container } from 'inversify'
-import { ValidationMiddleware } from '../../../src/libs/middlewares/validation.middleware'
+import 'reflect-metadata';
+import { expect } from 'chai';
+import fs from 'fs';
+import path from 'path';
+import sinon from 'sinon';
+import { Container } from 'inversify';
+import { ValidationMiddleware } from '../../../src/libs/middlewares/validation.middleware';
 
-const SRC = path.resolve(__dirname, '../../../src')
+const SRC = path.resolve(__dirname, '../../../src');
 
-const WRITE_METHODS = ['post', 'put', 'patch'] as const
+const WRITE_METHODS = ['post', 'put', 'patch'] as const;
 
 // Write routes that run without ValidationMiddleware today. Each one either
 // takes no body, validates it some other way, or is a follow-up to give a Zod
@@ -110,7 +110,7 @@ const ROUTES_WITHOUT_VALIDATION = new Set<string>([
   'createConnectorRouter POST /getTokenFromCode',
   'createConnectorRouter POST /internal/refreshIndividualConnectorToken',
   'createMailServiceRouter POST /emails/sendEmail',
-])
+]);
 
 // Anything a router factory asks its container for: callable, and every
 // property is another stand-in, so building a router needs no real services.
@@ -118,14 +118,14 @@ const ROUTES_WITHOUT_VALIDATION = new Set<string>([
 const standIn = (): any =>
   new Proxy(function standInFn() {}, {
     get: (_target, prop) => {
-      if (prop === 'then') return undefined
-      if (prop === Symbol.toPrimitive) return () => ''
-      if (prop === Symbol.iterator) return undefined
-      return standIn()
+      if (prop === 'then') return undefined;
+      if (prop === Symbol.toPrimitive) return () => '';
+      if (prop === Symbol.iterator) return undefined;
+      return standIn();
     },
     apply: () => standIn(),
     construct: () => standIn(),
-  })
+  });
 
 const fakeContainer = (): Container =>
   ({
@@ -134,27 +134,31 @@ const fakeContainer = (): Container =>
     isBound: () => true,
     getNamed: () => standIn(),
     getTagged: () => standIn(),
-  }) as unknown as Container
+  }) as unknown as Container;
 
 const routeFiles = (): string[] =>
   (fs.readdirSync(path.join(SRC, 'modules'), { recursive: true }) as string[])
     .map((file) => file.replace(/\\/g, '/'))
-    .filter((file) => /(^|\/)routes\/[^/]+\.ts$/.test(file) || /(^|\/)[^/]+\.routes\.ts$/.test(file))
+    .filter(
+      (file) =>
+        /(^|\/)routes\/[^/]+\.ts$/.test(file) ||
+        /(^|\/)[^/]+\.routes\.ts$/.test(file),
+    )
     .map((file) => path.join(SRC, 'modules', file))
-    .sort()
+    .sort();
 
 interface Layer {
-  route?: { path: string; methods: Record<string, boolean>; stack: Layer[] }
-  handle: ((...args: unknown[]) => unknown) & { stack?: Layer[] }
-  regexp?: RegExp
-  name?: string
+  route?: { path: string; methods: Record<string, boolean>; stack: Layer[] };
+  handle: ((...args: unknown[]) => unknown) & { stack?: Layer[] };
+  regexp?: RegExp;
+  name?: string;
 }
 
 const mountPrefix = (layer: Layer): string => {
-  const source = layer.regexp?.source ?? ''
-  const match = source.match(/^\^\\\/(.*?)\\\/\?\(\?=\\\/\|\$\)$/)
-  return match?.[1] ? `/${match[1].replace(/\\\//g, '/')}` : ''
-}
+  const source = layer.regexp?.source ?? '';
+  const match = source.match(/^\^\\\/(.*?)\\\/\?\(\?=\\\/\|\$\)$/);
+  return match?.[1] ? `/${match[1].replace(/\\\//g, '/')}` : '';
+};
 
 const collectWriteRoutes = (
   stack: Layer[],
@@ -163,80 +167,117 @@ const collectWriteRoutes = (
   inheritedValidation: boolean,
   out: Array<{ route: string; validated: boolean }>,
 ): void => {
-  let routerWideValidation = inheritedValidation
+  let routerWideValidation = inheritedValidation;
   for (const layer of stack) {
     if (layer.route) {
       const validated =
-        routerWideValidation || layer.route.stack.some((l) => validators.has(l.handle))
+        routerWideValidation ||
+        layer.route.stack.some((l) => validators.has(l.handle));
       for (const method of WRITE_METHODS) {
         if (layer.route.methods[method]) {
-          out.push({ route: `${method.toUpperCase()} ${prefix}${layer.route.path}`, validated })
+          out.push({
+            route: `${method.toUpperCase()} ${prefix}${layer.route.path}`,
+            validated,
+          });
         }
       }
     } else if (Array.isArray(layer.handle?.stack)) {
-      collectWriteRoutes(layer.handle.stack, validators, prefix + mountPrefix(layer), routerWideValidation, out)
+      collectWriteRoutes(
+        layer.handle.stack,
+        validators,
+        prefix + mountPrefix(layer),
+        routerWideValidation,
+        out,
+      );
     } else if (validators.has(layer.handle)) {
-      routerWideValidation = true
+      routerWideValidation = true;
     }
   }
-}
+};
 
 describe('Every write route validates its input', () => {
-  const routes: Array<{ file: string; route: string; validated: boolean }> = []
-  const unbuildable: string[] = []
+  const routes: Array<{ file: string; route: string; validated: boolean }> = [];
+  const unbuildable: string[] = [];
 
   before(async function () {
-    this.timeout(60000)
-    const validators = new WeakSet<object>()
-    const original = ValidationMiddleware.validate.bind(ValidationMiddleware)
+    this.timeout(60000);
+    const validators = new WeakSet<object>();
+    const original = ValidationMiddleware.validate.bind(ValidationMiddleware);
     // The health router reads its config, which insists on a key, when built.
-    const secretKey = process.env.SECRET_KEY
-    process.env.SECRET_KEY = secretKey ?? 'route-validation-coverage-test-key'
-    const validate = sinon.stub(ValidationMiddleware, 'validate').callsFake((schema, options) => {
-      const handler = original(schema, options)
-      validators.add(handler)
-      return handler
-    })
+    const secretKey = process.env.SECRET_KEY;
+    process.env.SECRET_KEY = secretKey ?? 'route-validation-coverage-test-key';
+    const validate = sinon
+      .stub(ValidationMiddleware, 'validate')
+      .callsFake((schema, options) => {
+        const handler = original(schema, options);
+        validators.add(handler);
+        return handler;
+      });
     try {
       for (const file of routeFiles()) {
-        const mod = (await import(file)) as Record<string, unknown>
+        const mod = (await import(file)) as Record<string, unknown>;
         const factories = Object.entries(mod).filter(
-          ([name, value]) => typeof value === 'function' && /^create\w*Router$/.test(name),
-        )
+          ([name, value]) =>
+            typeof value === 'function' && /^create\w*Router$/.test(name),
+        );
         for (const [name, factory] of factories) {
-          let router: { stack: Layer[] }
+          let router: { stack: Layer[] };
           try {
-            router = (factory as (...c: Container[]) => { stack: Layer[] })(fakeContainer(), fakeContainer())
+            router = (factory as (...c: Container[]) => { stack: Layer[] })(
+              fakeContainer(),
+              fakeContainer(),
+            );
           } catch (error) {
-            unbuildable.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
-            continue
+            unbuildable.push(
+              `${name}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            continue;
           }
-          const found: Array<{ route: string; validated: boolean }> = []
-          collectWriteRoutes(router.stack, validators, '', false, found)
-          const rel = path.relative(SRC, file)
-          for (const r of found) routes.push({ file: rel, route: `${name} ${r.route}`, validated: r.validated })
+          const found: Array<{ route: string; validated: boolean }> = [];
+          collectWriteRoutes(router.stack, validators, '', false, found);
+          const rel = path.relative(SRC, file);
+          for (const r of found)
+            routes.push({
+              file: rel,
+              route: `${name} ${r.route}`,
+              validated: r.validated,
+            });
         }
       }
     } finally {
-      validate.restore()
-      if (secretKey === undefined) delete process.env.SECRET_KEY
-      else process.env.SECRET_KEY = secretKey
+      validate.restore();
+      if (secretKey === undefined) delete process.env.SECRET_KEY;
+      else process.env.SECRET_KEY = secretKey;
     }
-  })
+  });
 
   it('finds the write routes of every router factory', () => {
-    expect(unbuildable, 'router factories that could not be built from stand-ins').to.deep.equal([])
-    expect(routes.length).to.be.greaterThan(100)
-  })
+    expect(
+      unbuildable,
+      'router factories that could not be built from stand-ins',
+    ).to.deep.equal([]);
+    expect(routes.length).to.be.greaterThan(100);
+  });
 
   it('puts ValidationMiddleware on every POST, PUT and PATCH route that is not allowlisted', () => {
-    const missing = routes.filter((r) => !r.validated && !ROUTES_WITHOUT_VALIDATION.has(r.route)).map((r) => r.route)
-    expect(missing, 'add a Zod schema with ValidationMiddleware.validate, or allowlist it with a reason').to.deep.equal([])
-  })
+    const missing = routes
+      .filter((r) => !r.validated && !ROUTES_WITHOUT_VALIDATION.has(r.route))
+      .map((r) => r.route);
+    expect(
+      missing,
+      'add a Zod schema with ValidationMiddleware.validate, or allowlist it with a reason',
+    ).to.deep.equal([]);
+  });
 
   it('keeps the allowlist to routes that still exist and still lack validation', () => {
-    const unvalidated = new Set(routes.filter((r) => !r.validated).map((r) => r.route))
-    const stale = [...ROUTES_WITHOUT_VALIDATION].filter((r) => !unvalidated.has(r))
-    expect(stale, 'remove these from ROUTES_WITHOUT_VALIDATION').to.deep.equal([])
-  })
-})
+    const unvalidated = new Set(
+      routes.filter((r) => !r.validated).map((r) => r.route),
+    );
+    const stale = [...ROUTES_WITHOUT_VALIDATION].filter(
+      (r) => !unvalidated.has(r),
+    );
+    expect(stale, 'remove these from ROUTES_WITHOUT_VALIDATION').to.deep.equal(
+      [],
+    );
+  });
+});

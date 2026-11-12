@@ -502,7 +502,10 @@ export class UserAccountController {
   ): Promise<void> {
     try {
       const { userId, orgId } = this.callerIdentity(req);
-      const userCredentialData = await getCredentialRepository().find(userId, orgId);
+      const userCredentialData = await getCredentialRepository().find(
+        userId,
+        orgId,
+      );
       res.json({ hasPassword: !!userCredentialData?.hashedPassword });
     } catch (error) {
       next(error);
@@ -518,7 +521,10 @@ export class UserAccountController {
   ): Promise<void> {
     try {
       const { userId, orgId } = this.callerIdentity(req);
-      const userCredentialData = await getCredentialRepository().find(userId, orgId);
+      const userCredentialData = await getCredentialRepository().find(
+        userId,
+        orgId,
+      );
       if (userCredentialData?.hashedPassword) {
         throw new BadRequestError(
           'A password is already set. Use change password instead.',
@@ -1751,17 +1757,26 @@ export class UserAccountController {
         try {
           await Promise.race([
             recordAuditEvent({
-              org_id: String(user.orgId), actor_id: String(user._id), operation_id: randomUUID(),
-              request_id: req.context?.requestId, action: 'auth.login', outcome: 'success',
-              group_ids: [], member_ids: [],
+              org_id: String(user.orgId),
+              actor_id: String(user._id),
+              operation_id: randomUUID(),
+              request_id: req.context?.requestId,
+              action: 'auth.login',
+              outcome: 'success',
+              group_ids: [],
+              member_ids: [],
             }),
             new Promise<never>((_, reject) => {
-              auditTimer = setTimeout(() => reject(new Error('Audit timed out')), 1000);
+              auditTimer = setTimeout(
+                () => reject(new Error('Audit timed out')),
+                1000,
+              );
             }),
           ]);
         } catch {
           this.logger.error('Sign-in audit event could not be recorded', {
-            orgId: String(user.orgId), userId: String(user._id),
+            orgId: String(user.orgId),
+            userId: String(user._id),
           });
         } finally {
           if (auditTimer) clearTimeout(auditTimer);

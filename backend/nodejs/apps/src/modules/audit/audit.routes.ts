@@ -41,6 +41,7 @@ const agentEvent = z
           .string()
           .min(1)
           .max(256)
+          // eslint-disable-next-line no-control-regex -- Audit metadata must reject C0 control characters.
           .regex(/^[^\x00-\x1f]+$/)
           .optional(),
       })
@@ -72,11 +73,9 @@ export function createAuditRouter(container: Container): Router {
       try {
         const identity = serviceIdentity.safeParse(req.tokenPayload);
         if (!identity.success) {
-          res
-            .status(401)
-            .json({
-              error: 'An organization-scoped audit service token is required',
-            });
+          res.status(401).json({
+            error: 'An organization-scoped audit service token is required',
+          });
           return;
         }
         const event = agentEvent.safeParse(req.body);
@@ -102,7 +101,7 @@ export function createAuditRouter(container: Container): Router {
   );
   router.get(
     '/',
-    auth.authenticate,
+    auth.authenticate.bind(auth),
     requireScopes(OAuthScopeNames.CONFIG_READ),
     userAdminCheck,
     async (req: AuthenticatedUserRequest, res, next) => {
@@ -214,20 +213,23 @@ export function createAuditRouter(container: Container): Router {
           res.status(400).json({ error: 'Invalid UTC audit time range' });
           return;
         }
-        const events = await listAuditEvents(String(currentOrgContext().orgId), {
-          action: action as AuditAction | undefined,
-          limit: Number(rawLimit),
-          before,
-          actorId: actorId as string | undefined,
-          groupId: groupId as string | undefined,
-          resourceId: resourceId as string | undefined,
-          outcome: outcome as (typeof AUDIT_OUTCOMES)[number] | undefined,
-          from: start,
-          to: end,
-        });
+        const events = await listAuditEvents(
+          String(currentOrgContext().orgId),
+          {
+            action: action as AuditAction | undefined,
+            limit: Number(rawLimit),
+            before,
+            actorId,
+            groupId,
+            resourceId,
+            outcome: outcome as (typeof AUDIT_OUTCOMES)[number] | undefined,
+            from: start,
+            to: end,
+          },
+        );
         await recordAuditEvent({
           org_id: String(currentOrgContext().orgId),
-          actor_id: String(req.user!.userId),
+          actor_id: String(currentOrgContext().userId),
           operation_id: randomUUID(),
           request_id: req.context?.requestId,
           action: req.query.export === 'true' ? 'audit.export' : 'audit.read',

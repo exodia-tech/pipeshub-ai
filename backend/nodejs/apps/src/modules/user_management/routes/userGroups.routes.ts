@@ -115,30 +115,32 @@ export const groupAdminCheck =
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
-    await userAdminCheck(req, res, async (error?: unknown) => {
+    await userAdminCheck(req, res, (error?: unknown) => {
       if (!error) {
         next();
         return;
       }
-      if (req.user?.userId) {
-        try {
-          await recordAuditEvent({
-            org_id: String(currentOrgContext().orgId),
-            actor_id: String(req.user.userId),
-            operation_id: randomUUID(),
-            request_id: req.context?.requestId,
-            action,
-            outcome: 'denied',
-            group_ids: [],
-            member_ids: [],
-          });
-        } catch {
-          Logger.getInstance().error(
-            'Group audit denial could not be recorded',
-          );
+      void (async () => {
+        if (req.user?.userId) {
+          try {
+            await recordAuditEvent({
+              org_id: String(currentOrgContext().orgId),
+              actor_id: String(req.user.userId),
+              operation_id: randomUUID(),
+              request_id: req.context?.requestId,
+              action,
+              outcome: 'denied',
+              group_ids: [],
+              member_ids: [],
+            });
+          } catch {
+            Logger.getInstance().error(
+              'Group audit denial could not be recorded',
+            );
+          }
         }
-      }
-      next(error);
+        next(error);
+      })().catch(next);
     });
   };
 

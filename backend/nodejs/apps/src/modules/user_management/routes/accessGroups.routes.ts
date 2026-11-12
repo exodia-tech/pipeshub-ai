@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Container } from 'inversify';
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { AuthMiddleware } from '../../../libs/middlewares/auth.middleware';
 import { AuthenticatedUserRequest } from '../../../libs/middlewares/types';
 import { requireScopes } from '../../../libs/middlewares/require-scopes.middleware';
@@ -19,6 +20,28 @@ import { AppConfig } from '../../tokens_manager/config/config';
 import { groupAdminCheck } from './userGroups.routes';
 import { userAdminCheck } from '../middlewares/userAdminCheck';
 
+// eslint-disable-next-line no-control-regex -- Resource references must reject C0 control characters.
+const resourceReference = /^(apps|recordGroups|records)\/[^/\x00-\x1f]{1,256}$/;
+const accessPolicy = z.object({
+  defaultAllow: z.boolean(),
+  revision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullish(),
+  rules: z
+    .array(
+      z.object({
+        ref: z.string().regex(resourceReference),
+        allow: z.boolean(),
+      }),
+    )
+    .max(1000),
+});
+const namedGroup = z.object({ name: z.string() });
+const groupMembers = z.object({
+  userIds: z
+    .array(z.string().regex(/^[a-f0-9]{24}$/i))
+    .min(1)
+    .max(500),
+});
+
 export function createAccessGroupsRouter(container: Container): Router {
   const router = Router();
   const auth = container.get<AuthMiddleware>('AuthMiddleware');
@@ -26,7 +49,7 @@ export function createAccessGroupsRouter(container: Container): Router {
   for (const part of ['access', 'resources'] as const) {
     router.get(
       `/:id/${part}`,
-      auth.authenticate,
+      auth.authenticate.bind(auth),
       requireScopes(OAuthScopeNames.USERGROUP_READ),
       userAdminCheck,
       async (req: AuthenticatedUserRequest, res, next) => {
@@ -49,7 +72,7 @@ export function createAccessGroupsRouter(container: Container): Router {
           }
           const token = jwt.sign(
             {
-              userId: String(req.user!.userId),
+              userId: String(currentOrgContext().userId),
               orgId: String(currentOrgContext().orgId),
               scopes: [TokenScopes.ACCESS_GROUP_MANAGE],
             },
@@ -78,37 +101,24 @@ export function createAccessGroupsRouter(container: Container): Router {
   }
   router.put(
     '/:id/access',
-    auth.authenticate,
+    auth.authenticate.bind(auth),
     requireScopes(OAuthScopeNames.USERGROUP_WRITE),
     groupAdminCheck('group.access.change'),
     async (req: AuthenticatedUserRequest, res, next) => {
       try {
-        const id = String(req.params.id),
-          body = req.body;
+        const id = String(req.params.id);
+        const parsed = accessPolicy.safeParse(req.body);
         if (
           !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
             id,
           ) ||
-          !body ||
-          typeof body.defaultAllow !== 'boolean' ||
-          !Number.isSafeInteger(body.revision ?? 0) ||
-          (body.revision ?? 0) < 0 ||
-          !Array.isArray(body.rules) ||
-          body.rules.length > 1000 ||
-          body.rules.some(
-            (rule: { ref?: unknown; allow?: unknown }) =>
-              !rule ||
-              typeof rule.ref !== 'string' ||
-              !/^(apps|recordGroups|records)\/[^/\x00-\x1f]{1,256}$/.test(
-                rule.ref,
-              ) ||
-              typeof rule.allow !== 'boolean',
-          )
+          !parsed.success
         )
           throw new BadRequestError('Invalid resource policy');
+        const body = parsed.data;
         const audit = {
           org_id: String(currentOrgContext().orgId),
-          actor_id: String(req.user!.userId),
+          actor_id: String(currentOrgContext().userId),
           operation_id: randomUUID(),
           request_id: req.context?.requestId,
           action: 'group.access.change' as const,
@@ -173,7 +183,7 @@ export function createAccessGroupsRouter(container: Container): Router {
   );
   router.get(
     '/',
-    auth.authenticate,
+    auth.authenticate.bind(auth),
     requireScopes(OAuthScopeNames.USERGROUP_READ),
     userAdminCheck,
     async (req: AuthenticatedUserRequest, res, next) => {
@@ -190,7 +200,7 @@ export function createAccessGroupsRouter(container: Container): Router {
           throw new BadRequestError('Invalid group page');
         const token = jwt.sign(
           {
-            userId: String(req.user!.userId),
+            userId: String(currentOrgContext().userId),
             orgId: String(currentOrgContext().orgId),
             scopes: [TokenScopes.ACCESS_GROUP_MANAGE],
           },
@@ -214,7 +224,7 @@ export function createAccessGroupsRouter(container: Container): Router {
   );
   router.get(
     '/:id/members',
-    auth.authenticate,
+    auth.authenticate.bind(auth),
     requireScopes(OAuthScopeNames.USERGROUP_READ),
     userAdminCheck,
     async (req: AuthenticatedUserRequest, res, next) => {
@@ -236,7 +246,7 @@ export function createAccessGroupsRouter(container: Container): Router {
           throw new BadRequestError('Invalid group or member page');
         const token = jwt.sign(
           {
-            userId: String(req.user!.userId),
+            userId: String(currentOrgContext().userId),
             orgId: String(currentOrgContext().orgId),
             scopes: [TokenScopes.ACCESS_GROUP_MANAGE],
           },
@@ -261,12 +271,13 @@ export function createAccessGroupsRouter(container: Container): Router {
   );
   router.post(
     '/',
-    auth.authenticate,
+    auth.authenticate.bind(auth),
     requireScopes(OAuthScopeNames.USERGROUP_WRITE),
     groupAdminCheck('group.create'),
     async (req: AuthenticatedUserRequest, res, next) => {
       try {
-        const name = req.body?.name;
+        const parsedName = namedGroup.safeParse(req.body);
+        const name = parsedName.success ? parsedName.data.name : undefined;
         if (
           typeof name !== 'string' ||
           !name.trim() ||
@@ -274,7 +285,7 @@ export function createAccessGroupsRouter(container: Container): Router {
         )
           throw new BadRequestError('Invalid group name');
         const org_id = String(currentOrgContext().orgId);
-        const actor_id = String(req.user!.userId);
+        const actor_id = String(currentOrgContext().userId);
         const audit = {
           org_id,
           actor_id,
@@ -354,29 +365,24 @@ export function createAccessGroupsRouter(container: Container): Router {
       operation === 'add' ? 'group.members.add' : 'group.members.remove';
     router.post(
       `/:id/members/${operation}`,
-      auth.authenticate,
+      auth.authenticate.bind(auth),
       requireScopes(OAuthScopeNames.USERGROUP_WRITE),
       groupAdminCheck(action),
       async (req: AuthenticatedUserRequest, res, next) => {
         try {
           const { id } = req.params;
-          const userIds: unknown = req.body?.userIds;
+          const parsedMembers = groupMembers.safeParse(req.body);
           if (
             typeof id !== 'string' ||
             !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
               id,
             ) ||
-            !Array.isArray(userIds) ||
-            userIds.length < 1 ||
-            userIds.length > 500 ||
-            userIds.some(
-              (userId) =>
-                typeof userId !== 'string' || !/^[a-f0-9]{24}$/i.test(userId),
-            )
+            !parsedMembers.success
           )
             throw new BadRequestError('Invalid group or member IDs');
+          const { userIds } = parsedMembers.data;
           const org_id = String(currentOrgContext().orgId),
-            actor_id = String(req.user!.userId);
+            actor_id = String(currentOrgContext().userId);
           const audit = {
             org_id,
             actor_id,
@@ -384,7 +390,7 @@ export function createAccessGroupsRouter(container: Container): Router {
             request_id: req.context?.requestId,
             action,
             group_ids: [id],
-            member_ids: userIds as string[],
+            member_ids: userIds,
           };
           await recordAuditEvent({ ...audit, outcome: 'intent' });
           const token = jwt.sign(
@@ -436,10 +442,11 @@ export function createAccessGroupsRouter(container: Container): Router {
       req: AuthenticatedUserRequest,
       res: import('express').Response,
       next: import('express').NextFunction,
-    ) => {
+    ): Promise<void> => {
       try {
-        const { id } = req.params,
-          name = req.body?.name;
+        const { id } = req.params;
+        const parsedName = namedGroup.safeParse(req.body);
+        const name = parsedName.success ? parsedName.data.name : undefined;
         if (
           typeof id !== 'string' ||
           !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
@@ -452,7 +459,7 @@ export function createAccessGroupsRouter(container: Container): Router {
         )
           throw new BadRequestError('Invalid group or name');
         const org_id = String(currentOrgContext().orgId),
-          actor_id = String(req.user!.userId);
+          actor_id = String(currentOrgContext().userId);
         const audit = {
           org_id,
           actor_id,
@@ -483,7 +490,7 @@ export function createAccessGroupsRouter(container: Container): Router {
                 'content-type': 'application/json',
               },
               ...(operation === 'rename'
-                ? { body: JSON.stringify({ name: name.trim() }) }
+                ? { body: JSON.stringify({ name: name?.trim() }) }
                 : {}),
               signal: AbortSignal.timeout(15_000),
             },
@@ -507,7 +514,7 @@ export function createAccessGroupsRouter(container: Container): Router {
     if (operation === 'rename')
       router.put(
         '/:id',
-        auth.authenticate,
+        auth.authenticate.bind(auth),
         requireScopes(OAuthScopeNames.USERGROUP_WRITE),
         groupAdminCheck(action),
         handler,
@@ -515,7 +522,7 @@ export function createAccessGroupsRouter(container: Container): Router {
     else
       router.delete(
         '/:id',
-        auth.authenticate,
+        auth.authenticate.bind(auth),
         requireScopes(OAuthScopeNames.USERGROUP_WRITE),
         groupAdminCheck(action),
         handler,

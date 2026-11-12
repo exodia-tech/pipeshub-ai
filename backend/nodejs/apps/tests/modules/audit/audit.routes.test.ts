@@ -52,12 +52,10 @@ describe('Audit history HTTP with unavailable storage', () => {
     } as never);
     create = sinon.stub(events, 'create').resolves({} as never);
     const container = new Container();
-    container
-      .bind('AppConfig')
-      .toConstantValue({
-        connectorBackend: backend.url,
-        scopedJwtSecret: 'synthetic-test-secret',
-      });
+    container.bind('AppConfig').toConstantValue({
+      connectorBackend: backend.url,
+      scopedJwtSecret: 'synthetic-test-secret',
+    });
     container.bind('AuthMiddleware').toConstantValue({
       authenticate: (
         req: express.Request,
@@ -98,6 +96,7 @@ describe('Audit history HTTP with unavailable storage', () => {
         res: express.Response,
         _next: express.NextFunction,
       ) => {
+        void _next;
         res.status(error.statusCode ?? 500).json({ error: error.message });
       },
     );
@@ -144,11 +143,9 @@ describe('Audit history HTTP with unavailable storage', () => {
     const events = mongoose.model('exodiaAuditEvent');
     sinon.stub(events, 'init').resolves(events);
     create.rejects(Object.assign(new Error('duplicate'), { code: 11000 }));
-    sinon
-      .stub(events, 'findOne')
-      .returns({
-        lean: () => Promise.reject(new Error('private database failure')),
-      } as never);
+    sinon.stub(events, 'findOne').returns({
+      lean: () => Promise.reject(new Error('private database failure')),
+    } as never);
     const response = await fetch(`${base}/internal/events`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -205,6 +202,47 @@ describe('Audit history HTTP with unavailable storage', () => {
       method: 'DELETE',
     });
     assert.equal(response.status, 503);
+    assert.equal(backend.calls.length, 0);
+  });
+
+  it('refuses malformed access policies and membership fields before audit or forwarding', async () => {
+    const group = randomUUID();
+    for (const [method, path, body] of [
+      [
+        'PUT',
+        `/groups/${group}/access`,
+        { defaultAllow: true, revision: 0.5, rules: [] },
+      ],
+      [
+        'PUT',
+        `/groups/${group}/access`,
+        {
+          defaultAllow: true,
+          rules: [{ ref: 'apps/private\nsecret', allow: true }],
+        },
+      ],
+      [
+        'PUT',
+        `/groups/${group}/access`,
+        { defaultAllow: true, rules: [{ ref: 'apps/source', allow: 'yes' }] },
+      ],
+      ['POST', `/groups/${group}/members/add`, { userIds: { $ne: null } }],
+      [
+        'POST',
+        `/groups/${group}/members/add`,
+        { userIds: [actor, { $ne: null }] },
+      ],
+      ['POST', '/groups', { name: { $ne: null } }],
+    ] as const) {
+      const response = await fetch(`${base}${path}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      assert.equal(response.status, 400);
+      assert.ok(!(await response.text()).includes('secret'));
+    }
+    assert.equal(create.callCount, 0);
     assert.equal(backend.calls.length, 0);
   });
 });

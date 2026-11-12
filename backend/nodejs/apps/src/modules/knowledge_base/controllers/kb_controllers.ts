@@ -1,4 +1,5 @@
 import { currentOrgContext } from '../../../libs/context/orgContext';
+import type { Readable } from 'node:stream';
 import { randomUUID } from 'crypto';
 import { recordAuditEvent } from '../../audit/audit.store';
 import * as crypto from 'crypto';
@@ -66,7 +67,10 @@ import {
   validateNoFormatSpecifiers,
   validateNoXSS,
 } from '../../../utils/xss-sanitization';
-import { FileBufferInfo, RejectedFileInfo } from '../../../libs/middlewares/file_processor/fp.interface';
+import {
+  FileBufferInfo,
+  RejectedFileInfo,
+} from '../../../libs/middlewares/file_processor/fp.interface';
 import { getFileExtension } from '../../../libs/utils/file-extension.util';
 import { scopedStorageServiceJwtGenerator } from '../../../libs/utils/createJwt';
 const logger = Logger.getInstance({
@@ -569,11 +573,7 @@ export const listKnowledgeBases =
 
       // Validate permissions filter
       if (permissions) {
-        const validPermissions = [
-          'OWNER',
-          'WRITER',
-          'READER',
-        ];
+        const validPermissions = ['OWNER', 'WRITER', 'READER'];
         const invalidPermissions = permissions.filter(
           (p) => !validPermissions.includes(p),
         );
@@ -911,7 +911,9 @@ const placeholderErrorMessage = (err: unknown): string => {
       err.message
     );
   }
-  return err instanceof Error ? err.message : 'Failed to create placeholder document';
+  return err instanceof Error
+    ? err.message
+    : 'Failed to create placeholder document';
 };
 
 // SSE headers for the streaming upload response. No global compression is
@@ -1066,7 +1068,8 @@ const streamKbUpload = async (opts: {
           ? filePath.split('/').pop() || originalname
           : filePath;
         const extension = getFileExtension(fileName);
-        const correctMimeType = (extension && getMimeType(extension)) || mimetype;
+        const correctMimeType =
+          (extension && getMimeType(extension)) || mimetype;
         const key: string = randomUUID();
         const webUrl = `/record/${key}`;
         const validLastModified =
@@ -1204,10 +1207,7 @@ const assertKbWritePermission = async (
  * processor middleware which attaches filePath/lastModified to each buffer.
  */
 export const uploadRecords =
-  (
-    keyValueStoreService: KeyValueStoreService,
-    appConfig: AppConfig,
-  ) =>
+  (keyValueStoreService: KeyValueStoreService, appConfig: AppConfig) =>
   async (
     req: AuthenticatedUserRequest,
     res: Response,
@@ -1265,7 +1265,9 @@ export const uploadRecords =
       }
 
       logger.info(
-        folderId ? 'Processing file upload to folder' : 'Processing file upload to KB',
+        folderId
+          ? 'Processing file upload to folder'
+          : 'Processing file upload to KB',
         {
           totalFiles: fileBuffers.length,
           kbId,
@@ -1405,16 +1407,22 @@ export const updateRecord =
           req.headers as Record<string, string>,
         );
 
-        if (getRecordResponse.statusCode < 200 || getRecordResponse.statusCode >= 300) {
+        if (
+          getRecordResponse.statusCode < 200 ||
+          getRecordResponse.statusCode >= 300
+        ) {
           throw handleBackendError(getRecordResponse, 'get record for update');
         }
 
         // The new file is stored before the Python update checks the KB role, so the
         // same check runs here or a KB reader's file replaces the stored one anyway.
-        const recordDetail = getRecordResponse.data as RecordDetailData | undefined;
+        const recordDetail = getRecordResponse.data as
+          RecordDetailData | undefined;
         const kbId = recordDetail?.knowledgeBase?.id;
         if (!kbId) {
-          throw new ForbiddenError('You do not have permission to edit this record');
+          throw new ForbiddenError(
+            'You do not have permission to edit this record',
+          );
         }
         await assertKbWritePermission(
           appConfig.connectorBackend,
@@ -1479,15 +1487,12 @@ export const updateRecord =
         } catch (storageError: any) {
           const is404 = storageError?.response?.status === 404;
 
-          logger.error(
-            'Failed to upload file to storage',
-            {
-              recordId,
-              storageDocumentId: storageDocumentId,
-              error: storageError.message,
-              is404,
-            },
-          );
+          logger.error('Failed to upload file to storage', {
+            recordId,
+            storageDocumentId: storageDocumentId,
+            error: storageError.message,
+            is404,
+          });
 
           if (is404) {
             throw new InternalServerError(
@@ -1599,7 +1604,10 @@ export const getRecordById =
         req.headers as Record<string, string>,
       );
 
-      const responseForClient: Record<string, any> = { ...response, data: { ...(response?.data || {}) } };
+      const responseForClient: Record<string, any> = {
+        ...response,
+        data: { ...(response?.data || {}) },
+      };
 
       if (responseForClient.statusCode === 404) {
         throw new NotFoundError(`Record ${recordId} not found`);
@@ -1655,7 +1663,11 @@ export const reindexRecord =
         );
       }
 
-      const reindexBody: { depth: number; force: boolean; statusFilters?: string[] } = {
+      const reindexBody: {
+        depth: number;
+        force: boolean;
+        statusFilters?: string[];
+      } = {
         depth,
         force,
       };
@@ -1706,7 +1718,11 @@ export const reindexRecordGroup =
         );
       }
 
-      const reindexBody: { depth: number; force: boolean; statusFilters?: string[] } = {
+      const reindexBody: {
+        depth: number;
+        force: boolean;
+        statusFilters?: string[];
+      } = {
         depth,
         force,
       };
@@ -1877,7 +1893,10 @@ export const listTrash =
       }
       const { kbId } = req.params as { kbId: string };
       const { page, limit } = req.query as { page?: string; limit?: string };
-      const query = new URLSearchParams({ page: page ?? '1', limit: limit ?? '25' });
+      const query = new URLSearchParams({
+        page: page ?? '1',
+        limit: limit ?? '25',
+      });
 
       const response = await executeConnectorCommand(
         `${appConfig.connectorBackend}/api/v1/kb/${encodeURIComponent(kbId)}/trash?${query.toString()}`,
@@ -1936,11 +1955,7 @@ export const createKBPermission =
 
       // Validate role only if it's provided (for users)
       if (role) {
-        const validRoles = [
-          'OWNER',
-          'WRITER',
-          'READER',
-        ];
+        const validRoles = ['OWNER', 'WRITER', 'READER'];
         if (!validRoles.includes(role)) {
           throw new BadRequestError(
             `Invalid role. Must be one of: ${validRoles.join(', ')}`,
@@ -1962,10 +1977,15 @@ export const createKBPermission =
       }
 
       const audit = {
-        org_id: String(currentOrgContext().orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
-        request_id: req.context?.requestId, action: 'collection.permission.grant' as const,
-        resource_id: kbId, permission_role: role as 'OWNER' | 'WRITER' | 'READER' | undefined,
-        group_ids: teamIds, member_ids: userIds,
+        org_id: String(currentOrgContext().orgId),
+        actor_id: String(req.user?.userId),
+        operation_id: randomUUID(),
+        request_id: req.context?.requestId,
+        action: 'collection.permission.grant' as const,
+        resource_id: kbId,
+        permission_role: role as 'OWNER' | 'WRITER' | 'READER' | undefined,
+        group_ids: teamIds,
+        member_ids: userIds,
       };
       await recordAuditEvent({ ...audit, outcome: 'intent' });
 
@@ -1977,7 +1997,8 @@ export const createKBPermission =
       );
 
       if (response.statusCode !== 200 && response.statusCode !== 201) {
-        if (response.statusCode === 403) await recordAuditEvent({ ...audit, outcome: 'denied' });
+        if (response.statusCode === 403)
+          await recordAuditEvent({ ...audit, outcome: 'denied' });
         throw handleBackendError(response, 'create permissions');
       }
 
@@ -2034,11 +2055,7 @@ export const updateKBPermission =
         throw new BadRequestError('Role is required');
       }
 
-      const validRoles = [
-        'OWNER',
-        'WRITER',
-        'READER',
-      ];
+      const validRoles = ['OWNER', 'WRITER', 'READER'];
       if (!validRoles.includes(role)) {
         throw new BadRequestError(
           `Invalid role. Must be one of: ${validRoles.join(', ')}`,
@@ -2050,10 +2067,15 @@ export const updateKBPermission =
       );
 
       const audit = {
-        org_id: String(currentOrgContext().orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
-        request_id: req.context?.requestId, action: 'collection.permission.change' as const,
-        resource_id: kbId, permission_role: role as 'OWNER' | 'WRITER' | 'READER',
-        group_ids: teamIds, member_ids: userIds,
+        org_id: String(currentOrgContext().orgId),
+        actor_id: String(req.user?.userId),
+        operation_id: randomUUID(),
+        request_id: req.context?.requestId,
+        action: 'collection.permission.change' as const,
+        resource_id: kbId,
+        permission_role: role as 'OWNER' | 'WRITER' | 'READER',
+        group_ids: teamIds,
+        member_ids: userIds,
       };
       await recordAuditEvent({ ...audit, outcome: 'intent' });
 
@@ -2069,7 +2091,8 @@ export const updateKBPermission =
       );
 
       if (response.statusCode !== 200) {
-        if (response.statusCode === 403) await recordAuditEvent({ ...audit, outcome: 'denied' });
+        if (response.statusCode === 403)
+          await recordAuditEvent({ ...audit, outcome: 'denied' });
         throw handleBackendError(response, 'update permissions');
       }
 
@@ -2121,9 +2144,14 @@ export const removeKBPermission =
       );
 
       const audit = {
-        org_id: String(currentOrgContext().orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
-        request_id: req.context?.requestId, action: 'collection.permission.revoke' as const,
-        resource_id: kbId, group_ids: teamIds, member_ids: userIds,
+        org_id: String(currentOrgContext().orgId),
+        actor_id: String(req.user?.userId),
+        operation_id: randomUUID(),
+        request_id: req.context?.requestId,
+        action: 'collection.permission.revoke' as const,
+        resource_id: kbId,
+        group_ids: teamIds,
+        member_ids: userIds,
       };
       await recordAuditEvent({ ...audit, outcome: 'intent' });
 
@@ -2138,7 +2166,8 @@ export const removeKBPermission =
       );
 
       if (response.statusCode !== 200) {
-        if (response.statusCode === 403) await recordAuditEvent({ ...audit, outcome: 'denied' });
+        if (response.statusCode === 403)
+          await recordAuditEvent({ ...audit, outcome: 'denied' });
         throw handleBackendError(response, 'remove permissions');
       }
 
@@ -2223,9 +2252,14 @@ export const getRecordBuffer =
       }
 
       const audit = {
-        org_id: String(orgId), actor_id: String(userId), operation_id: auditOperationId,
-        request_id: req.context?.requestId, action: 'record.download.start' as const,
-        resource_id: recordId, group_ids: [] as string[], member_ids: [] as string[],
+        org_id: String(orgId),
+        actor_id: String(userId),
+        operation_id: auditOperationId,
+        request_id: req.context?.requestId,
+        action: 'record.download.start' as const,
+        resource_id: recordId,
+        group_ids: [] as string[],
+        member_ids: [] as string[],
       };
       await recordAuditEvent({ ...audit, outcome: 'intent' });
 
@@ -2244,7 +2278,7 @@ export const getRecordBuffer =
       });
 
       // Make request to FastAPI backend
-      const response = await axios.get(
+      const response = await axios.get<Readable>(
         `${connectorUrl}/api/v1/stream/record/${encodeURIComponent(recordId)}?${queryParams.toString()}`,
         {
           responseType: 'stream',
@@ -2298,10 +2332,27 @@ export const getRecordBuffer =
         error: error?.message,
         recordId: req.params.recordId,
       });
-      if ([403, 404].includes(error.response?.status) && req.user?.userId) {
+      if (
+        axios.isAxiosError(error) &&
+        [403, 404].includes(error.response?.status ?? 0) &&
+        req.user?.userId
+      ) {
         try {
-          await recordAuditEvent({org_id:String(currentOrgContext().orgId),actor_id:String(req.user.userId),operation_id:auditOperationId,request_id:req.context?.requestId,action:'record.download.start',resource_id:String(req.params.recordId),group_ids:[],member_ids:[],outcome:'denied'});
-        } catch (auditError) {next(auditError);return;}
+          await recordAuditEvent({
+            org_id: String(currentOrgContext().orgId),
+            actor_id: String(req.user.userId),
+            operation_id: auditOperationId,
+            request_id: req.context?.requestId,
+            action: 'record.download.start',
+            resource_id: String(req.params.recordId),
+            group_ids: [],
+            member_ids: [],
+            outcome: 'denied',
+          });
+        } catch (auditError) {
+          next(auditError);
+          return;
+        }
       }
       if (!res.headersSent) {
         if (error instanceof ServiceUnavailableError) {

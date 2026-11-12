@@ -35,7 +35,9 @@ describe('TokenScopes', () => {
   });
 
   it('should have CONVERSATION_PERMISSIONS as "conversation:permissions"', () => {
-    expect(TokenScopes.CONVERSATION_PERMISSIONS).to.equal('conversation:permissions');
+    expect(TokenScopes.CONVERSATION_PERMISSIONS).to.equal(
+      'conversation:permissions',
+    );
   });
   it('should have VALIDATE_EMAIL as "email:validate"', () => {
     expect(TokenScopes.VALIDATE_EMAIL).to.equal('email:validate');

@@ -14,8 +14,14 @@ import { UserGroupController } from '../../../../src/modules/user_management/con
 import { createUserGroupRouter } from '../../../../src/modules/user_management/routes/userGroups.routes';
 import { createAuditRouter } from '../../../../src/modules/audit/audit.routes';
 import { createAccessGroupsRouter } from '../../../../src/modules/user_management/routes/accessGroups.routes';
-import { createKBPermission, getRecordBuffer } from '../../../../src/modules/knowledge_base/controllers/kb_controllers';
-import { updateKBPermission, removeKBPermission } from '../../../../src/modules/knowledge_base/controllers/kb_controllers';
+import {
+  createKBPermission,
+  getRecordBuffer,
+} from '../../../../src/modules/knowledge_base/controllers/kb_controllers';
+import {
+  updateKBPermission,
+  removeKBPermission,
+} from '../../../../src/modules/knowledge_base/controllers/kb_controllers';
 
 describe('group membership API isolation', function () {
   let server: Server;
@@ -72,12 +78,20 @@ describe('group membership API isolation', function () {
     });
     connector.post('/api/v1/kb/:id/permissions', (req, res) => {
       shareCalls++;
-      if (req.body.userIds.includes(String(foreign))) return res.status(403).json({ detail: 'denied' });
+      if (req.body.userIds.includes(String(foreign)))
+        return res.status(403).json({ detail: 'denied' });
       return res.json({ success: true });
     });
-    connector.put('/api/v1/kb/:id/permissions', (_req, res) => res.json({ userIds: [], teamIds: [], newRole: 'READER' }));
-    connector.delete('/api/v1/kb/:id/permissions', (_req, res) => res.json({ userIds: [], teamIds: [] }));
-    connector.get('/api/v1/stream/record/:id', (_req, res) => { downloadCalls++; res.type('text/plain').send('synthetic document bytes'); });
+    connector.put('/api/v1/kb/:id/permissions', (_req, res) =>
+      res.json({ userIds: [], teamIds: [], newRole: 'READER' }),
+    );
+    connector.delete('/api/v1/kb/:id/permissions', (_req, res) =>
+      res.json({ userIds: [], teamIds: [] }),
+    );
+    connector.get('/api/v1/stream/record/:id', (_req, res) => {
+      downloadCalls++;
+      res.type('text/plain').send('synthetic document bytes');
+    });
     connector.post('/api/v1/entity/access-groups', (req, res) => {
       const claims = jwt.verify(
         (req.headers.authorization ?? '').replace(/^Bearer /, ''),
@@ -135,17 +149,33 @@ describe('group membership API isolation', function () {
     app.use('/userGroups', createUserGroupRouter(container));
     app.use('/audit', createAuditRouter(container));
     app.use('/access-groups', createAccessGroupsRouter(container));
-    app.post('/collections/:kbId/permissions', container.get<AuthMiddleware>('AuthMiddleware').authenticate,
-      createKBPermission(container.get('AppConfig')));
-    app.put('/collections/:kbId/permissions', container.get<AuthMiddleware>('AuthMiddleware').authenticate,
-      updateKBPermission(container.get('AppConfig')));
-    app.delete('/collections/:kbId/permissions', container.get<AuthMiddleware>('AuthMiddleware').authenticate,
-      removeKBPermission(container.get('AppConfig')));
-    app.get('/records/:recordId/download', container.get<AuthMiddleware>('AuthMiddleware').authenticate,
-      getRecordBuffer((container.get('AppConfig') as { connectorBackend: string }).connectorBackend));
-    app.use((err: any, _req: any, res: any, _next: any) =>
-      res.status(err.statusCode || 500).json({ error: err.message }),
+    app.post(
+      '/collections/:kbId/permissions',
+      container.get<AuthMiddleware>('AuthMiddleware').authenticate,
+      createKBPermission(container.get('AppConfig')),
     );
+    app.put(
+      '/collections/:kbId/permissions',
+      container.get<AuthMiddleware>('AuthMiddleware').authenticate,
+      updateKBPermission(container.get('AppConfig')),
+    );
+    app.delete(
+      '/collections/:kbId/permissions',
+      container.get<AuthMiddleware>('AuthMiddleware').authenticate,
+      removeKBPermission(container.get('AppConfig')),
+    );
+    app.get(
+      '/records/:recordId/download',
+      container.get<AuthMiddleware>('AuthMiddleware').authenticate,
+      getRecordBuffer(
+        (container.get('AppConfig') as { connectorBackend: string })
+          .connectorBackend,
+      ),
+    );
+    app.use((err: any, _req: any, res: any, _next: any) => {
+      void _next;
+      return res.status(err.statusCode || 500).json({ error: err.message });
+    });
     server = await new Promise<Server>((resolve) => {
       const s = app.listen(0, '127.0.0.1', () => resolve(s));
     });
@@ -314,81 +344,171 @@ describe('group membership API isolation', function () {
     assert.equal(body.groups[0].name, 'Example');
   });
   it('audits collection sharing without recording document content', async () => {
-    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
-    const response = await fetch(`${base}/collections/collection-id/permissions`, {
-      method: 'POST', headers, body: JSON.stringify({ userIds: [String(member)], role: 'READER' }),
-    });
+    const headers = {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    };
+    const response = await fetch(
+      `${base}/collections/collection-id/permissions`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ userIds: [String(member)], role: 'READER' }),
+      },
+    );
     assert.equal(response.status, 201);
-    const audit = await fetch(`${base}/audit?action=collection.permission.grant&outcome=success&resource_id=collection-id`, { headers });
-    const body = (await audit.json()) as { events: Array<{ resource_id: string }> };
+    const audit = await fetch(
+      `${base}/audit?action=collection.permission.grant&outcome=success&resource_id=collection-id`,
+      { headers },
+    );
+    const body = (await audit.json()) as {
+      events: Array<{ resource_id: string }>;
+    };
     assert.equal(body.events[0].resource_id, 'collection-id');
-    const other = await fetch(`${base}/audit?action=collection.permission.grant&outcome=success&resource_id=other-id`, { headers });
+    const other = await fetch(
+      `${base}/audit?action=collection.permission.grant&outcome=success&resource_id=other-id`,
+      { headers },
+    );
     const otherBody = (await other.json()) as { events: unknown[] };
     assert.equal(otherBody.events.length, 0);
-    for (const [method, action] of [['PUT', 'collection.permission.change'], ['DELETE', 'collection.permission.revoke']]) {
-      const changed = await fetch(`${base}/collections/collection-id/permissions`, {
-        method, headers, body: JSON.stringify({ userIds: [String(member)], role: 'READER' }),
-      });
+    for (const [method, action] of [
+      ['PUT', 'collection.permission.change'],
+      ['DELETE', 'collection.permission.revoke'],
+    ]) {
+      const changed = await fetch(
+        `${base}/collections/collection-id/permissions`,
+        {
+          method,
+          headers,
+          body: JSON.stringify({ userIds: [String(member)], role: 'READER' }),
+        },
+      );
       assert.equal(changed.status, 200);
-      const found = await fetch(`${base}/audit?action=${action}&outcome=success`, { headers });
-      const events = (await found.json()) as { events: Array<{ resource_id: string }> };
+      const found = await fetch(
+        `${base}/audit?action=${action}&outcome=success`,
+        { headers },
+      );
+      const events = (await found.json()) as {
+        events: Array<{ resource_id: string }>;
+      };
       assert.equal(events.events[0].resource_id, 'collection-id');
     }
   });
   it('does not change collection sharing when audit intent cannot be stored', async () => {
     const db = mongoose.connection.db!;
     await mongoose.model('exodiaAuditEvent').init();
-    await db.command({ collMod: 'exodiaAuditEvents', validator: { $jsonSchema: { properties: { outcome: { enum: ['success'] } } } } });
+    await db.command({
+      collMod: 'exodiaAuditEvents',
+      validator: {
+        $jsonSchema: { properties: { outcome: { enum: ['success'] } } },
+      },
+    });
     try {
-      const response = await fetch(`${base}/collections/collection-id/permissions`, {
-        method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ userIds: [String(member)], role: 'READER' }),
-      });
+      const response = await fetch(
+        `${base}/collections/collection-id/permissions`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ userIds: [String(member)], role: 'READER' }),
+        },
+      );
       assert.equal(response.status, 503);
       assert.equal(shareCalls, 0);
-    } finally { await db.command({ collMod: 'exodiaAuditEvents', validator: {} }); }
+    } finally {
+      await db.command({ collMod: 'exodiaAuditEvents', validator: {} });
+    }
   });
   it('records denied collection permission changes', async () => {
-    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
-    const response = await fetch(`${base}/collections/collection-id/permissions`, {
-      method: 'POST', headers, body: JSON.stringify({ userIds: [String(foreign)], role: 'READER' }),
-    });
+    const headers = {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    };
+    const response = await fetch(
+      `${base}/collections/collection-id/permissions`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ userIds: [String(foreign)], role: 'READER' }),
+      },
+    );
     assert.equal(response.status, 403);
-    const audit = await fetch(`${base}/audit?action=collection.permission.grant&outcome=denied`, { headers });
-    const body = (await audit.json()) as { events: Array<{ resource_id: string }> };
+    const audit = await fetch(
+      `${base}/audit?action=collection.permission.grant&outcome=denied`,
+      { headers },
+    );
+    const body = (await audit.json()) as {
+      events: Array<{ resource_id: string }>;
+    };
     assert.equal(body.events[0].resource_id, 'collection-id');
   });
   it('records a document stream start without storing document content', async () => {
     const headers = { authorization: `Bearer ${token}` };
-    const response = await fetch(`${base}/records/record-id/download`, { headers });
+    const response = await fetch(`${base}/records/record-id/download`, {
+      headers,
+    });
     assert.equal(response.status, 200);
     assert.equal(await response.text(), 'synthetic document bytes');
-    const audit = await fetch(`${base}/audit?action=record.download.start&outcome=success`, { headers });
-    const body = (await audit.json()) as { events: Array<{ resource_id: string }> };
+    const audit = await fetch(
+      `${base}/audit?action=record.download.start&outcome=success`,
+      { headers },
+    );
+    const body = (await audit.json()) as {
+      events: Array<{ resource_id: string }>;
+    };
     assert.equal(body.events[0].resource_id, 'record-id');
-    assert.equal(JSON.stringify(body).includes('synthetic document bytes'), false);
+    assert.equal(
+      JSON.stringify(body).includes('synthetic document bytes'),
+      false,
+    );
   });
   it('does not start a document stream when audit intent cannot be stored', async () => {
     const db = mongoose.connection.db!;
     await mongoose.model('exodiaAuditEvent').init();
-    await db.command({ collMod: 'exodiaAuditEvents', validator: { $jsonSchema: { properties: { outcome: { enum: ['success'] } } } } });
+    await db.command({
+      collMod: 'exodiaAuditEvents',
+      validator: {
+        $jsonSchema: { properties: { outcome: { enum: ['success'] } } },
+      },
+    });
     try {
-      const response = await fetch(`${base}/records/record-id/download`, { headers: { authorization: `Bearer ${token}` } });
+      const response = await fetch(`${base}/records/record-id/download`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
       assert.equal(response.status, 503);
       assert.equal(downloadCalls, 0);
-      assert.equal((await response.text()).includes('synthetic document bytes'), false);
-    } finally { await db.command({ collMod: 'exodiaAuditEvents', validator: {} }); }
+      assert.equal(
+        (await response.text()).includes('synthetic document bytes'),
+        false,
+      );
+    } finally {
+      await db.command({ collMod: 'exodiaAuditEvents', validator: {} });
+    }
   });
   it('does not release document bytes when the stream-start audit cannot be stored', async () => {
     const db = mongoose.connection.db!;
     await mongoose.model('exodiaAuditEvent').init();
-    await db.command({ collMod: 'exodiaAuditEvents', validator: { $jsonSchema: { properties: { outcome: { enum: ['intent'] } } } } });
+    await db.command({
+      collMod: 'exodiaAuditEvents',
+      validator: {
+        $jsonSchema: { properties: { outcome: { enum: ['intent'] } } },
+      },
+    });
     try {
-      const response = await fetch(`${base}/records/record-id/download`, { headers: { authorization: `Bearer ${token}` } });
+      const response = await fetch(`${base}/records/record-id/download`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
       assert.equal(response.status, 503);
       assert.equal(downloadCalls, 1);
-      assert.equal((await response.text()).includes('synthetic document bytes'), false);
-    } finally { await db.command({ collMod: 'exodiaAuditEvents', validator: {} }); }
+      assert.equal(
+        (await response.text()).includes('synthetic document bytes'),
+        false,
+      );
+    } finally {
+      await db.command({ collMod: 'exodiaAuditEvents', validator: {} });
+    }
   });
   it('allows only administrators to inspect access group members', async () => {
     const path = `${base}/access-groups/5fdbb18a-9881-4d77-890f-28170c2fef12/members`;
@@ -945,23 +1065,39 @@ describe('group membership API isolation', function () {
   it('stores service agent events in the same administrator audit history', async () => {
     const service = jwt.sign(
       { orgId: String(org), userId: String(member), scopes: ['audit:write'] },
-      'local-only-test-secret-with-enough-length', { expiresIn: '1m' },
+      'local-only-test-secret-with-enough-length',
+      { expiresIn: '1m' },
     );
     const event = {
       event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0',
-      action: 'agent.tool', outcome: 'failed',
-      agent_event: { run_id: 'run-1', trace_id: 'trace-1', agent_id: 'agent-1', tool_call_id: 'call-1', tool_name: 'fetch_record', model: 'fixture-model' },
+      action: 'agent.tool',
+      outcome: 'failed',
+      agent_event: {
+        run_id: 'run-1',
+        trace_id: 'trace-1',
+        agent_id: 'agent-1',
+        tool_call_id: 'call-1',
+        tool_name: 'fetch_record',
+        model: 'fixture-model',
+      },
     };
     const response = await fetch(`${base}/audit/internal/events`, {
-      method: 'POST', headers: { authorization: `Bearer ${service}`, 'content-type': 'application/json' },
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${service}`,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify(event),
     });
     assert.equal(response.status, 201);
-    const read = await fetch(`${base}/audit?action=agent.tool&outcome=failed&actor_id=${member}`, {
-      headers: { authorization: `Bearer ${token}` },
-    });
+    const read = await fetch(
+      `${base}/audit?action=agent.tool&outcome=failed&actor_id=${member}`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+      },
+    );
     assert.equal(read.status, 200);
-    const body = await read.json() as { events: Array<Record<string, any>> };
+    const body = (await read.json()) as { events: Array<Record<string, any>> };
     assert.equal(body.events.length, 1);
     assert.equal(body.events[0].actor_id, String(member));
     assert.equal(body.events[0].operation_id, event.event_id);
@@ -970,103 +1106,249 @@ describe('group membership API isolation', function () {
       headers: { authorization: `Bearer ${foreignToken}` },
     });
     assert.equal(foreignRead.status, 200);
-    assert.deepEqual((await foreignRead.json() as { events: unknown[] }).events, []);
+    assert.deepEqual(
+      ((await foreignRead.json()) as { events: unknown[] }).events,
+      [],
+    );
   });
   it('deduplicates concurrent agent-event replays without allowing history to be rewritten', async () => {
     const service = jwt.sign(
       { orgId: String(org), userId: String(member), scopes: ['audit:write'] },
-      'local-only-test-secret-with-enough-length', { expiresIn: '1m' },
+      'local-only-test-secret-with-enough-length',
+      { expiresIn: '1m' },
     );
     const event = {
-      event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0', action: 'agent.tool', outcome: 'success',
-      agent_event: { run_id: 'run-1', trace_id: 'trace-1', agent_id: 'agent-1', tool_call_id: 'call-1', tool_name: 'fetch_record' },
+      event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0',
+      action: 'agent.tool',
+      outcome: 'success',
+      agent_event: {
+        run_id: 'run-1',
+        trace_id: 'trace-1',
+        agent_id: 'agent-1',
+        tool_call_id: 'call-1',
+        tool_name: 'fetch_record',
+      },
     };
-    const headers = { authorization: `Bearer ${service}`, 'content-type': 'application/json' };
-    const responses = await Promise.all(Array.from({ length: 8 }, () => fetch(`${base}/audit/internal/events`, { method: 'POST', headers, body: JSON.stringify(event) })));
-    assert.deepEqual(responses.map((response) => response.status), Array(8).fill(201));
-    const read = await fetch(`${base}/audit?action=agent.tool`, { headers: { authorization: `Bearer ${token}` } });
-    const saved = (await read.json() as { events: Array<Record<string, unknown>> }).events;
+    const headers = {
+      authorization: `Bearer ${service}`,
+      'content-type': 'application/json',
+    };
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        fetch(`${base}/audit/internal/events`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(event),
+        }),
+      ),
+    );
+    assert.deepEqual(
+      responses.map((response) => response.status),
+      Array(8).fill(201),
+    );
+    const read = await fetch(`${base}/audit?action=agent.tool`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const saved = (
+      (await read.json()) as { events: Array<Record<string, unknown>> }
+    ).events;
     assert.equal(saved.length, 1);
     for (const changed of [
       { ...event, outcome: 'denied' },
-      { ...event, agent_event: { ...event.agent_event, tool_name: 'delete_record' } },
+      {
+        ...event,
+        agent_event: { ...event.agent_event, tool_name: 'delete_record' },
+      },
     ]) {
-      const response = await fetch(`${base}/audit/internal/events`, { method: 'POST', headers, body: JSON.stringify(changed) });
+      const response = await fetch(`${base}/audit/internal/events`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(changed),
+      });
       assert.equal(response.status, 409);
     }
-    const otherActor = jwt.sign({ orgId: String(org), userId: String(admin), scopes: ['audit:write'] },
-      'local-only-test-secret-with-enough-length', { expiresIn: '1m' });
+    const otherActor = jwt.sign(
+      { orgId: String(org), userId: String(admin), scopes: ['audit:write'] },
+      'local-only-test-secret-with-enough-length',
+      { expiresIn: '1m' },
+    );
     const rewriteActor = await fetch(`${base}/audit/internal/events`, {
-      method: 'POST', headers: { ...headers, authorization: `Bearer ${otherActor}` }, body: JSON.stringify(event),
+      method: 'POST',
+      headers: { ...headers, authorization: `Bearer ${otherActor}` },
+      body: JSON.stringify(event),
     });
     assert.equal(rewriteActor.status, 409);
-    const again = await fetch(`${base}/audit?action=agent.tool`, { headers: { authorization: `Bearer ${token}` } });
-    assert.deepEqual((await again.json() as { events: unknown[] }).events, saved);
+    const again = await fetch(`${base}/audit?action=agent.tool`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.deepEqual(
+      ((await again.json()) as { events: unknown[] }).events,
+      saved,
+    );
   });
   it('keeps the same source event ID isolated between organizations', async () => {
-    const event = { event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0', action: 'agent.run', outcome: 'intent',
-      agent_event: { run_id: 'run-1', trace_id: 'trace-1', agent_id: 'agent-1' } };
-    for (const [organization, actor] of [[org, member], [foreignOrg, foreign]]) {
-      const service = jwt.sign({ orgId: String(organization), userId: String(actor), scopes: ['audit:write'] },
-        'local-only-test-secret-with-enough-length', { expiresIn: '1m' });
-      const response = await fetch(`${base}/audit/internal/events`, { method: 'POST', headers: { authorization: `Bearer ${service}`, 'content-type': 'application/json' }, body: JSON.stringify(event) });
+    const event = {
+      event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0',
+      action: 'agent.run',
+      outcome: 'intent',
+      agent_event: {
+        run_id: 'run-1',
+        trace_id: 'trace-1',
+        agent_id: 'agent-1',
+      },
+    };
+    for (const [organization, actor] of [
+      [org, member],
+      [foreignOrg, foreign],
+    ]) {
+      const service = jwt.sign(
+        {
+          orgId: String(organization),
+          userId: String(actor),
+          scopes: ['audit:write'],
+        },
+        'local-only-test-secret-with-enough-length',
+        { expiresIn: '1m' },
+      );
+      const response = await fetch(`${base}/audit/internal/events`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${service}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      });
       assert.equal(response.status, 201);
     }
-    for (const [credential, actor] of [[token, member], [foreignToken, foreign]]) {
-      const response = await fetch(`${base}/audit?action=agent.run&export=true`, { headers: { authorization: `Bearer ${credential}` } });
+    for (const [credential, actor] of [
+      [token, member],
+      [foreignToken, foreign],
+    ]) {
+      const response = await fetch(
+        `${base}/audit?action=agent.run&export=true`,
+        { headers: { authorization: `Bearer ${credential}` } },
+      );
       assert.equal(response.status, 200);
-      const events = (await response.json() as { events: Array<{ actor_id: string }> }).events;
+      const events = (
+        (await response.json()) as { events: Array<{ actor_id: string }> }
+      ).events;
       assert.equal(events.length, 1);
       assert.equal(events[0].actor_id, String(actor));
     }
-    const forbidden = await fetch(`${base}/audit?export=true`, { headers: { authorization: `Bearer ${memberToken}` } });
+    const forbidden = await fetch(`${base}/audit?export=true`, {
+      headers: { authorization: `Bearer ${memberToken}` },
+    });
     assert.equal(forbidden.status, 403);
   });
   it('rejects client tokens, forged identity and content in agent audit ingestion', async () => {
-    const claims = { orgId: String(org), userId: String(member), scopes: ['audit:write'] };
+    const claims = {
+      orgId: String(org),
+      userId: String(member),
+      scopes: ['audit:write'],
+    };
     const secret = 'local-only-test-secret-with-enough-length';
     const event = {
-      event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0', action: 'agent.run', outcome: 'intent',
-      agent_event: { run_id: 'run-1', trace_id: 'trace-1', agent_id: 'agent-1' },
+      event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0',
+      action: 'agent.run',
+      outcome: 'intent',
+      agent_event: {
+        run_id: 'run-1',
+        trace_id: 'trace-1',
+        agent_id: 'agent-1',
+      },
     };
-    for (const credential of [token, memberToken, '',
-      jwt.sign({ ...claims, scopes: ['storage:token'] }, secret, { expiresIn: '1m' }),
-      jwt.sign(claims, secret, { expiresIn: -1 }), jwt.sign(claims, secret),
+    for (const credential of [
+      token,
+      memberToken,
+      '',
+      jwt.sign({ ...claims, scopes: ['storage:token'] }, secret, {
+        expiresIn: '1m',
+      }),
+      jwt.sign(claims, secret, { expiresIn: -1 }),
+      jwt.sign(claims, secret),
       jwt.sign({ ...claims, orgId: undefined }, secret, { expiresIn: '1m' }),
-      jwt.sign({ ...claims, scopes: 'audit:write' }, secret, { expiresIn: '1m' }),
+      jwt.sign({ ...claims, scopes: 'audit:write' }, secret, {
+        expiresIn: '1m',
+      }),
     ]) {
       const response = await fetch(`${base}/audit/internal/events`, {
-        method: 'POST', headers: { authorization: `Bearer ${credential}`, 'content-type': 'application/json' }, body: JSON.stringify(event),
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${credential}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(event),
       });
       assert.equal(response.status, 401);
     }
-    const headers = { authorization: `Bearer ${jwt.sign(claims, secret, { expiresIn: '1m' })}`, 'content-type': 'application/json' };
+    const headers = {
+      authorization: `Bearer ${jwt.sign(claims, secret, { expiresIn: '1m' })}`,
+      'content-type': 'application/json',
+    };
     for (const body of [
-      { ...event, org_id: String(foreignOrg) }, { ...event, actor_id: String(admin) },
-      { ...event, content: 'private document' }, { ...event, action: 'group.delete' },
-      { ...event, outcome: 'invented' }, { ...event, action: 'agent.tool' },
-      { ...event, agent_event: { ...event.agent_event, args: { token: 'secret' } } },
-      { ...event, agent_event: { ...event.agent_event, tool_name: 'x'.repeat(257) } },
+      { ...event, org_id: String(foreignOrg) },
+      { ...event, actor_id: String(admin) },
+      { ...event, content: 'private document' },
+      { ...event, action: 'group.delete' },
+      { ...event, outcome: 'invented' },
+      { ...event, action: 'agent.tool' },
+      {
+        ...event,
+        agent_event: { ...event.agent_event, args: { token: 'secret' } },
+      },
+      {
+        ...event,
+        agent_event: { ...event.agent_event, tool_name: 'x'.repeat(257) },
+      },
     ]) {
-      const response = await fetch(`${base}/audit/internal/events`, { method: 'POST', headers, body: JSON.stringify(body) });
+      const response = await fetch(`${base}/audit/internal/events`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
       assert.equal(response.status, 400);
     }
-    const read = await fetch(`${base}/audit?action=agent.run`, { headers: { authorization: `Bearer ${token}` } });
-    assert.deepEqual((await read.json() as { events: unknown[] }).events, []);
+    const read = await fetch(`${base}/audit?action=agent.run`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.deepEqual(((await read.json()) as { events: unknown[] }).events, []);
   });
   it('does not acknowledge an agent event when Mongo rejects its write', async () => {
     const db = mongoose.connection.db!;
     await mongoose.model('exodiaAuditEvent').init();
-    await db.command({ collMod: 'exodiaAuditEvents', validator: { $jsonSchema: { properties: { action: { enum: ['audit.read'] } } } } });
+    await db.command({
+      collMod: 'exodiaAuditEvents',
+      validator: {
+        $jsonSchema: { properties: { action: { enum: ['audit.read'] } } },
+      },
+    });
     try {
-      const service = jwt.sign({ orgId: String(org), userId: String(member), scopes: ['audit:write'] },
-        'local-only-test-secret-with-enough-length', { expiresIn: '1m' });
+      const service = jwt.sign(
+        { orgId: String(org), userId: String(member), scopes: ['audit:write'] },
+        'local-only-test-secret-with-enough-length',
+        { expiresIn: '1m' },
+      );
       const response = await fetch(`${base}/audit/internal/events`, {
-        method: 'POST', headers: { authorization: `Bearer ${service}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0', action: 'agent.run', outcome: 'intent', agent_event: { run_id: 'run-1', trace_id: 'trace-1', agent_id: 'agent-1' } }),
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${service}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          event_id: 'f48120d4-1784-4f5c-bb0a-cea429d655a0',
+          action: 'agent.run',
+          outcome: 'intent',
+          agent_event: {
+            run_id: 'run-1',
+            trace_id: 'trace-1',
+            agent_id: 'agent-1',
+          },
+        }),
       });
       assert.equal(response.status, 503);
-    } finally { await db.command({ collMod: 'exodiaAuditEvents', validator: {} }); }
+    } finally {
+      await db.command({ collMod: 'exodiaAuditEvents', validator: {} });
+    }
   });
   it('rejects malformed audit filters and ignores stale admin role claims', async () => {
     const staleAdmin = jwt.sign(

@@ -117,7 +117,7 @@ export class UserGroupController {
     }
 
     const audit = {
-      org_id: String(orgId),
+      org_id: orgId,
       operation_id: randomUUID(),
       request_id: req.context?.requestId,
       actor_id: String(req.user?.userId),
@@ -135,7 +135,7 @@ export class UserGroupController {
 
     await recordAuditEvent({
       ...audit,
-      group_ids: [String(group._id)],
+      group_ids: [group._id],
       outcome: 'success',
     });
     res.status(201).json(group);

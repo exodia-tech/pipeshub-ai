@@ -1,8 +1,8 @@
-import fs from 'fs'
-import path from 'path'
-import sinon from 'sinon'
-import { Router } from 'express'
-import { ValidationMiddleware } from '../../src/libs/middlewares/validation.middleware'
+import fs from 'fs';
+import path from 'path';
+import sinon from 'sinon';
+import { Router } from 'express';
+import { ValidationMiddleware } from '../../src/libs/middlewares/validation.middleware';
 
 /**
  * Builds every router factory under src/modules with stand-in services and
@@ -10,19 +10,19 @@ import { ValidationMiddleware } from '../../src/libs/middlewares/validation.midd
  * the route it sits on, so a test can drive the real validation of the real
  * route schemas.
  */
-const SRC = path.resolve(__dirname, '../../src')
+const SRC = path.resolve(__dirname, '../../src');
 
 const standIn = (): any =>
   new Proxy(function standInFn() {}, {
     get: (_t, prop) => {
-      if (prop === 'then') return undefined
-      if (prop === Symbol.toPrimitive) return () => ''
-      if (prop === Symbol.iterator) return undefined
-      return standIn()
+      if (prop === 'then') return undefined;
+      if (prop === Symbol.toPrimitive) return () => '';
+      if (prop === Symbol.iterator) return undefined;
+      return standIn();
     },
     apply: () => standIn(),
     construct: () => standIn(),
-  })
+  });
 
 const fakeContainer = (): any => ({
   get: () => standIn(),
@@ -30,91 +30,127 @@ const fakeContainer = (): any => ({
   isBound: () => true,
   getNamed: () => standIn(),
   getTagged: () => standIn(),
-})
+});
 
 interface Layer {
-  route?: { path: string; methods: Record<string, boolean>; stack: Layer[] }
-  handle: any
-  regexp?: RegExp
+  route?: { path: string; methods: Record<string, boolean>; stack: Layer[] };
+  handle: any;
+  regexp?: RegExp;
 }
 
 const mountPrefix = (layer: Layer): string => {
-  const source = layer.regexp?.source ?? ''
-  const match = source.match(/^\^\\\/(.*?)\\\/\?\(\?=\\\/\|\$\)$/)
-  return match?.[1] ? `/${match[1].replace(/\\\//g, '/')}` : ''
-}
+  const source = layer.regexp?.source ?? '';
+  const match = source.match(/^\^\\\/(.*?)\\\/\?\(\?=\\\/\|\$\)$/);
+  return match?.[1] ? `/${match[1].replace(/\\\//g, '/')}` : '';
+};
 
 export interface ValidatorMount {
-  key: string
-  handler: (req: any, res: any, next: (arg?: unknown) => void) => Promise<void>
+  key: string;
+  handler: (req: any, res: any, next: (arg?: unknown) => void) => Promise<void>;
 }
 
 export async function collectValidatorMounts(): Promise<ValidatorMount[]> {
-  const captured = new Map<unknown, true>()
-  const mountPaths = new WeakMap<Layer, string>()
-  const routerPrototype = Router as unknown as { use: (...args: any[]) => unknown }
-  const originalUse = routerPrototype.use
-  const use = sinon.stub(routerPrototype, 'use').callsFake(function (this: { stack: Layer[] }, ...args: any[]) {
-    const start = this.stack.length
-    const result = originalUse.apply(this, args)
+  const captured = new Map<unknown, true>();
+  const mountPaths = new WeakMap<Layer, string>();
+  const routerPrototype = Router as unknown as {
+    use: (...args: any[]) => unknown;
+  };
+  const originalUse = routerPrototype.use;
+  const use = sinon.stub(routerPrototype, 'use').callsFake(function (
+    this: { stack: Layer[] },
+    ...args: any[]
+  ) {
+    const start = this.stack.length;
+    const result = originalUse.apply(this, args);
     if (typeof args[0] === 'string') {
-      for (const layer of this.stack.slice(start)) mountPaths.set(layer, args[0])
+      for (const layer of this.stack.slice(start))
+        mountPaths.set(layer, args[0]);
     }
-    return result
-  })
-  const original = ValidationMiddleware.validate.bind(ValidationMiddleware)
-  process.env.SECRET_KEY = process.env.SECRET_KEY ?? 'route-validator-contract-key'
-  const stub = sinon.stub(ValidationMiddleware, 'validate').callsFake((schema, options) => {
-    const handler = original(schema, options)
-    captured.set(handler, true)
-    return handler
-  })
-  const mounts: ValidatorMount[] = []
-  const seen = new Map<string, number>()
+    return result;
+  });
+  const original = ValidationMiddleware.validate.bind(ValidationMiddleware);
+  process.env.SECRET_KEY =
+    process.env.SECRET_KEY ?? 'route-validator-contract-key';
+  const stub = sinon
+    .stub(ValidationMiddleware, 'validate')
+    .callsFake((schema, options) => {
+      const handler = original(schema, options);
+      captured.set(handler, true);
+      return handler;
+    });
+  const mounts: ValidatorMount[] = [];
+  const seen = new Map<string, number>();
   const add = (key: string, handler: ValidatorMount['handler']): void => {
-    const n = (seen.get(key) ?? 0) + 1
-    seen.set(key, n)
-    mounts.push({ key: n > 1 ? `${key} dup${n}` : key, handler })
-  }
-  const walk = (stack: Layer[], prefix: string, factory: string, inherited: any[]): void => {
-    const routerWide = inherited.slice()
+    const n = (seen.get(key) ?? 0) + 1;
+    seen.set(key, n);
+    mounts.push({ key: n > 1 ? `${key} dup${n}` : key, handler });
+  };
+  const walk = (
+    stack: Layer[],
+    prefix: string,
+    factory: string,
+    inherited: any[],
+  ): void => {
+    const routerWide = inherited.slice();
     for (const layer of stack) {
       if (layer.route) {
-        const methods = Object.keys(layer.route.methods).filter((m) => layer.route!.methods[m]).map((m) => m.toUpperCase())
-        const own = layer.route.stack.filter((l) => captured.has(l.handle)).map((l) => l.handle)
-        let idx = 0
+        const methods = Object.keys(layer.route.methods)
+          .filter((m) => layer.route!.methods[m])
+          .map((m) => m.toUpperCase());
+        const own = layer.route.stack
+          .filter((l) => captured.has(l.handle))
+          .map((l) => l.handle);
+        let idx = 0;
         for (const h of [...routerWide, ...own]) {
-          add(`${factory} ${methods.join(',')} ${prefix}${layer.route.path} #${idx++}`, h)
+          add(
+            `${factory} ${methods.join(',')} ${prefix}${layer.route.path} #${idx++}`,
+            h,
+          );
         }
       } else if (Array.isArray(layer.handle?.stack)) {
-        walk(layer.handle.stack, prefix + (mountPaths.get(layer) ?? mountPrefix(layer)), factory, routerWide)
+        walk(
+          layer.handle.stack,
+          prefix + (mountPaths.get(layer) ?? mountPrefix(layer)),
+          factory,
+          routerWide,
+        );
       } else if (captured.has(layer.handle)) {
-        routerWide.push(layer.handle)
+        routerWide.push(layer.handle);
       }
     }
-  }
+  };
   try {
-    const files = (fs.readdirSync(path.join(SRC, 'modules'), { recursive: true }) as string[])
+    const files = (
+      fs.readdirSync(path.join(SRC, 'modules'), { recursive: true }) as string[]
+    )
       .map((f) => f.replace(/\\/g, '/'))
-      .filter((f) => /(^|\/)routes\/[^/]+\.ts$/.test(f) || /(^|\/)[^/]+\.routes\.ts$/.test(f))
+      .filter(
+        (f) =>
+          /(^|\/)routes\/[^/]+\.ts$/.test(f) ||
+          /(^|\/)[^/]+\.routes\.ts$/.test(f),
+      )
       .map((f) => path.join(SRC, 'modules', f))
-      .sort()
+      .sort();
     for (const file of files) {
-      const mod = (await import(file)) as Record<string, unknown>
+      const mod = (await import(file)) as Record<string, unknown>;
       for (const [name, factory] of Object.entries(mod)) {
-        if (typeof factory !== 'function' || !/^create\w*Router$/.test(name)) continue
-        let router: { stack: Layer[] }
+        if (typeof factory !== 'function' || !/^create\w*Router$/.test(name))
+          continue;
+        let router: { stack: Layer[] };
         try {
-          router = (factory as (...c: unknown[]) => { stack: Layer[] })(fakeContainer(), fakeContainer())
+          router = (factory as (...c: unknown[]) => { stack: Layer[] })(
+            fakeContainer(),
+            fakeContainer(),
+          );
         } catch {
-          continue
+          continue;
         }
-        walk(router.stack, '', name, [])
+        walk(router.stack, '', name, []);
       }
     }
   } finally {
-    stub.restore()
-    use.restore()
+    stub.restore();
+    use.restore();
   }
-  return mounts
+  return mounts;
 }

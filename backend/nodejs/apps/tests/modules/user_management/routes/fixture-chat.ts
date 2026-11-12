@@ -119,7 +119,10 @@ export function fixtureChat(auth: AuthMiddleware, backend: string): Router {
             row.userId === String(req.user!.userId) &&
             row.orgId === String(req.user!.orgId),
         )
-        .map(({ messages, ...row }) => row),
+        .map(({ messages, ...row }) => {
+          void messages;
+          return row;
+        }),
       pagination: { totalCount: conversations.size, hasNextPage: false },
     }),
   );
@@ -160,14 +163,12 @@ export function fixtureChat(auth: AuthMiddleware, backend: string): Router {
         query.length > 5000 ||
         req.body.attachments?.length
       ) {
-        res
-          .status(400)
-          .json({
-            error: 'The local fixture responder accepts text questions only.',
-          });
+        res.status(400).json({
+          error: 'The local fixture responder accepts text questions only.',
+        });
         return;
       }
-      let row = req.params.id ? owned(req, String(req.params.id)) : null;
+      let row = req.params.id ? owned(req, req.params.id) : null;
       if (req.params.id && !row) {
         res.sendStatus(404);
         return;
