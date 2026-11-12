@@ -78,6 +78,8 @@ def setup() -> tuple:
         indexing_filters=FilterCollection(), logger=MagicMock(),
         notify=AsyncMock(),
         user_id_to_name_cache={}, channel_id_to_name_cache={},
+        user_id_to_email_cache={}, workspace_domain="acme",
+        _warm_user_cache_for_messages=AsyncMock(),
         channel_groups_cache={"C1": "group-1", "C2": "group-2"},
         _replace_mentions_in_text=lambda text, *_maps: text,
     )

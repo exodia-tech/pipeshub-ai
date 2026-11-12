@@ -5,6 +5,7 @@ import time
 import pytest
 from slack_behaviour_setup import (
     ALICE,
+    BOB,
     GENERAL,
     SECRET,
     personal_connector,
@@ -111,3 +112,48 @@ async def test_huddle_filename_uses_content_title_inside_channel(workspace, stor
     updated = store.records[record.external_record_id]
     assert updated.id == record.id
     assert updated.record_name == "Revised title.md"
+
+
+@pytest.mark.parametrize("personal", [False, True])
+async def test_huddle_mentions_are_readable_unique_and_never_permission_grants(workspace, store, checkpoints, personal, monkeypatch) -> None:
+    factory = personal_connector if personal else workspace_connector
+    next(user for user in workspace.users if user["id"] == ALICE)["profile"]["real_name"] = "Mohamed Gaafer"
+    connector, _ = await factory(store, checkpoints)
+    await connector.run_sync()
+    key = huddle_id(GENERAL, "FHUDDLE")
+    before = store.records[key]
+    grants = [(p.entity_type, p.external_id, p.email, p.type) for p in store.record_permissions[key]]
+    original_info = workspace._api_users_info
+    outsider_info = {"ok": True, "user": {
+        "id": "U0OUTSIDER", "profile": {"real_name": "Mohamed Other", "email": "other.mohamed@acme.com"},
+    }}
+    monkeypatch.setattr(workspace, "_api_users_info", lambda params: (
+        outsider_info if params.get("user") == "U0OUTSIDER" else original_info(params)
+    ))
+    workspace.canvases["FHUDDLE"] = (
+        f"# :handshake: Attendees\n\n<@{ALICE}> and &lt;@{BOB}&gt; met <@U0OUTSIDER|wrong label>.\n"
+        "## :star: Summary\n\n:white_check_mark: Done :custom_exodia: :thumbsup::skin-tone-3:\n"
+        f"`<@{ALICE}> :star:`\n\n```\n<@{BOB}> :star:\n```\n"
+        "\n[Original link](https://example.test/:star:)\n"
+    )
+    await connector.run_sync()
+    record = store.records[key]
+    assert record.id == before.id
+    assert record.external_revision_id != before.external_revision_id
+    connector.user_id_to_name_cache.clear()
+    connector.user_id_to_email_cache.clear()
+    rendered = (await body(await connector.stream_record(record))).decode()
+    assert "[@Mohamed Gaafer](https://acme.slack.com/team/U0ALICE)" in rendered
+    assert "Slack ID: U0ALICE; Email: alice@acme.com" in rendered
+    assert "[@Bob](https://acme.slack.com/team/U0BOB)" in rendered
+    assert "[@Mohamed Other](https://acme.slack.com/team/U0OUTSIDER)" in rendered
+    assert "Slack ID: U0OUTSIDER; Email: other.mohamed@acme.com" in rendered
+    assert "wrong label" not in rendered
+    assert "## ⭐ Summary" in rendered
+    assert "✅ Done :custom_exodia:" in rendered
+    assert "👍🏼" in rendered
+    assert f"`<@{ALICE}> :star:`" in rendered
+    assert f"```\n<@{BOB}> :star:\n```" in rendered
+    assert "[Original link](https://example.test/:star:)" in rendered
+    assert [(p.entity_type, p.external_id, p.email, p.type) for p in store.record_permissions[key]] == grants
+    assert not any(u.source_user_id == "U0OUTSIDER" for u in store.app_users.values())
