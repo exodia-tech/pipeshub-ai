@@ -16,6 +16,11 @@ vi.mock('@/chat/api', () => ({
   },
 }));
 
+// An organization switch reloads flags; this hook test must not call a real API.
+vi.mock('@/lib/api/axios-instance', () => ({
+  apiClient: { get: vi.fn().mockResolvedValue({ data: { featureFlags: {} } }) },
+}));
+
 // SWR's default cache binds the real setTimeout for focus events when it loads.
 const realSetTimeout = globalThis.setTimeout;
 

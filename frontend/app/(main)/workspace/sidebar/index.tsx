@@ -44,6 +44,7 @@ interface NavItem {
 const OVERVIEW_ITEMS: NavItem[] = [
   { icon: 'business', labelKey: 'workspace.sidebar.nav.general', route: '/workspace/general' },
   { icon: 'science', labelKey: 'workspace.sidebar.nav.labs', route: '/workspace/labs', adminOnly: true },
+  { icon: 'history', labelKey: 'audit.title', route: '/workspace/audit', adminOnly: true },
 ];
 const DEVELOPER_SETTINGS_ITEMS: NavItem[] = [
   { icon: 'code', labelKey: 'workspace.sidebar.nav.oauth2', route: '/workspace/developer-settings/oauth2' },

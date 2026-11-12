@@ -85,6 +85,7 @@ from app.agents.actions.knowledge_graph.ops.fetch import FETCH_RECORD_TOOL_NAME
 from app.agents.actions.knowledge_graph.ops.timeline import TIMELINE_TOOL_NAME
 from app.agents.agent_loop import parked_turn
 from app.agents.agent_loop.artifact_store import build_artifact_store
+from app.agents.agent_loop.audit import AuditEventEmitter
 from app.agents.agent_loop.cancellation_transport import with_cancellation
 from app.agents.agent_loop.direct_transport import build_direct_transport
 from app.agents.agent_loop.domain_agents import (
@@ -1086,22 +1087,16 @@ class PipesHubAgentFactory:
 
     @staticmethod
     def _build_event_emitter(context: "AgentContext") -> Any:  # noqa: ANN401
-        """`AGUIEventEmitter` composed with a `TranscriptCollector` (see
-        that module's docstring for why it has to be wired at this same
-        `EventEmitter` layer rather than downstream of it) when this
-        request negotiated the `agui` protocol, `SSEEventEmitter` (today's
-        behavior, byte-for-byte unchanged) otherwise — including every
-        request that never set `context.protocol` at all. `None` when
-        there's no streaming client for this call (background/test runs),
-        same as before this method existed."""
+        """Audit upstream events alongside the existing stream and transcript consumers."""
+        audit = AuditEventEmitter(context)
         if context.event_sink is None:
-            return None
+            return audit
         if context.protocol == "agui":
             emitter = AGUIEventEmitter(context.event_sink, thread_id=context.conversation_id or "")
             collector = TranscriptCollector(ref_to_url=context.citation_ref_to_url)
             context.transcript_collector = collector
-            return CompositeEmitter([emitter, collector])
-        return SSEEventEmitter(context.event_sink)
+            return CompositeEmitter([emitter, collector, audit])
+        return CompositeEmitter([SSEEventEmitter(context.event_sink), audit])
 
     @staticmethod
     def _build_hooks(
@@ -1206,6 +1201,7 @@ class PipesHubAgentFactory:
         # Per-tool approvals. Last, so no later middleware can still deny a call it leaves
         # waiting for a person (the card would show for a call that was refused anyway).
         hooks.on(HookEvent.PRE_TOOL_USE).use(approval_gate(context))
+        hooks.on(HookEvent.POST_AGENT).use(AuditEventEmitter(context).run_outcome)
 
         return hooks
 

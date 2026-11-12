@@ -91,6 +91,24 @@ Style: [.gemini/styleguide.md](./.gemini/styleguide.md) (Ruff, PEP 8, ESLint, no
 - Comments explain only the why the code cannot show: a non-obvious constraint or the bug a line guards against. No comments that restate the code or narrate the change, no commented-out code, no TODOs without an owner.
 - PR review criteria: [.claude/skills/pr-review/SKILL.md](./.claude/skills/pr-review/SKILL.md). Frontend work: [frontend/CLAUDE.md](./frontend/CLAUDE.md) (Collections vs Knowledge Base naming, styling, i18n).
 
+## Product UI consistency
+
+When changing a screen, read [frontend/CLAUDE.md](./frontend/CLAUDE.md) and inspect the closest existing product screen before designing it.
+
+- Reuse shared frontend components first: page headers, tables, drawers, people selectors, date pickers, filters and help tooltips. Search the codebase before adding a dependency or a new component. If a shared component needs a fix, improve it for its callers.
+- Match the product's typography, spacing, corner radii, colors and interaction patterns. Use theme tokens and the existing icon wrapper. New features must look like part of the same application, including their detail panels.
+- Keep filter controls aligned at the same height. Put labels inside toolbar triggers; avoid labels above individual controls that push them below their neighbours. Use the shared calendar instead of browser-default date inputs in filter bars, and retain the date/timezone semantics.
+- Put secondary explanations behind a labelled question-mark help button with hover, keyboard-focus and touch access. Keep errors and decisions that need action visible. Do not use an expanded disclosure for routine help text.
+- Keep navigation ordered around user tasks: general settings before specialized reporting and administration. Do not place every new feature at the top of the sidebar.
+- Verify the real local screen at desktop and mobile widths, including open pickers, populated filters and detail panels. Check keyboard controls, overflow and loading/error states. Show an actual screenshot; label fixtures and distinguish local verification from deployment.
+
+## Agent skills and Linear
+
+- Use the installed Matt Pocock engineering skills for their matching tasks, including TDD for behavior tests and writing-for-agents for agent instructions. Reuse the user's agreed test seams instead of asking again for the same scope.
+- Track this fork in Linear, team EXODIA, project EXODIA Knowledgebase. Read [issue-tracker.md](./docs/agents/issue-tracker.md) before planning or reporting; search for the existing issue before creating one.
+- Keep tickets concise: one user story, testable acceptance criteria, and UI screenshots when useful. Keep detailed designs and test logs in the repo, linked from a short progress note. Report implemented, tested and deployed states separately; mark complete only when the acceptance criteria are met.
+- Skill references: [triage labels](./docs/agents/triage-labels.md) and [domain documentation](./docs/agents/domain.md).
+
 ## Do not
 
 - Commit secrets, tokens, or `.env` values.

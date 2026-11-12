@@ -67,6 +67,15 @@ _SERVICE_TOKEN_ROUTES = {
     ("parsing", "GET", "/api/v1/parse/providers"): {"document:parse"},
     ("extraction", "POST", "/api/v1/extract/classify"): {"document:classify"},
     ("entity", "PATCH", "/api/v1/entity/user/email"): {"entity:user:write"},
+    ("entity", "POST", "/api/v1/entity/access-groups"): {"access-group:manage"},
+    ("entity", "GET", "/api/v1/entity/access-groups"): {"access-group:manage"},
+    ("entity", "GET", "/api/v1/entity/access-groups/{group_id}/access"): {"access-group:manage"},
+    ("entity", "PUT", "/api/v1/entity/access-groups/{group_id}/access"): {"access-group:manage"},
+    ("entity", "GET", "/api/v1/entity/access-groups/{group_id}/resources"): {"access-group:manage"},
+    ("entity", "POST", "/api/v1/entity/access-groups/{group_id}/members"): {"access-group:manage"},
+    ("entity", "GET", "/api/v1/entity/access-groups/{group_id}/members"): {"access-group:manage"},
+    ("entity", "PUT", "/api/v1/entity/access-groups/{group_id}"): {"access-group:manage"},
+    ("entity", "DELETE", "/api/v1/entity/access-groups/{group_id}"): {"access-group:manage"},
     ("extraction", "POST", "/api/v1/extract/entities"): {"document:classify"},
 }
 

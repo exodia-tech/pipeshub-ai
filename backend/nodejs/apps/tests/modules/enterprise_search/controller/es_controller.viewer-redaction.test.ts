@@ -2,7 +2,7 @@ import 'reflect-metadata'
 import { expect } from 'chai'
 import sinon from 'sinon'
 import { Types } from 'mongoose'
-import { readableRecordIds } from '../../../../src/modules/enterprise_search/utils/viewer-redaction'
+import { readableRecordIds, redactMessagesFor, viewerOf } from '../../../../src/modules/enterprise_search/utils/viewer-redaction'
 import { addComputedFields } from '../../../../src/modules/enterprise_search/utils/utils'
 import {
   searchArchivedConversations,
@@ -142,7 +142,7 @@ const res = (): any => {
 
 /** Stubs the access route: it names `readable` as readable; `null` makes it fail. Returns the calls seen. */
 const askedUrls: string[] = []
-const stubAccess = (readable: string[] | null) => {
+const stubAccess = (readable: string[] | null, groupRestricted = false) => {
   askedUrls.length = 0
   const asked: string[][] = []
   sinon.stub(AIServiceCommand.prototype, 'execute').callsFake(async function (this: any) {
@@ -151,7 +151,7 @@ const stubAccess = (readable: string[] | null) => {
       asked.push(body.recordIds ?? [])
       askedUrls.push(...(body.webUrls ?? []))
       if (readable === null) throw new Error('access service down')
-      return { statusCode: 200, data: { accessible: readable.filter((r) => !r.startsWith('http')), accessibleUrls: readable.filter((r) => r.startsWith('http')) }, msg: '' } as any
+      return { statusCode: 200, data: { accessible: readable.filter((r) => !r.startsWith('http')), accessibleUrls: readable.filter((r) => r.startsWith('http')), groupRestricted }, msg: '' } as any
     }
     return { statusCode: 200, data: {}, msg: '' } as any // the unrelated permission sync
   })
@@ -179,6 +179,23 @@ const fetchConversation = async (userId: string) => {
 
 describe('shared chats: per-viewer citations', () => {
   afterEach(() => sinon.restore())
+
+  it('a group restriction also hides an owner reply derived from a now-denied source', async () => {
+    stubAccess(['rec-ok'], true)
+    const stored = {...richAnswer(),content:SECRET}
+    const [message] = await redactMessagesFor(appConfig, viewerOf(OWNER, ORG), [stored], () => OWNER)
+    expect(JSON.stringify(message)).to.not.contain(SECRET)
+    expect(JSON.stringify(message)).to.not.contain(TOOL_TEXT)
+    expect(message.content).to.contain('no longer accessible')
+    expect(stored.content).to.equal(SECRET)
+  })
+
+  it('a restricted owner can retain an answer whose cited sources remain readable', async () => {
+    stubAccess(['rec-ok'], true)
+    const stored={messageType:'bot_response',content:'Allowed budget summary',citations:[{citationData:citation(CIT_OK,'rec-ok','allowed text')}],parts:[{type:'text',content:'Allowed budget summary'}],appliedFilters:{apps:[{id:'parent-connector',name:'Scoped connector'}]}}
+    const [message]=await redactMessagesFor(appConfig,viewerOf(OWNER,ORG),[stored],()=>OWNER)
+    expect(message.content).to.equal('Allowed budget summary')
+  })
 
   it('a viewer gets a placeholder for each citation, excerpt and attachment they cannot read', async () => {
     const asked = stubAccess(['rec-ok', 'att-ok'])
@@ -234,16 +251,16 @@ describe('shared chats: per-viewer citations', () => {
     stubAccess(null)
     stubConversation([{ ...answer(), referenceData: [{ name: 'Ticket', id: 'PA-1', webUrl: 'https://jira/PA-1' }] }])
     const message = await fetchConversation(VIEWER)
-    expect(message.referenceData[0].name).to.equal('Restricted source')
+    expect(message.referenceData).to.deep.equal([])
   })
 
-  it('a failed access check hides every record reference but leaves the rest of the chat', async () => {
+  it('a failed access check hides the complete derived reply and tool output', async () => {
     stubAccess(null)
     stubConversation([richAnswer()])
     const message = await fetchConversation(VIEWER)
-    expectRecordsOnlyRedacted(message, false)
-    expect(message.referenceData[0].redacted).to.equal(true)
-    expect(message.reasoning).to.have.length(1)
+    expect(JSON.stringify(message)).not.to.contain(SECRET)
+    expect(message.content).to.contain('cannot be verified')
+    expect(message.reasoning).to.have.length(0)
   })
 
   it('the owner still gets every field and reference', async () => {
@@ -262,7 +279,7 @@ describe('shared chats: per-viewer citations', () => {
     })
     stubConversation([{ ...answer(), referenceData: [{ name: SECRET, id: 'v-1', webUrl: 'https://x/rec-no' }] }])
     const message = await fetchConversation(VIEWER)
-    expect(message.citations).to.deep.equal([{ redacted: true, reason: 'no_access' }, { redacted: true, reason: 'no_access' }])
+    expect(message.citations).to.deep.equal([])
     expect(message.attachments).to.deep.equal([])
     expect(JSON.stringify(message)).to.not.contain(SECRET)
   })
@@ -303,7 +320,7 @@ describe('shared chats: per-viewer citations', () => {
     )
     const message = await fetchConversation(OWNER)
     expect(message.citations[1].citationData.content).to.equal(SECRET)
-    expect(asked).to.have.length(0)
+    expect(asked).to.have.length(1)
   })
 
   it('an agent conversation opened by a project member or shared user is redacted too', async () => {
@@ -325,14 +342,14 @@ describe('shared chats: per-viewer citations', () => {
     expect(message.attachments).to.deep.equal([{ recordId: 'att-ok', recordName: 'ok.pdf' }])
   })
 
-  it('the owner sees everything and no access check is made', async () => {
+  it('an unrestricted owner sees everything after the group-policy check', async () => {
     const asked = stubAccess([])
     stubConversation([answer()])
     const message = await fetchConversation(OWNER)
 
     expect(message.citations[1].citationData.content).to.equal(SECRET)
     expect(message.attachments[1].recordId).to.equal('att-no')
-    expect(asked).to.have.length(0)
+    expect(asked).to.have.length(1)
   })
 
   it('redacts everything when the access check fails', async () => {
@@ -340,7 +357,7 @@ describe('shared chats: per-viewer citations', () => {
     stubConversation([answer()])
     const message = await fetchConversation(VIEWER)
 
-    expect(message.citations).to.deep.equal([{ redacted: true, reason: 'no_access' }, { redacted: true, reason: 'no_access' }])
+    expect(message.citations).to.deep.equal([])
     expect(message.attachments).to.deep.equal([])
     expect(JSON.stringify(message)).to.not.contain(SECRET)
   })
@@ -507,6 +524,6 @@ describe('shared chats: per-viewer citations', () => {
     await getSearchById(appConfig)(req(VIEWER, { params: { searchId: SESSION } }), r, sinon.stub())
 
     expect(r.json.firstCall.args[0][0]).to.deep.equal(search) // a copy: the repository hands out plain rows
-    expect(asked).to.have.length(0)
+    expect(asked).to.have.length(1)
   })
 })

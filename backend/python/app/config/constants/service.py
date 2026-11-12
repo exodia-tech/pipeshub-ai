@@ -57,6 +57,7 @@ class TokenScopes(Enum):
     # (the name predates the route; it is not tied to signed URLs).
     CONNECTOR_SIGNED_URL = "connector:signedUrl"
     CONVERSATION_CREATE = "conversation:create"
+    AUDIT_WRITE = "audit:write"
     # Node -> query: grant/revoke permission edges on a conversation's attachments
     # and artifacts, after Node has checked ownership/sharing in Mongo.
     CONVERSATION_PERMISSIONS = "conversation:permissions"
@@ -67,6 +68,7 @@ class TokenScopes(Enum):
     DOCUMENT_CLASSIFY = "document:classify"
     # Node -> connectors: write verified profile email onto the graph user.
     ENTITY_USER_WRITE = "entity:user:write"
+    ACCESS_GROUP_MANAGE = "access-group:manage"
 
 
 class OAuthScopes(str, Enum):

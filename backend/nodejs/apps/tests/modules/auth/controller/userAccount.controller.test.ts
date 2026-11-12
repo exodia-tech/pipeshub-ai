@@ -96,6 +96,7 @@ describe('UserAccountController', () => {
   let next: sinon.SinonStub;
 
   beforeEach(() => {
+    sinon.stub(mongoose.model('exodiaAuditEvent'), 'create').resolves({} as never);
     mockConfig = {
       iamBackend: 'http://iam:3000',
       cmBackend: 'http://cm:3001',

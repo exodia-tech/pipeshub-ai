@@ -12770,8 +12770,8 @@ class TestDeleteTeamMemberEdges:
     @pytest.mark.asyncio
     async def test_exception(self, connected_provider):
         connected_provider.execute_query = AsyncMock(side_effect=Exception("fail"))
-        result = await connected_provider.delete_team_member_edges("t1", ["u1"])
-        assert result == []
+        with pytest.raises(Exception, match="fail"):
+            await connected_provider.delete_team_member_edges("t1", ["u1"])
 
 
 # ---------------------------------------------------------------------------
@@ -12793,10 +12793,10 @@ class TestBatchUpdateTeamMemberRoles:
     @pytest.mark.asyncio
     async def test_exception(self, connected_provider):
         connected_provider.execute_query = AsyncMock(side_effect=Exception("fail"))
-        result = await connected_provider.batch_update_team_member_roles(
-            "t1", [{"userId": "u1", "role": "WRITER"}], 1000
-        )
-        assert result == []
+        with pytest.raises(Exception, match="fail"):
+            await connected_provider.batch_update_team_member_roles(
+                "t1", [{"userId": "u1", "role": "WRITER"}], 1000
+            )
 
 
 # ---------------------------------------------------------------------------

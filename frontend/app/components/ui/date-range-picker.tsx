@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Flex, Box, Text, Button, Popover, IconButton, Tabs } from '@radix-ui/themes';
+import {
+  Flex,
+  Box,
+  Text,
+  Button,
+  Popover,
+  IconButton,
+  Tabs,
+} from '@radix-ui/themes';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 
 /**
@@ -28,7 +37,11 @@ export interface DateRangePickerProps {
   /** Current date filter type (controlled from parent) */
   dateType?: DateFilterType;
   /** Callback fired when date(s) are applied - includes the date type */
-  onApply: (startDate: string, endDate: string | undefined, dateType: DateFilterType) => void;
+  onApply: (
+    startDate: string,
+    endDate: string | undefined,
+    dateType: DateFilterType,
+  ) => void;
   /** Callback fired when dates are cleared */
   onClear: () => void;
   /** Default tab to show when opening (optional) */
@@ -72,7 +85,10 @@ function dateKey(iso: string | null): string {
   return iso.slice(0, 10);
 }
 
-function parseDateTimeBoundary(s: string | undefined | null): { date: string; time: string } {
+function parseDateTimeBoundary(s: string | undefined | null): {
+  date: string;
+  time: string;
+} {
   if (!s?.trim()) return { date: '', time: '00:00' };
   const tIdx = s.indexOf('T');
   if (tIdx >= 0) {
@@ -119,19 +135,6 @@ const getDaysInMonth = (year: number, month: number): number => {
  */
 const getFirstDayOfMonth = (year: number, month: number): number => {
   return new Date(year, month, 1).getDay();
-};
-
-const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-const DATE_TYPE_LABELS: Record<DateFilterType, string> = {
-  on: 'On',
-  between: 'Between',
-  before: 'Before',
-  after: 'After',
 };
 
 /**
@@ -186,36 +189,60 @@ export function DateRangePicker({
   triggerVariant = 'toolbar',
   summaryBelowTrigger = false,
 }: DateRangePickerProps) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n?.language || 'en-US';
+  const DATE_TYPE_LABELS: Record<DateFilterType, string> = {
+    on: t('datePicker.on'),
+    between: t('datePicker.between'),
+    before: t('datePicker.before'),
+    after: t('datePicker.after'),
+  };
+  const WEEKDAYS = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) =>
+        new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(
+          new Date(2023, 0, 1 + index),
+        ),
+      ),
+    [locale],
+  );
   const effectiveDateType = fixedDateType ?? dateType ?? defaultDateType;
 
   const [isOpen, setIsOpen] = useState(false);
-  const anchorForCalendar = (s?: string, e?: string) => (s || e || '').slice(0, 10);
+  const anchorForCalendar = (s?: string, e?: string) =>
+    (s || e || '').slice(0, 10);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const a = anchorForCalendar(startDate, endDate);
-    if (a) return new Date(a).getMonth();
+    if (a) return new Date(a + 'T12:00:00').getMonth();
     return new Date().getMonth();
   });
   const [currentYear, setCurrentYear] = useState(() => {
     const a = anchorForCalendar(startDate, endDate);
-    if (a) return new Date(a).getFullYear();
+    if (a) return new Date(a + 'T12:00:00').getFullYear();
     return new Date().getFullYear();
   });
-  const [selectedStart, setSelectedStart] = useState<string | null>(startDate || null);
-  const [selectedEnd, setSelectedEnd] = useState<string | null>(endDate || null);
+  const [selectedStart, setSelectedStart] = useState<string | null>(
+    startDate || null,
+  );
+  const [selectedEnd, setSelectedEnd] = useState<string | null>(
+    endDate || null,
+  );
   const [isSelectingEnd, setIsSelectingEnd] = useState(false);
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
-  const [selectedDateType, setSelectedDateType] = useState<DateFilterType>(effectiveDateType);
+  const [selectedDateType, setSelectedDateType] =
+    useState<DateFilterType>(effectiveDateType);
 
   useEffect(() => {
     if (fixedDateType) setSelectedDateType(fixedDateType);
     else if (dateType) setSelectedDateType(dateType);
   }, [fixedDateType, dateType]);
 
-  const hasSelection = dateType === 'between'
-    ? !!startDate && !!endDate
-    : dateType === 'before'
-    ? !!endDate
-    : !!startDate;
+  const hasSelection =
+    dateType === 'between'
+      ? !!startDate && !!endDate
+      : dateType === 'before'
+        ? !!endDate
+        : !!startDate;
 
   // Generate calendar days for the current month (including prev/next month days)
   const calendarDays = useMemo(() => {
@@ -279,11 +306,15 @@ export function DateRangePicker({
 
   // Handle day click - supports both single and range selection based on date type
   const handleDayClick = (day: number) => {
-    const dateStr = formatDateForInput(new Date(currentYear, currentMonth, day));
+    const dateStr = formatDateForInput(
+      new Date(currentYear, currentMonth, day),
+    );
 
     if (selectedDateType !== 'between') {
       const prevSource =
-        selectedDateType === 'before' ? selectedStart || selectedEnd : selectedStart;
+        selectedDateType === 'before'
+          ? selectedStart || selectedEnd
+          : selectedStart;
       const { time: prevTime } = parseDateTimeBoundary(prevSource);
       const merged = withTime ? mergeDateTime(dateStr, prevTime) : dateStr;
       setSelectedStart(merged);
@@ -291,13 +322,17 @@ export function DateRangePicker({
     } else {
       if (!selectedStart || !isSelectingEnd) {
         const { time: startTime } = parseDateTimeBoundary(selectedStart);
-        const merged = withTime ? mergeDateTime(dateStr, startTime || '00:00') : dateStr;
+        const merged = withTime
+          ? mergeDateTime(dateStr, startTime || '00:00')
+          : dateStr;
         setSelectedStart(merged);
         setSelectedEnd(null);
         setIsSelectingEnd(true);
       } else {
         const { time: endTime } = parseDateTimeBoundary(selectedEnd);
-        const endMerged = withTime ? mergeDateTime(dateStr, endTime || '00:00') : dateStr;
+        const endMerged = withTime
+          ? mergeDateTime(dateStr, endTime || '00:00')
+          : dateStr;
         const startKey = dateKey(selectedStart);
         if (dateStr < startKey) {
           setSelectedEnd(selectedStart);
@@ -322,14 +357,21 @@ export function DateRangePicker({
 
   // Check if a day is selected (start or end)
   const isDaySelected = (day: number): boolean => {
-    const dateStr = formatDateForInput(new Date(currentYear, currentMonth, day));
-    return dateStr === dateKey(selectedStart) || dateStr === dateKey(selectedEnd);
+    const dateStr = formatDateForInput(
+      new Date(currentYear, currentMonth, day),
+    );
+    return (
+      dateStr === dateKey(selectedStart) || dateStr === dateKey(selectedEnd)
+    );
   };
 
   // Check if a day is within the selected range
   const isDayInRange = (day: number): boolean => {
-    if (!selectedStart || !selectedEnd || selectedDateType !== 'between') return false;
-    const dateStr = formatDateForInput(new Date(currentYear, currentMonth, day));
+    if (!selectedStart || !selectedEnd || selectedDateType !== 'between')
+      return false;
+    const dateStr = formatDateForInput(
+      new Date(currentYear, currentMonth, day),
+    );
     const a = dateKey(selectedStart);
     const b = dateKey(selectedEnd);
     return dateStr > a && dateStr < b;
@@ -337,8 +379,16 @@ export function DateRangePicker({
 
   // Check if a day is within the hover preview range (between mode, selecting end date)
   const isDayInHoverRange = (day: number): boolean => {
-    if (!selectedStart || !hoveredDay || !isSelectingEnd || selectedDateType !== 'between') return false;
-    const dateStr = formatDateForInput(new Date(currentYear, currentMonth, day));
+    if (
+      !selectedStart ||
+      !hoveredDay ||
+      !isSelectingEnd ||
+      selectedDateType !== 'between'
+    )
+      return false;
+    const dateStr = formatDateForInput(
+      new Date(currentYear, currentMonth, day),
+    );
     const hk = dateKey(hoveredDay);
     const sk = dateKey(selectedStart);
     const rangeStart = sk < hk ? sk : hk;
@@ -410,9 +460,12 @@ export function DateRangePicker({
       setSelectedEnd(nextEnd);
       setSelectedDateType(fixedDateType ?? dateType ?? defaultDateType);
       setIsSelectingEnd(false);
-      const anchor = anchorForCalendar(nextStart ?? undefined, nextEnd ?? undefined);
+      const anchor = anchorForCalendar(
+        nextStart ?? undefined,
+        nextEnd ?? undefined,
+      );
       if (anchor) {
-        const d = new Date(anchor);
+        const d = new Date(anchor + 'T12:00:00');
         setCurrentMonth(d.getMonth());
         setCurrentYear(d.getFullYear());
       }
@@ -433,103 +486,80 @@ export function DateRangePicker({
           handleClear(e);
         }}
       >
-        Clear
+        {t('common.clear')}
       </Button>
     </Flex>
   );
 
-  const triggerToolbar = hasSelection ? (
+  const triggerToolbar = (
     <Flex
       align="center"
       style={{
         height: 28,
-        border: '1px solid var(--gray-a7)',
+        flexShrink: 0,
+        border: '1px solid var(--olive-4)',
         borderRadius: 'var(--radius-2)',
-        backgroundColor: 'var(--gray-a3)',
-        cursor: 'pointer',
-        overflow: 'hidden',
+        backgroundColor: hasSelection ? 'var(--accent-a3)' : 'transparent',
       }}
     >
-      {icon && (
-        <Flex
-          align="center"
-          justify="center"
+      <Popover.Trigger>
+        <Button
+          type="button"
+          variant="ghost"
+          size="1"
+          color="gray"
+          className="touch-hit"
+          aria-label={hasSelection ? `${label}: ${getDateValue()}` : label}
           style={{
-            padding: '0 0 0 8px',
-            height: '100%',
+            height: 26,
+            margin: 0,
+            padding: '0 8px',
+            gap: 6,
+            boxShadow: 'none',
+            cursor: 'pointer',
           }}
         >
-          <MaterialIcon name={icon} size={14} color="var(--neutral-11)" />
-        </Flex>
+          {icon && <MaterialIcon name={icon} size={14} />}
+          <Text size="1" style={{ whiteSpace: 'nowrap' }}>
+            {label}
+          </Text>
+          {hasSelection ? (
+            <Text
+              size="1"
+              weight="medium"
+              style={{ whiteSpace: 'nowrap', color: 'var(--accent-11)' }}
+            >
+              {!fixedDateType && dateType
+                ? `${DATE_TYPE_LABELS[dateType]} · `
+                : ''}
+              {getDateValue()}
+            </Text>
+          ) : (
+            <MaterialIcon name="expand_more" size={14} />
+          )}
+        </Button>
+      </Popover.Trigger>
+      {hasSelection && (
+        <IconButton
+          type="button"
+          variant="ghost"
+          color="gray"
+          size="1"
+          className="touch-hit"
+          aria-label={`${t('common.clear')} ${label}`}
+          onClick={handleClear}
+          style={{
+            height: 26,
+            width: 26,
+            margin: 0,
+            borderLeft: '1px solid var(--olive-4)',
+            borderRadius: 0,
+          }}
+        >
+          <MaterialIcon name="close" size={14} />
+        </IconButton>
       )}
-      <Flex
-        align="center"
-        style={{
-          padding: '0 8px',
-          borderRight: '1px solid var(--gray-a7)',
-          height: '100%',
-        }}
-      >
-        <Text size="1" weight="medium" style={{ color: 'var(--neutral-11)', lineHeight: '18px', whiteSpace: 'nowrap' }}>{label}</Text>
-      </Flex>
-      <Flex
-        align="center"
-        style={{
-          padding: '0 8px',
-          borderRight: '1px solid var(--gray-a7)',
-          height: '100%',
-        }}
-      >
-        <Text size="1" style={{ color: 'var(--neutral-11)', fontWeight: 400, lineHeight: '18px', whiteSpace: 'nowrap' }}>
-          {dateType ? DATE_TYPE_LABELS[dateType].toLowerCase() : 'on'}
-        </Text>
-      </Flex>
-      <Flex
-        align="center"
-        style={{
-          padding: '0 8px',
-          borderRight: '1px solid var(--gray-a7)',
-          height: '100%',
-        }}
-      >
-        <Text size="1" weight="medium" style={{ color: 'var(--neutral-11)', lineHeight: '18px', whiteSpace: 'nowrap' }}>{getDateValue()}</Text>
-      </Flex>
-      <Flex
-        align="center"
-        justify="center"
-        onClick={handleClear}
-        style={{
-          padding: '0 4px',
-          height: '100%',
-          cursor: 'pointer',
-        }}
-      >
-        <MaterialIcon name="close" size={14} color="var(--neutral-11)" />
-      </Flex>
     </Flex>
-  ) : (
-    <Button
-      variant="outline"
-      size="1"
-      radius="medium"
-      color="gray"
-      style={{
-        height: 28,
-        padding: '0 6px 0 10px',
-        gap: 6,
-        cursor: 'pointer',
-        borderRadius: 'var(--radius-2)',
-        border: '1px solid var(--olive-4)',
-        boxShadow: 'none',
-        fontWeight: 400,
-      }}
-    >
-      {icon && (
-        <MaterialIcon name={icon} size={14} color="var(--neutral-11)" />
-      )}
-      <Text size="1" style={{ fontWeight: 400, lineHeight: '18px', color: 'var(--neutral-11)' }}>{label}</Text>
-      <MaterialIcon name="expand_more" size={14} color="var(--neutral-11)" />
-    </Button>
   );
 
   const triggerField = (
@@ -555,9 +585,21 @@ export function DateRangePicker({
           }}
         >
           {icon && (
-            <MaterialIcon name={icon} size={16} color="var(--slate-11)" style={{ flexShrink: 0 }} />
+            <MaterialIcon
+              name={icon}
+              size={16}
+              color="var(--slate-11)"
+              style={{ flexShrink: 0 }}
+            />
           )}
-          <Box style={{ minWidth: 0, flex: 1, overflow: 'hidden', textAlign: 'left' }}>
+          <Box
+            style={{
+              minWidth: 0,
+              flex: 1,
+              overflow: 'hidden',
+              textAlign: 'left',
+            }}
+          >
             <Text
               size="2"
               style={{
@@ -579,20 +621,19 @@ export function DateRangePicker({
 
   return (
     <Popover.Root open={isOpen} onOpenChange={handleOpenChange}>
-      {triggerVariant === 'field' ? (
-        triggerField
-      ) : (
-        <Popover.Trigger>{triggerToolbar}</Popover.Trigger>
-      )}
+      {triggerVariant === 'field' ? triggerField : triggerToolbar}
 
       <Popover.Content
+        aria-label={label}
         side="bottom"
         align="start"
         sideOffset={4}
         container={portalContainer ?? undefined}
         style={{
           padding: '8px',
-          minWidth: '280px',
+          minWidth: 'min(344px, calc(100vw - 24px))',
+          maxHeight: 'var(--radix-popover-content-available-height)',
+          overflowY: 'auto',
           // Frosted like the action menus (shared frost tokens in globals.css)
           backgroundColor: 'var(--frost-bg-strong)',
           backdropFilter: 'var(--frost-filter)',
@@ -602,7 +643,10 @@ export function DateRangePicker({
         }}
       >
         {!fixedDateType ? (
-          <Tabs.Root value={selectedDateType} onValueChange={handleDateTypeChange}>
+          <Tabs.Root
+            value={selectedDateType}
+            onValueChange={handleDateTypeChange}
+          >
             <Tabs.List
               style={{
                 display: 'flex',
@@ -611,29 +655,34 @@ export function DateRangePicker({
                 backgroundColor: 'transparent',
               }}
             >
-              {(['on', 'between', 'before', 'after'] as DateFilterType[]).map((type) => (
-                <Tabs.Trigger
-                  key={type}
-                  value={type}
-                  style={{
-                    flex: 1,
-                    padding: '8px 4px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderBottom:
-                      selectedDateType === type
-                        ? '2px solid var(--accent-10)'
-                        : '2px solid transparent',
-                    marginBottom: '-2px',
-                    color: selectedDateType === type ? 'var(--slate-12)' : 'var(--slate-11)',
-                    fontWeight: selectedDateType === type ? '500' : '400',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {DATE_TYPE_LABELS[type]}
-                </Tabs.Trigger>
-              ))}
+              {(['on', 'between', 'before', 'after'] as DateFilterType[]).map(
+                (type) => (
+                  <Tabs.Trigger
+                    key={type}
+                    value={type}
+                    style={{
+                      flex: 1,
+                      padding: '8px 4px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom:
+                        selectedDateType === type
+                          ? '2px solid var(--accent-10)'
+                          : '2px solid transparent',
+                      marginBottom: '-2px',
+                      color:
+                        selectedDateType === type
+                          ? 'var(--slate-12)'
+                          : 'var(--slate-11)',
+                      fontWeight: selectedDateType === type ? '500' : '400',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {DATE_TYPE_LABELS[type]}
+                  </Tabs.Trigger>
+                ),
+              )}
             </Tabs.List>
           </Tabs.Root>
         ) : null}
@@ -654,30 +703,47 @@ export function DateRangePicker({
           <Text size="2" style={{ color: 'var(--slate-11)' }}>
             {(() => {
               const primary = selectedStart || selectedEnd;
-              if (selectedDateType === 'between' && !primary) return 'Start Date - End Date';
-              if (!primary) return 'Pick a date';
-              if (selectedDateType === 'between' && selectedStart && selectedEnd) {
+              if (selectedDateType === 'between' && !primary)
+                return t('datePicker.chooseRange');
+              if (!primary) return t('datePicker.pickDate');
+              if (
+                selectedDateType === 'between' &&
+                selectedStart &&
+                selectedEnd
+              ) {
                 return `${formatBoundaryForDisplay(selectedStart, withTime)} - ${formatBoundaryForDisplay(selectedEnd, withTime)}`;
               }
-              if (selectedDateType === 'between' && isSelectingEnd && hoveredDay) {
+              if (
+                selectedDateType === 'between' &&
+                isSelectingEnd &&
+                hoveredDay
+              ) {
                 return `${formatBoundaryForDisplay(selectedStart!, withTime)} - ${formatBoundaryForDisplay(hoveredDay, withTime)}`;
               }
               if (selectedDateType === 'between' && isSelectingEnd) {
-                return `${formatBoundaryForDisplay(selectedStart!, withTime)} - End Date`;
+                return `${formatBoundaryForDisplay(selectedStart!, withTime)} - ${t('datePicker.endDate')}`;
               }
               return formatBoundaryForDisplay(primary, withTime);
             })()}
           </Text>
-          <MaterialIcon name="calendar_today" size={20} color="var(--slate-9)" />
+          <MaterialIcon
+            name="calendar_today"
+            size={20}
+            color="var(--slate-9)"
+          />
         </Flex>
 
         {withTime ? (
           <Flex direction="column" gap="2" style={{ marginBottom: '12px' }}>
             {selectedDateType === 'between' ? (
               <Flex align="center" gap="3" wrap="wrap">
-                <Flex direction="column" gap="1" style={{ flex: '1 1 120px', minWidth: 0 }}>
+                <Flex
+                  direction="column"
+                  gap="1"
+                  style={{ flex: '1 1 120px', minWidth: 0 }}
+                >
                   <Text size="1" style={{ color: 'var(--slate-11)' }}>
-                    Start time
+                    {t('datePicker.startTime')}
                   </Text>
                   <input
                     type="time"
@@ -701,9 +767,13 @@ export function DateRangePicker({
                     }}
                   />
                 </Flex>
-                <Flex direction="column" gap="1" style={{ flex: '1 1 120px', minWidth: 0 }}>
+                <Flex
+                  direction="column"
+                  gap="1"
+                  style={{ flex: '1 1 120px', minWidth: 0 }}
+                >
                   <Text size="1" style={{ color: 'var(--slate-11)' }}>
-                    End time
+                    {t('datePicker.endTime')}
                   </Text>
                   <input
                     type="time"
@@ -731,13 +801,15 @@ export function DateRangePicker({
             ) : (
               <Flex direction="column" gap="1" style={{ width: '100%' }}>
                 <Text size="1" style={{ color: 'var(--slate-11)' }}>
-                  Time
+                  {t('datePicker.time')}
                 </Text>
                 <input
                   type="time"
                   step={60}
                   disabled={!(selectedStart || selectedEnd)}
-                  value={parseDateTimeBoundary(selectedStart || selectedEnd).time}
+                  value={
+                    parseDateTimeBoundary(selectedStart || selectedEnd).time
+                  }
                   onChange={(e) => {
                     const src = selectedStart || selectedEnd;
                     const { date } = parseDateTimeBoundary(src);
@@ -776,27 +848,46 @@ export function DateRangePicker({
           }}
         >
           {/* Month navigation */}
-          <Flex align="center" justify="between" style={{ marginBottom: '16px', padding: '4px 8px' }}>
+          <Flex
+            align="center"
+            justify="between"
+            style={{ marginBottom: '16px', padding: '4px 8px' }}
+          >
             <IconButton
               variant="outline"
               size="1"
               color="gray"
+              aria-label={t('datePicker.previousMonth')}
+              className="touch-hit"
               onClick={goToPreviousMonth}
               style={{ cursor: 'pointer' }}
             >
-              <MaterialIcon name="chevron_left" size={16} color="var(--slate-11)" />
+              <MaterialIcon
+                name="chevron_left"
+                size={16}
+                color="var(--slate-11)"
+              />
             </IconButton>
             <Text size="2" weight="bold" style={{ color: 'var(--slate-12)' }}>
-              {MONTHS[currentMonth]} {currentYear}
+              {new Intl.DateTimeFormat(locale, {
+                month: 'long',
+                year: 'numeric',
+              }).format(new Date(currentYear, currentMonth, 1))}
             </Text>
             <IconButton
               variant="outline"
               size="1"
               color="gray"
+              aria-label={t('datePicker.nextMonth')}
+              className="touch-hit"
               onClick={goToNextMonth}
               style={{ cursor: 'pointer' }}
             >
-              <MaterialIcon name="chevron_right" size={16} color="var(--slate-11)" />
+              <MaterialIcon
+                name="chevron_right"
+                size={16}
+                color="var(--slate-11)"
+              />
             </IconButton>
           </Flex>
 
@@ -832,32 +923,55 @@ export function DateRangePicker({
             }}
           >
             {calendarDays.map(({ day, isCurrentMonth }, index) => (
-              <Flex
+              <Button
                 key={index}
-                direction="column"
-                align="center"
-                justify="center"
+                type="button"
+                variant="ghost"
+                color="gray"
+                disabled={!isCurrentMonth}
+                aria-label={
+                  isCurrentMonth
+                    ? new Intl.DateTimeFormat(locale, {
+                        dateStyle: 'full',
+                      }).format(new Date(currentYear, currentMonth, day))
+                    : undefined
+                }
+                aria-pressed={isCurrentMonth && isDaySelected(day)}
                 onClick={() => isCurrentMonth && handleDayClick(day)}
                 onMouseEnter={() => {
-                  if (isCurrentMonth && isSelectingEnd && selectedDateType === 'between') {
-                    setHoveredDay(formatDateForInput(new Date(currentYear, currentMonth, day)));
+                  if (
+                    isCurrentMonth &&
+                    isSelectingEnd &&
+                    selectedDateType === 'between'
+                  ) {
+                    setHoveredDay(
+                      formatDateForInput(
+                        new Date(currentYear, currentMonth, day),
+                      ),
+                    );
                   }
                 }}
                 onMouseLeave={() => {
                   if (hoveredDay) setHoveredDay(null);
                 }}
                 style={{
-                  height: '36px',
-                  width: '36px',
+                  height: '44px',
+                  width: '100%',
+                  minWidth: 0,
+                  margin: 0,
+                  padding: 0,
+                  flexDirection: 'column',
+                  gap: 0,
                   cursor: isCurrentMonth ? 'pointer' : 'default',
                   opacity: isCurrentMonth ? 1 : 0.3,
-                  backgroundColor: isCurrentMonth && isDaySelected(day)
-                    ? 'var(--accent-5)'
-                    : isCurrentMonth && isDayInRange(day)
-                    ? 'var(--accent-5)'
-                    : isCurrentMonth && isDayInHoverRange(day)
-                    ? 'var(--accent-3)'
-                    : 'transparent',
+                  backgroundColor:
+                    isCurrentMonth && isDaySelected(day)
+                      ? 'var(--accent-5)'
+                      : isCurrentMonth && isDayInRange(day)
+                        ? 'var(--accent-5)'
+                        : isCurrentMonth && isDayInHoverRange(day)
+                          ? 'var(--accent-3)'
+                          : 'transparent',
                 }}
               >
                 <Text
@@ -879,7 +993,7 @@ export function DateRangePicker({
                     }}
                   />
                 )}
-              </Flex>
+              </Button>
             ))}
           </Box>
         </Box>
@@ -893,12 +1007,14 @@ export function DateRangePicker({
               cursor: isApplyDisabled ? 'not-allowed' : 'pointer',
               width: '100%',
               height: 'var(--space-6)',
-              ...(!isApplyDisabled ? { backgroundColor: 'var(--accent-8)' } : {}),
+              ...(!isApplyDisabled
+                ? { backgroundColor: 'var(--accent-8)' }
+                : {}),
             }}
             disabled={isApplyDisabled}
             onClick={handleApply}
           >
-            Apply
+            {t('datePicker.apply')}
           </Button>
         </Flex>
       </Popover.Content>

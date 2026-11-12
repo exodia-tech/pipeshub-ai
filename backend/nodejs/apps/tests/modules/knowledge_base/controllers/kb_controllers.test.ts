@@ -1,7 +1,9 @@
 import 'reflect-metadata'
 import { expect } from 'chai'
 import sinon from 'sinon'
+import mongoose from 'mongoose'
 import axios from 'axios'
+import * as orgContext from '../../../../src/libs/context/orgContext'
 import { ConnectorServiceCommand } from '../../../../src/libs/commands/connector_service/connector.service.command'
 import { registerDesktopPresence } from '../../../../src/libs/services/desktop-presence.provider'
 const makePresence = (online: boolean | null, connected: boolean | null = null) => ({
@@ -248,6 +250,12 @@ function stubUpdateRecordFileUploadConnectorCalls(options: {
 }
 
 describe('Knowledge Base Controller', () => {
+  beforeEach(() => {
+    sinon.stub(orgContext, 'currentOrgContext').returns({
+      orgId: 'org-1', userId: 'user-1', kind: 'user', source: 'jwt', requestId: 'test',
+    })
+    sinon.stub(mongoose.model('exodiaAuditEvent'), 'create').resolves({} as never)
+  })
   afterEach(() => {
     sinon.restore()
   })

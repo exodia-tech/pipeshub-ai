@@ -704,7 +704,7 @@ async def _settle(context: "AgentContext", run: "RunScope", answer: ToolApproval
                 "may or may not have run. Don't run it again; tell the user to check its effect.",
             ))
     if outcome.answer != "allowed" or target is None:
-        await _show(run, call_id, tool_name, pending, target, outcome)
+        await _show(run, call_id, tool_name, pending, target, outcome, record_outcome=True)
     return _Settled(call_id, tool_name, pending.arguments, outcome.result, outcome.status != "completed")
 
 
@@ -770,17 +770,20 @@ def _start_payload(call_id: str, tool_name: str, pending: PendingCall, target: O
     return payload
 
 
-async def _show(run: Any, call_id: str, tool_name: str, pending: PendingCall, target: Optional[ApprovalTarget], outcome: Outcome) -> None:  # noqa: ANN401
+async def _show(run: Any, call_id: str, tool_name: str, pending: PendingCall, target: Optional[ApprovalTarget], outcome: Outcome, *, record_outcome: bool = False) -> None:  # noqa: ANN401
     """The stopped call's row, settled: the same id, so it replaces the card's row in the reply."""
     start = _start_payload(call_id, tool_name, pending, target, outcome.answer)
     if outcome.ran:
         # Kept on the reply's part: regenerating that reply could run the action again.
         start["approved"] = True
-    await _emit(run, EventType.TOOL_CALL_START, start)
-    await _emit(run, EventType.TOOL_CALL_END, {
+    end = {
         "tool": tool_name, "tool_call_id": call_id, "is_error": outcome.status == "failed",
         "content": outcome.preview, "result_summary": outcome.summary, **_end_status(outcome),
-    })
+    }
+    if record_outcome:
+        await _emit(run, EventType.TOOL_BLOCKED if outcome.status == "blocked" else EventType.TOOL_RESULT, end)
+    await _emit(run, EventType.TOOL_CALL_START, start)
+    await _emit(run, EventType.TOOL_CALL_END, end)
 
 
 def _end_status(outcome: Outcome) -> dict[str, Any]:
@@ -800,6 +803,8 @@ async def _run(context: "AgentContext", run: Any, target: ApprovalTarget, pendin
         denied.append(reason)
 
     call = ToolCall(id=call_id, name=name, arguments=pending.arguments)
+    # Canonical events feed non-UI consumers; replaying a saved result in _show does not execute a tool.
+    await _emit(run, EventType.TOOL_CALL, _start_payload(call_id, name, pending, target, "allowed"))
     await _emit(run, EventType.TOOL_CALL_START, {**_start_payload(call_id, name, pending, target, "allowed"), "approved": True})
     context.tool_state[_APPROVED_CALL] = _identity(target)
     try:
@@ -813,10 +818,12 @@ async def _run(context: "AgentContext", run: Any, target: ApprovalTarget, pendin
             result=f"The user approved running {tool} on {server}, but something went wrong while it ran, so it may "
             "or may not have run. Don't run it again; tell the user to check its effect.",
         )
-        await _emit(run, EventType.TOOL_CALL_END, {
+        end = {
             "tool": name, "tool_call_id": call_id, "is_error": True, "content": outcome.preview,
             "result_summary": None, "status": ToolCallStatus.ERROR,
-        })
+        }
+        await _emit(run, EventType.TOOL_RESULT, end)
+        await _emit(run, EventType.TOOL_CALL_END, end)
         return outcome
     finally:
         context.tool_state.pop(_APPROVED_CALL, None)
@@ -844,6 +851,7 @@ async def _run(context: "AgentContext", run: Any, target: ApprovalTarget, pendin
         view = _quietly(target.tool.result_view, pending.arguments, result)
         if isinstance(view, dict):
             end["result_view"] = view
+    await _emit(run, EventType.TOOL_BLOCKED if denied else EventType.TOOL_RESULT, end)
     await _emit(run, EventType.TOOL_CALL_END, end)
     return outcome
 

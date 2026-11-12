@@ -146,13 +146,13 @@ class TestCreate:
 
         assert runtime.event_emitter is not None
 
-    async def test_event_emitter_none_without_event_sink(self) -> None:
+    async def test_background_runs_keep_audit_reporting_without_a_stream_sink(self) -> None:
         context = make_context(llm=FakeChatModel())
         factory = PipesHubAgentFactory()
 
         _agent, runtime, _goal, _clarifying = await factory.create(context, context.llm, "react", query="hello")
 
-        assert runtime.event_emitter is None
+        assert runtime.event_emitter is not None
 
     async def test_seeds_conversation_history_when_present(self) -> None:
         context = make_context(

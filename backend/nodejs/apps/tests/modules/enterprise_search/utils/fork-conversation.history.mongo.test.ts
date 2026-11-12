@@ -12,11 +12,15 @@
 import 'reflect-metadata'
 import { expect } from 'chai'
 import mongoose from 'mongoose'
+import sinon from 'sinon'
+import { AIServiceCommand } from '../../../../src/libs/commands/ai_service/ai.service.command'
+import type { AppConfig } from '../../../../src/modules/tokens_manager/config/config'
 import { ChatSession } from '../../../../src/modules/enterprise_search/schema/chat.session.schema'
 import { ChatSessionMessage } from '../../../../src/modules/enterprise_search/schema/chat.session.message.schema'
 import { copyArtifactsForFork, copySessionUpToMessage } from '../../../../src/modules/enterprise_search/utils/fork-conversation'
 import type { ArtifactCopier, ArtifactRef } from '../../../../src/modules/enterprise_search/utils/fork-artifacts'
 import { continueConversation } from '../../../../src/modules/enterprise_search/utils/non-streaming-chat'
+import { getConversationRepository } from '../../../../src/libs/repositories/conversation'
 import { saveCompleteConversation } from '../../../../src/modules/enterprise_search/utils/utils'
 import type { IAIResponse, IChatSessionDocument } from '../../../../src/modules/enterprise_search/types/conversation.interfaces'
 
@@ -54,12 +58,14 @@ describeIfMongo(`history after a fork on a real MongoDB (transactions: ${useTran
   const owner = oid()
 
   before(async () => {
+    sinon.stub(AIServiceCommand.prototype,'execute').resolves({statusCode:200,data:{accessible:[],accessibleUrls:[],groupRestricted:false},msg:''})
     await mongoose.connect(URI as string, { dbName: `fork_history_test_${Date.now()}` })
     await ChatSession.syncIndexes()
     await ChatSessionMessage.syncIndexes()
   })
 
   after(async () => {
+    sinon.restore()
     await mongoose.connection.dropDatabase()
     await mongoose.disconnect()
   })
@@ -77,8 +83,10 @@ describeIfMongo(`history after a fork on a real MongoDB (transactions: ${useTran
   const ask = async (chat: IChatSessionDocument, question: string, answer?: string) => {
     const now = new Date()
     const { conversation, previousConversations } = await continueConversation(
-      { _id: chat._id, orgId, userId: owner },
+      { kind:'chat' },String(chat._id),
       { messageType: 'user_query', content: question, contentFormat: 'MARKDOWN', createdAt: now, updatedAt: now },
+      {orgId:String(orgId),userId:String(owner)},
+      {aiBackend:'http://local-fixture',jwtSecret:'test-jwt-secret',scopedJwtSecret:'test-service-secret'} as AppConfig,
     )
     const history = previousConversations as unknown as HistoryRow[]
     const reply = answer ?? fakeModel(history, question)
@@ -103,10 +111,10 @@ describeIfMongo(`history after a fork on a real MongoDB (transactions: ${useTran
   ): Promise<IChatSessionDocument> => {
     const rows = await ChatSessionMessage.find({ sessionId: chat._id }).sort({ seq: 1 }).lean()
     const point = String(rows[position - 1]!._id)
-    const source = (await ChatSession.findById(chat._id)) as IChatSessionDocument
+    const source = (await getConversationRepository().findById(String(chat._id)))!
     // Copied first, outside the transaction, the way the controller does it.
     const artifacts = copyArtifacts
-      ? await copyArtifactsForFork(source, point, new mongoose.Types.ObjectId(), copyArtifacts)
+      ? await copyArtifactsForFork(source, point, String(new mongoose.Types.ObjectId()), copyArtifacts)
       : undefined
     const run = (mongoSession: mongoose.ClientSession | null) =>
       copySessionUpToMessage(

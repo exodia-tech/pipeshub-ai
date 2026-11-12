@@ -38,6 +38,9 @@ def row(row_id: str, name: str, *, parent: str = "par-1", internal: bool = False
 class FakeProvider:
     """One page per connector, the way the real provider returns it."""
 
+    async def get_edges_from_node(self, *args, **kwargs) -> list[dict]:
+        return []
+
     def __init__(self, rows_by_connector: dict[str, list[dict]], *, fails: set[str] = frozenset()) -> None:
         self.rows_by_connector = rows_by_connector
         self.fails = set(fails)

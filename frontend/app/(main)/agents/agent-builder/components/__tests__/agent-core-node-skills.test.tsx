@@ -70,12 +70,18 @@ function renderCore() {
 
 describe('AgentCoreNode skills section', () => {
   beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
     flow.nodes = [];
     flow.edges = [];
   });
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     useFeatureFlagsStore.setState({ flags: null });
   });
 

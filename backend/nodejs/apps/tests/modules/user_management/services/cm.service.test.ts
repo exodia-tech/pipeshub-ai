@@ -3,6 +3,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import axios, { AxiosError } from 'axios';
 import { ConfigurationManagerService } from '../../../../src/modules/user_management/services/cm.service';
+import { FakeBackend } from '../../tokens_manager/routes/connectors-http-harness';
 
 describe('ConfigurationManagerService', () => {
   let cmService: ConfigurationManagerService;
@@ -72,28 +73,37 @@ describe('ConfigurationManagerService', () => {
     });
 
     it('should construct correct request config', async () => {
-      // Verify the service constructs the right URL
-      const cmBackendUrl = 'http://localhost:3004';
+      const backend = new FakeBackend();
+      await backend.start();
       const configUrlPath = 'api/v1/configurationManager/smtpConfig';
       const scopedToken = 'my-scoped-token';
       const body = { host: 'smtp.example.com', port: 587 };
 
+      backend.on('POST', `/${configUrlPath}`, {
+        status: 200,
+        body: { saved: true },
+      });
       try {
-        await cmService.setConfig(cmBackendUrl, configUrlPath, scopedToken, body);
-      } catch (error) {
-        // Expected to fail - just verifying no constructor/param issues
+        expect(
+          await cmService.setConfig(
+            backend.url,
+            configUrlPath,
+            scopedToken,
+            body,
+          ),
+        ).to.deep.equal({ statusCode: 200, data: { saved: true } });
+        const [call] = backend.callsTo('POST', `/${configUrlPath}`);
+        expect(call.headers.authorization).to.equal(`Bearer ${scopedToken}`);
+        expect(call.body).to.deep.equal(body);
+      } finally {
+        await backend.stop();
       }
     });
 
     it('should throw InternalServerError for non-axios errors', async () => {
       // Force a non-axios error by providing invalid args
       try {
-        await cmService.setConfig(
-          null as any,
-          'api/v1/config',
-          'token',
-          {},
-        );
+        await cmService.setConfig(null as any, 'api/v1/config', 'token', {});
         expect.fail('Should have thrown an error');
       } catch (error: any) {
         expect(error).to.be.an('error');

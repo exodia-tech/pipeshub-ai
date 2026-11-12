@@ -1,4 +1,6 @@
 import { AIServiceCommand } from '../../../libs/commands/ai_service/ai.service.command';
+import type { AppConfig } from '../../tokens_manager/config/config';
+import { redactMessagesFor } from './viewer-redaction';
 import { HttpMethod } from '../../../libs/enums/http-methods.enum';
 import { unansweredCallError } from '../../../libs/errors/backend-error';
 import {
@@ -87,6 +89,7 @@ export const continueConversation = async (
   conversationId: string,
   userMessage: NewMessage,
   viewer: TurnViewer,
+  appConfig: AppConfig,
 ): Promise<ContinuedConversation> => {
   const { conversation, rows } = await inShortTransaction(async (tx) => {
     const repo = getConversationRepository();
@@ -120,7 +123,12 @@ export const continueConversation = async (
   return {
     conversation,
     previousConversations: formatPreviousConversations(
-      rows as unknown as IMessage[],
+      await redactMessagesFor(
+        appConfig,
+        viewer,
+        rows as unknown as IMessage[],
+        () => conversation.initiator,
+      ),
     ),
   };
 };

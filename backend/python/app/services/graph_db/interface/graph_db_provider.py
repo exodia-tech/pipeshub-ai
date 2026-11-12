@@ -7198,6 +7198,9 @@ class IGraphDBProvider(ABC):
 
         Returns:
             List[Dict]: List of deleted permission edges (OLD values)
+
+        Raises:
+            Exception: When the store could not confirm the deletion.
         """
         pass
 
@@ -7220,6 +7223,9 @@ class IGraphDBProvider(ABC):
 
         Returns:
             List[Dict]: List of updated permission edges
+
+        Raises:
+            Exception: When the store could not confirm the update.
         """
         pass
 
@@ -7530,6 +7536,10 @@ class IGraphDBProvider(ABC):
     async def kh_scope_restamp_stale(self) -> list:
         return []
 
+    async def update_group_resource_policy(self, org_id: str, group_id: str, policy_json: str, expected_revision: int) -> bool:
+        """Atomically save an access-group policy if its revision still matches; false is a stale edit."""
+        raise NotImplementedError("Atomic group policies are unavailable on this graph backend")
+
     async def check_access(
         self,
         user_key: str,
@@ -7596,6 +7606,11 @@ class IGraphDBProvider(ABC):
                 user_key, org_id, list(asked_nodes), list(asked_vrids),
                 access=access, transaction=transaction,
             )
+            policy_user_key = user_key or (access or {}).get("user_key")
+            if policy_user_key:
+                from app.services.group_resource_policy import GroupResourceAccess
+
+                rows = await GroupResourceAccess(self).restrict_rows(org_id, policy_user_key, rows)
         except NotImplementedError:
             raise
         except Exception as exc:
@@ -8249,6 +8264,9 @@ class IGraphDBProvider(ABC):
             rows = await self._kh_v3_accessible_rows(
                 user_key, org_id, list(asked), [], access=None, transaction=transaction,
             )
+            from app.services.group_resource_policy import GroupResourceAccess
+
+            rows = await GroupResourceAccess(self).restrict_rows(org_id, user_key, rows)
         except NotImplementedError:
             raise
         except Exception as exc:

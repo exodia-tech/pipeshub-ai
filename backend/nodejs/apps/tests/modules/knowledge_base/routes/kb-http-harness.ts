@@ -4,6 +4,7 @@ import { AddressInfo } from 'net'
 import express, { Router } from 'express'
 import jwt from 'jsonwebtoken'
 import sinon from 'sinon'
+import mongoose from 'mongoose'
 import { Container } from 'inversify'
 import { createKnowledgeBaseRouter } from '../../../../src/modules/knowledge_base/routes/kb.routes'
 import { AuthMiddleware } from '../../../../src/libs/middlewares/auth.middleware'
@@ -151,6 +152,8 @@ export const startKbHarness = async (): Promise<KbHarness> => {
   container.bind<AppConfig>('AppConfig').toConstantValue(config)
   container.bind<KeyValueStoreService>('KeyValueStoreService').toConstantValue(kv as unknown as KeyValueStoreService)
 
+  // Mongo persistence is a double here; real audit writes have separate Mongo API tests.
+  sinon.stub(mongoose.model('exodiaAuditEvent'), 'create').resolves()
   sinon.stub(Users, 'findOne').callsFake(((filter: Record<string, unknown>) =>
     query(
       USERS.find(

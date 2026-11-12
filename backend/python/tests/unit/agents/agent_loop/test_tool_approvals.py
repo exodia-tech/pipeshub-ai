@@ -754,6 +754,22 @@ def _result_of(sent: list[Any], call_id: str = "c1") -> ToolMessage:
 
 
 class TestAnsweringTheCard:
+    @pytest.mark.parametrize("decision,event_type,status", [
+        ("allow", EventType.TOOL_RESULT, ToolCallStatus.SUCCESS),
+        ("deny", EventType.TOOL_BLOCKED, ToolCallStatus.BLOCKED),
+    ])
+    async def test_resolved_approval_emits_one_auditable_outcome_and_replay_emits_none(self, decision, event_type, status) -> None:
+        store, mcp = _Store(), _Server()
+        approval_id = await _ask(store, mcp)
+        resolved = await _answer(store, mcp, approval_id, decision)
+        (outcome,) = resolved.events.of(event_type, "c1")
+        assert outcome["status"] == status
+        assert len(mcp.calls) == (1 if decision == "allow" else 0)
+        replay = await _answer(store, mcp, approval_id, decision)
+        assert replay.events.of(EventType.TOOL_RESULT, "c1") == []
+        assert replay.events.of(EventType.TOOL_BLOCKED, "c1") == []
+        assert len(mcp.calls) == (1 if decision == "allow" else 0)
+
     async def test_the_approved_call_runs_once_and_answers_the_call_the_model_made(self) -> None:
         """The bug this fixes: the answer was a new message, the model called the tool again, and
         every Allow asked again and ran it again (three pages for one request)."""

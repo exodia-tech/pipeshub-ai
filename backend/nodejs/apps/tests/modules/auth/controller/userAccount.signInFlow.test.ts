@@ -45,6 +45,7 @@ import type { AuthenticatedServiceRequest } from '../../../../src/libs/middlewar
 import { createMockRedisService } from '../../../helpers/mock-redis';
 import { createMockQuery } from '../../../helpers/mock-mongo';
 import { useCommunitySignInLists } from '../../../helpers/sign-in-lists';
+import '../../../../src/modules/audit/audit.store';
 
 // Drives the real controller and the real SessionService through whole
 // sign-ins, step after step, the way the /initAuth and /authenticate routes do.
@@ -168,6 +169,7 @@ describe('UserAccountController sign-in flow', () => {
   let activities: Array<Record<string, unknown>>;
   let configuredSteps: string[][];
   let disabledUserIds: Set<string>;
+  let auditCreate: sinon.SinonStub;
 
   function orgAuthConfig(steps: string[][]) {
     return {
@@ -230,6 +232,7 @@ describe('UserAccountController sign-in flow', () => {
   }
 
   beforeEach(() => {
+    auditCreate = sinon.stub(mongoose.model('exodiaAuditEvent'), 'create').resolves({} as never);
     redisStore = new Map();
     const redis = createMockRedisService();
     redis.set.callsFake(async (key: string, value: unknown) => {
@@ -401,6 +404,39 @@ describe('UserAccountController sign-in flow', () => {
   }
 
   describe('the sign-in method has to be one the org allows at this step', () => {
+    it('records a successful sign-in without credentials', async () => {
+      await givePassword(alice);
+      const token = await initAuth([['password']]);
+      const { res, error } = await authenticate(token, { method: 'password', credentials: { password: PASSWORD } });
+      expect(error).to.be.undefined;
+      expect(res.body?.message).to.equal('Fully authenticated');
+      const event = auditCreate.firstCall.args[0];
+      expect(event).to.include({ action: 'auth.login', outcome: 'success', org_id: orgId, actor_id: alice._id });
+      expect(JSON.stringify(event)).not.to.contain(PASSWORD);
+      expect(JSON.stringify(event)).not.to.contain(alice.email);
+    });
+
+    it('allows sign-in when the audit store is unavailable', async () => {
+      auditCreate.rejects(new Error('test audit unavailable'));
+      await givePassword(alice);
+      const token = await initAuth([['password']]);
+      const { res, error } = await authenticate(token, { method: 'password', credentials: { password: PASSWORD } });
+      expect(error).to.be.undefined;
+      expect(res.body?.message).to.equal('Fully authenticated');
+      expect(auditCreate.called).to.be.true;
+      expect(logger.error.calledWith('Sign-in audit event could not be recorded')).to.be.true;
+    });
+    it('does not wait indefinitely for an unresponsive audit store', async () => {
+      auditCreate.callsFake(() => new Promise(() => {}));
+      await givePassword(alice);
+      const token = await initAuth([['password']]);
+      const started = Date.now();
+      const { res, error } = await authenticate(token, { method: 'password', credentials: { password: PASSWORD } });
+      expect(error).to.be.undefined;
+      expect(res.body?.message).to.equal('Fully authenticated');
+      expect(Date.now() - started).to.be.lessThan(4000);
+      expect(logger.error.calledWith('Sign-in audit event could not be recorded')).to.be.true;
+    });
     it('refuses password sign-in when the org only allows Google, even with the right password', async () => {
       await givePassword(alice);
       const token = await initAuth([['google']]);

@@ -502,7 +502,10 @@ export const resolveChatAttachmentMimeType = (
   if (dot < 0) return null;
   const extension = name.slice(dot + 1).toLowerCase();
   // Own keys only: a file named "x.constructor" would otherwise resolve to Object.
-  return Object.prototype.hasOwnProperty.call(CHAT_ATTACHMENT_MIME_BY_EXTENSION, extension)
+  return Object.prototype.hasOwnProperty.call(
+    CHAT_ATTACHMENT_MIME_BY_EXTENSION,
+    extension,
+  )
     ? (CHAT_ATTACHMENT_MIME_BY_EXTENSION[extension] ?? null)
     : null;
 };
@@ -1614,7 +1617,12 @@ export const addMessageStream =
         session,
       )) as IMessage[];
       const previousConversations = formatPreviousConversations(
-        allMessagesSoFar.slice(0, -1),
+        await redactMessagesFor(
+          appConfig,
+          viewerOf(userId, orgId),
+          allMessagesSoFar.slice(0, -1),
+          () => confirmedConversation.initiator,
+        ),
       );
 
       const followUpProject = await loadProjectForSession(
@@ -3698,9 +3706,14 @@ async function regenerateAnswersInternal(
       if (questionIdx >= 0) regenUserIdx = questionIdx;
     }
     const previousConversations = formatPreviousConversations(
-      regenUserIdx >= 0
-        ? allMessagesForRegen.slice(0, regenUserIdx)
-        : allMessagesForRegen.slice(0, -2),
+      await redactMessagesFor(
+        appConfig,
+        viewerOf(userId, orgId),
+        regenUserIdx >= 0
+          ? allMessagesForRegen.slice(0, regenUserIdx)
+          : allMessagesForRegen.slice(0, -2),
+        () => existingConversation?.initiator,
+      ),
     );
 
     // The title of a chat is its first question, so editing that question moves the title too,
@@ -7338,7 +7351,12 @@ export const addMessageStreamToAgentConversation =
         session,
       )) as IMessage[];
       const previousConversations = formatPreviousConversations(
-        allMessagesSoFar.slice(0, -1),
+        await redactMessagesFor(
+          appConfig,
+          viewerOf(userId, orgId),
+          allMessagesSoFar.slice(0, -1),
+          () => confirmedConversation.initiator,
+        ),
       );
 
       const followUpProject = await loadProjectForSession(
