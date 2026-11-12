@@ -77,6 +77,9 @@ def setup() -> tuple:
         _compute_sync_window_oldest=lambda: None, _is_channel_indexing_enabled=lambda channel: True,
         indexing_filters=FilterCollection(), logger=MagicMock(),
         notify=AsyncMock(),
+        user_id_to_name_cache={}, channel_id_to_name_cache={},
+        channel_groups_cache={"C1": "group-1", "C2": "group-2"},
+        _replace_mentions_in_text=lambda text, *_maps: text,
     )
     return connector, store, slack
 
@@ -98,7 +101,8 @@ async def test_separate_channel_grants_edit_and_unshare() -> None:
     channels = {"C1": [reader("alice@example.test")], "C2": [reader("bob@example.test")]}
     await sync_huddles(connector, channels, personal=False)
     one, two = store.records[huddle_id("C1", "F1")], store.records[huddle_id("C2", "F1")]
-    assert one.record_group_id is None and not one.inherit_permissions
+    assert one.record_group_id == "group-1" and not one.inherit_permissions
+    assert two.record_group_id == "group-2" and not two.inherit_permissions
     assert [p.email for p in store.permissions[one.external_record_id]] == ["alice@example.test"]
     assert [p.email for p in store.permissions[two.external_record_id]] == ["bob@example.test"]
     old_revision = two.external_revision_id

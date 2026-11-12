@@ -5199,7 +5199,8 @@ class TestSlackTeamConnectorCoverageBoost:
             },
         )
         assert rg is not None
-        assert rg.hide_children is True
+        assert rg.hide_children is False
+        assert rg.permission_model.value == "RECORD_LEVEL"
         assert rg.source_created_at == 1779700655000
         assert rg.source_updated_at == 1779700655779
 

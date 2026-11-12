@@ -30,6 +30,7 @@ from app.config.constants.arangodb import (
     CollectionNames,
     Connectors,
     OriginTypes,
+    PermissionModel,
 )
 from app.models.entities import (
     FileRecord,
@@ -1272,6 +1273,36 @@ async def test_slack_huddle_direct_grants_are_independent_and_revocable(backend)
     )
     grant = Permission(email=alice_email, type=PermissionType.READ, entity_type=EntityType.USER)
     await processor.on_new_records([(record, [grant])], replace_permissions=True)
+    # Move an existing root note into a channel without adopting its audience.
+    group = RecordGroup(
+        org_id=ORG, name="Channel", external_group_id=f"C{_suffix()}",
+        connector_name=Connectors.SLACK_WORKSPACE, connector_id=connector_id,
+        group_type=RecordGroupType.SLACK_CHANNEL, inherit_permissions=False,
+        permission_model=PermissionModel.RECORD_GROUP_LEVEL, hide_children=True,
+    )
+    bob_grant = Permission(email=bob_email, type=PermissionType.READ, entity_type=EntityType.USER)
+    await processor.on_new_record_groups([(group, [grant, bob_grant])])
+    group.permission_model = PermissionModel.RECORD_LEVEL
+    group.hide_children = False
+    await processor.on_new_record_groups([(group, [grant, bob_grant])])
+    record.external_record_group_id = group.external_group_id
+    record.record_group_id = group.id
+    record.record_group_type = RecordGroupType.SLACK_CHANNEL
+    await processor.on_new_records([(record, [grant])], replace_permissions=True)
+    assert await backend.edge_exists(
+        CollectionNames.NODE_RELATIONS.value, CollectionNames.RECORD_GROUPS.value,
+        group.id, CollectionNames.RECORDS.value, record.id,
+    )
+    ordinary = FileRecord(
+        org_id=ORG, record_name="Ordinary message", external_record_id=f"message-{_suffix()}",
+        record_type=RecordType.FILE, connector_id=connector_id,
+        connector_name=Connectors.SLACK_WORKSPACE, origin=OriginTypes.CONNECTOR,
+        version=0, mime_type="text/plain", is_file=True, inherit_permissions=True,
+        external_record_group_id=group.external_group_id,
+        record_group_type=RecordGroupType.SLACK_CHANNEL,
+    )
+    await processor.on_new_records([(ordinary, [])])
+    assert ordinary.id in (await backend.provider.check_access(bob, ORG, node_ids=[ordinary.id])).node_ids
     assert record.id in (await backend.provider.check_access(alice, ORG, node_ids=[record.id])).node_ids
     assert record.id not in (await backend.provider.check_access(bob, ORG, node_ids=[record.id])).node_ids
     await processor.on_updated_record_permissions(record, [])

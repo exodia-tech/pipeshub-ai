@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 import hashlib
+from html import unescape
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
+from markdown_it import MarkdownIt
 
 from app.config.constants.arangodb import Connectors, MimeTypes, OriginTypes
 from app.connectors.core.base.error.stream_errors import map_source_status
 from app.connectors.core.registry.filters import IndexingFilterKey
 from app.connectors.sources.slack.common.stream_errors import slack_stream_error
-from app.models.entities import FileRecord, ProgressStatus, Record, RecordType
+from app.models.entities import (
+    FileRecord,
+    ProgressStatus,
+    Record,
+    RecordGroupType,
+    RecordType,
+)
 from app.services.notification.types import NotificationSeverity, NotificationType
 
 if TYPE_CHECKING:
@@ -216,10 +224,27 @@ async def sync_huddles(
                     raise
                 digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
                 title = fd.get("title") or fd.get("name") or "Huddle notes"
+                tokens = MarkdownIt("commonmark").parse(content)
+                for index, token in enumerate(tokens):
+                    if token.type == "heading_open" and token.tag == "h1":
+                        heading = "".join(
+                            child.content for child in (tokens[index + 1].children or [])
+                            if child.type in ("text", "code_inline", "image")
+                        ).strip()
+                        if heading:
+                            title = heading
+                            break
+                title = connector._replace_mentions_in_text(
+                    unescape(title).replace(":headphones:", "\U0001f3a7"),
+                    connector.user_id_to_name_cache, connector.channel_id_to_name_cache,
+                )
                 record = FileRecord(
                     org_id=connector.data_entities_processor.org_id,
                     record_name=f"{title}.md", record_type=RecordType.FILE,
                     external_record_id=external_id, external_revision_id=digest,
+                    external_record_group_id=channel_id,
+                    record_group_id=connector.channel_groups_cache.get(channel_id),
+                    record_group_type=RecordGroupType.SLACK_CHANNEL,
                     connector_name=Connectors.SLACK if personal else Connectors.SLACK_WORKSPACE,
                     connector_id=connector.connector_id, version=0, origin=OriginTypes.CONNECTOR,
                     mime_type=MimeTypes.MARKDOWN.value, is_file=True, extension="md",
