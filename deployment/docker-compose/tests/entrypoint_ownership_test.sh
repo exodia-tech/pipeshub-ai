@@ -259,14 +259,21 @@ cp "$PROCESS_MONITOR" "$TMP_ROOT/process_monitor.sh"
 cp "${BASH_SOURCE[0]}" "$TMP_ROOT/test.sh"
 chmod -R a+rX "$TMP_ROOT"
 
-docker run --rm --name "$NAME" --network none --memory 256m --cpus 1 --pids-limit 256 \
-  --tmpfs /data/pipeshub/nested:rw,size=1m \
-  -v "$TMP_ROOT:$INSIDE_DIR:ro" \
-  "$IMAGE" bash "$INSIDE_DIR/test.sh" --inside
+run_case() {
+  # A remote/sidecar daemon cannot bind-mount the client's temporary directory.
+  docker create --name "$NAME" --network none --memory 256m --cpus 1 --pids-limit 256 \
+    --tmpfs "$1" "$IMAGE" bash "$INSIDE_DIR/test.sh" --inside "${2:-}" >/dev/null || return 1
+  docker cp "$TMP_ROOT" "$NAME:$INSIDE_DIR" || return 1
+  docker start -a "$NAME" || { docker rm -fv "$NAME" >/dev/null; return 1; }
+  local status
+  status="$(docker inspect --format '{{.State.ExitCode}}' "$NAME")" || return 1
+  docker rm -v "$NAME" >/dev/null || return 1
+  return "$status"
+}
+
+run_case /data/pipeshub/nested:rw,size=1m
 status=$?
-docker run --rm --name "$NAME" --network none --memory 256m --cpus 1 --pids-limit 256 \
-  --tmpfs /root/.cache/huggingface/ro:ro,size=1m \
-  -v "$TMP_ROOT:$INSIDE_DIR:ro" \
-  "$IMAGE" bash "$INSIDE_DIR/test.sh" --inside readonly || status=1
+
+run_case /root/.cache/huggingface/ro:ro,size=1m readonly || status=1
 (( STATIC_FAILS )) && exit 1
 exit "$status"
