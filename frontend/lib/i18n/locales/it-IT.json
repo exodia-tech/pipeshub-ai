@@ -6341,7 +6341,7 @@
       "canvasHint": "L'immagine del grafo non è accessibile agli screen reader. Usa il pulsante Mostra come tabella per leggere e usare ogni nodo.",
       "selectionGone": "L'elemento selezionato non è più disponibile.",
       "viewGraph": "Visualizza grafo",
-      "viewGraphOf": "Visualizza il grafo di {{repo}}",
+      "viewGraphOf": "Visualizza grafo di {{repo}}",
       "fillerNode": "{{kind}} in {{file}}"
     },
     "capped": "L'immagine mostra solo parte di questa vista. La tabella elenca tutti gli elementi.",

@@ -81,7 +81,7 @@ describe('PermissionFreshness: loading, error, empty', () => {
   it('healthy and empty: a labelled region, the reach line, and calm "nothing" rows', async () => {
     renderCard();
     const region = await screen.findByRole('region', { name: 'Access' });
-    expect(within(region).getByText(/Jira \(Engineering\) reach PipesHub within 6 hours\./)).toBeTruthy();
+    expect(within(region).getByText(/Jira \(Engineering\) reach EXODIA Brain within 6 hours\./)).toBeTruthy();
     expect(within(region).getByText(/Last refreshed/)).toBeTruthy();
     expect(within(region).getByText('Nothing is waiting.')).toBeTruthy();
     expect(within(region).getByText('Nothing needs attention.')).toBeTruthy();
@@ -91,7 +91,7 @@ describe('PermissionFreshness: loading, error, empty', () => {
   it('says the next sync when the connector is not scheduled', async () => {
     getStatus.mockResolvedValue(status({ reachWithinMinutes: null }));
     renderCard();
-    await screen.findByText(/reach PipesHub on its next sync\./);
+    await screen.findByText(/reach EXODIA Brain on its next sync\./);
   });
 });
 
@@ -137,7 +137,7 @@ describe('PermissionFreshness: one state each', () => {
     await screen.findByText(/Not known: the list of folders waiting to update can't be read/);
     expect(screen.queryByText('Nothing is waiting.')).toBeNull();
     expect(screen.queryByText(/folders? (is|are) being updated/)).toBeNull();
-    expect(screen.getByRole('listitem').textContent).toContain("The list of folders waiting to update can't be read. Ask whoever runs PipesHub");
+    expect(screen.getByRole('listitem').textContent).toContain("The list of folders waiting to update can't be read. Ask whoever runs EXODIA Brain");
   });
 
   it('a connector that needs a full rebuild says search still checks each result, not that a change is being applied', async () => {

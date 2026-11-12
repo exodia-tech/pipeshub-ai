@@ -56,11 +56,11 @@ def lint(tool: str, files: list[str]) -> list[tuple[str, str, int]]:
     for item in json.loads(proc.stdout or "[]"):
         if tool != "eslint":   # ruff, log-emoji and log-pii print the same shape
             loc = item.get("location") or {}
-            found.append((os.path.relpath(item["filename"], root), item["code"] or "syntax", loc.get("row", 0)))
+            found.append((os.path.relpath(item["filename"], root).replace(os.sep, "/"), item["code"] or "syntax", loc.get("row", 0)))
         else:
             for msg in item["messages"]:
                 if msg.get("severity") == 2:   # warnings do not fail ESLint, so they are not counted
-                    found.append((os.path.relpath(item["filePath"], root), msg.get("ruleId") or "fatal", msg.get("line", 0)))
+                    found.append((os.path.relpath(item["filePath"], root).replace(os.sep, "/"), msg.get("ruleId") or "fatal", msg.get("line", 0)))
     return found
 
 
