@@ -94,7 +94,11 @@ export const readableRecordIds = async (
   const urls = [...new Set(webUrls.filter(Boolean))].filter(
     (u) => !known.asked.has(`u:${u}`),
   );
-  if (ids.length === 0 && urls.length === 0 && known.groupRestricted !== undefined)
+  if (
+    ids.length === 0 &&
+    urls.length === 0 &&
+    known.groupRestricted !== undefined
+  )
     return { ...known, failed: false };
   const found = newReadable();
   try {
@@ -111,7 +115,12 @@ export const readableRecordIds = async (
     );
     for (
       let i = 0;
-      i < Math.max(ids.length, urls.length, known.groupRestricted === undefined ? 1 : 0);
+      i <
+      Math.max(
+        ids.length,
+        urls.length,
+        known.groupRestricted === undefined ? 1 : 0,
+      );
       i += ACCESS_CHECK_BATCH
     ) {
       const response = await new AIServiceCommand<{
@@ -140,12 +149,12 @@ export const readableRecordIds = async (
       if (typeof response.data?.groupRestricted !== 'boolean')
         throw new Error('record access did not confirm the group policy');
       found.groupRestricted ||= response.data.groupRestricted;
-      const accessible: unknown = response.data?.accessible ?? [];
-      const accessibleUrls: unknown = response.data?.accessibleUrls ?? [];
+      const accessible: unknown = response.data.accessible ?? [];
+      const accessibleUrls: unknown = response.data.accessibleUrls ?? [];
       // Node and the query service ship in one image, so this is not version skew in practice; a
       // service that omits `unmatchedUrls` reads as no unmatched address, so a web link counts as a
       // record and the answer is hidden (fails closed, never shown).
-      const unmatchedUrls: unknown = response.data?.unmatchedUrls ?? [];
+      const unmatchedUrls: unknown = response.data.unmatchedUrls ?? [];
       // Only lists of strings: a string is read per character, String(['id']) is 'id'.
       if (
         !isStringList(accessible) ||
@@ -170,7 +179,11 @@ export const readableRecordIds = async (
     logger.error('Viewer access check failed; redacting every source', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return { ...known, failed: true, groupRestricted: known.groupRestricted ?? true };
+    return {
+      ...known,
+      failed: true,
+      groupRestricted: known.groupRestricted ?? true,
+    };
   }
 };
 
@@ -295,9 +308,9 @@ const hiddenAnswer = (
   marker: typeof ANSWER_LOST | typeof ANSWER_UNCONFIRMED,
 ): Record<string, unknown> => ({
   ...Object.fromEntries(
-    ['_id', 'messageType', 'createdAt', 'updatedAt', 'status', 'modelInfo'].map((key) => [
-      key, (m as Record<string, unknown>)[key],
-    ]),
+    ['_id', 'messageType', 'createdAt', 'updatedAt', 'status', 'modelInfo'].map(
+      (key) => [key, (m as Record<string, unknown>)[key]],
+    ),
   ),
   contentFormat: 'MARKDOWN',
   content: marker === ANSWER_LOST ? ANSWER_LOST_TEXT : ANSWER_UNCONFIRMED_TEXT,
@@ -494,13 +507,22 @@ export const redactMessagesFor = async <M extends ViewerMessage>(
   return messages.map((m, i) => {
     const stored = m as M & { tools?: unknown[]; parts?: { type?: string }[] };
     // Legacy transcripts cannot prove complete provenance under group restrictions.
-    if (readable.groupRestricted && m.messageType !== 'user_query' && (
-      (m.citations ?? []).some((c) => !ok(recordIdOf(c))) ||
-      (m.attachments ?? []).some((a) => !ok(a?.recordId)) ||
-      (m.referenceData ?? []).some((e) => !refVisible(e, ok, okUrl)) ||
-      !m.citations?.length || stored.tools?.length ||
-      stored.parts?.some((part) => part.type !== 'text')
-    )) return hiddenAnswer(m, answerVerdict[i] ?? turnVerdict.get(turnOf[i] ?? 0) ?? ANSWER_UNCONFIRMED) as M;
+    if (
+      readable.groupRestricted &&
+      m.messageType !== 'user_query' &&
+      ((m.citations ?? []).some((c) => !ok(recordIdOf(c))) ||
+        (m.attachments ?? []).some((a) => !ok(a?.recordId)) ||
+        (m.referenceData ?? []).some((e) => !refVisible(e, ok, okUrl)) ||
+        !m.citations?.length ||
+        stored.tools?.length ||
+        stored.parts?.some((part) => part.type !== 'text'))
+    )
+      return hiddenAnswer(
+        m,
+        answerVerdict[i] ??
+          turnVerdict.get(turnOf[i] ?? 0) ??
+          ANSWER_UNCONFIRMED,
+      ) as M;
     if (isAnswer(m)) {
       const v = answerVerdict[i] ?? null;
       if (v !== null) return hiddenAnswer(m, v) as M;

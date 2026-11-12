@@ -1196,21 +1196,6 @@ class LinearGraphQLOperations:
             "description": "Ids of projects, for reconciling what is stored with what Linear has"
         },
 
-        "projectTeams": {
-            "query": """
-                query ProjectTeams($id: String!, $first: Int, $after: String) {
-                    project(id: $id) {
-                        id
-                        teams(first: $first, after: $after) {
-                            nodes { id }
-                            pageInfo { hasNextPage endCursor }
-                        }
-                    }
-                }
-            """,
-            "fragments": [],
-            "description": "Read every team associated with a shared project",
-        },
         "issueChildren": {
             "query": """
                 query issueChildren($first: Int, $after: String, $filter: IssueFilter, $includeArchived: Boolean) {
