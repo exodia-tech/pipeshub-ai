@@ -789,7 +789,7 @@ class TestChannelHelpers:
             {"id": "C1", "name": "general", "topic": {"value": "t"}, "created": "100.0"}
         )
         assert rg is not None
-        assert rg.hide_children is True
+        assert rg.hide_children is False
 
         rg2 = c._to_channel_record_group(
             {"id": "D1", "is_im": True, "user": "USLACKBOT"}

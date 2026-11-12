@@ -68,8 +68,46 @@ async def test_personal_huddle_notes_inherit_only_personal_app_gate(workspace, s
     connector, _ = await personal_connector(store, checkpoints)
     await connector.run_sync()
     record = store.records[huddle_id(SECRET, "FHUDDLE")]
-    assert record.record_group_id is None
+    assert record.record_group_id == store.record_groups[SECRET].id
+    assert record.external_record_group_id == SECRET
     assert store.record_permissions[record.external_record_id] == []
     assert [u.email for u in store.app_users.values()] == ["alice@acme.com"]
     assert record.indexing_status != ProgressStatus.AUTO_INDEX_OFF.value
     assert await body(await connector.stream_record(record)) == b"# Summary\n\nSynthetic notes."
+
+
+@pytest.mark.parametrize("personal", [False, True])
+async def test_huddle_title_decodes_slack_markup_without_changing_identity_or_grants(workspace, store, checkpoints, personal) -> None:
+    factory = personal_connector if personal else workspace_connector
+    connector, _ = await factory(store, checkpoints)
+    workspace.canvases["FHUDDLE"] = "Notes without a heading."
+    await connector.run_sync()
+    key = huddle_id(GENERAL, "FHUDDLE")
+    before = store.records[key]
+    permissions = [(p.entity_type, p.external_id, p.email, p.type) for p in store.record_permissions[key]]
+    workspace.files["FHUDDLE"]["title"] = ":headphones: Huddle &amp; notes in &lt;#C0GENERAL&gt;"
+    await connector.run_sync()
+    after = store.records[key]
+    assert after.record_name == "\U0001f3a7 Huddle & notes in #general.md"
+    assert after.id == before.id
+    assert after.external_revision_id == before.external_revision_id
+    assert [(p.entity_type, p.external_id, p.email, p.type) for p in store.record_permissions[key]] == permissions
+
+
+@pytest.mark.parametrize("personal", [False, True])
+async def test_huddle_filename_uses_content_title_inside_channel(workspace, store, checkpoints, personal) -> None:
+    factory = personal_connector if personal else workspace_connector
+    connector, _ = await factory(store, checkpoints)
+    workspace.canvases["FHUDDLE"] = "```\n# Not the title\n```\n\n# **Roadmap** &amp; `planning`\n\nNotes."
+    await connector.run_sync()
+    record = store.records[huddle_id(GENERAL, "FHUDDLE")]
+    assert record.record_name == "Roadmap & planning.md"
+    assert record.record_group_id == store.record_groups[GENERAL].id
+    assert record.external_record_group_id == GENERAL
+    assert not record.inherit_permissions
+    assert not store.record_groups[GENERAL].hide_children
+    workspace.canvases["FHUDDLE"] = "# Revised title\n\nNotes."
+    await connector.run_sync()
+    updated = store.records[record.external_record_id]
+    assert updated.id == record.id
+    assert updated.record_name == "Revised title.md"
