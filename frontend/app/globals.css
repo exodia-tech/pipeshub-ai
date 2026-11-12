@@ -1765,9 +1765,9 @@ th code {
 .chat-companion--thinking .chat-companion__eyes { animation-duration: 3.8s; }
 .graph-addon-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
 .graph-addon-canvas { height: clamp(360px, 60dvh, 800px); }
-.graph-addon-inspector { max-height: 320px; }
-@container (min-width: 900px) {
-  .graph-addon-layout { grid-template-columns: minmax(0, 1fr) 272px; }
+.graph-addon-inspector { height: 320px; }
+@container (min-width: 760px) {
+  .graph-addon-layout { grid-template-columns: minmax(0, 1fr) 248px; }
   .graph-addon-canvas, .graph-addon-inspector { height: clamp(440px, 70dvh, 900px); max-height: none; }
 }
 .chat-companion__head { transform-origin: 40px 40px; transition: transform 180ms ease; }
