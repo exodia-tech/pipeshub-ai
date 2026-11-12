@@ -79,6 +79,7 @@ class LinearGraphQLOperations:
                     id
                     identifier
                 }
+                project { id name url }
                 relations(first: 50) {
                     nodes {
                         id
@@ -171,6 +172,7 @@ class LinearGraphQLOperations:
                     id
                     identifier
                 }
+                project { id name url }
                 relations(first: 20) {
                     nodes {
                         id
@@ -252,6 +254,7 @@ class LinearGraphQLOperations:
                         private
                         visibility
                     }
+                    pageInfo { hasNextPage endCursor }
                 }
                 issues(first: 100) {
                     nodes {
@@ -1150,7 +1153,8 @@ class LinearGraphQLOperations:
                 query projectIds($first: Int, $after: String, $filter: ProjectFilter, $includeArchived: Boolean) {
                     projects(first: $first, after: $after, filter: $filter, includeArchived: $includeArchived) {
                         nodes {
-                            id trashed archivedAt updatedAt teams(first: 10) { nodes { id } }
+                            id name url trashed archivedAt updatedAt
+                            teams(first: 10) { nodes { id } pageInfo { hasNextPage endCursor } }
                             externalLinks(first: 50) { nodes { id updatedAt } pageInfo { hasNextPage } }
                             projectMilestones(first: 50) { nodes { id updatedAt } pageInfo { hasNextPage } }
                         }
@@ -1165,6 +1169,21 @@ class LinearGraphQLOperations:
             "description": "Ids of projects, for reconciling what is stored with what Linear has"
         },
 
+        "projectTeams": {
+            "query": """
+                query ProjectTeams($id: String!, $first: Int, $after: String) {
+                    project(id: $id) {
+                        id
+                        teams(first: $first, after: $after) {
+                            nodes { id }
+                            pageInfo { hasNextPage endCursor }
+                        }
+                    }
+                }
+            """,
+            "fragments": [],
+            "description": "Read every team associated with a shared project",
+        },
         "issueChildren": {
             "query": """
                 query issueChildren($first: Int, $after: String, $filter: IssueFilter, $includeArchived: Boolean) {

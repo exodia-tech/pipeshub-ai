@@ -146,6 +146,9 @@ class SourceReconciler:
         }
         removed = 0
         kept: dict[str, Record] = {}
+        for project in listed.values():
+            if isinstance(project.get("teams"), dict) and "pageInfo" in project["teams"]:
+                await self._gateway.complete(project, "teams", "projectTeams", ["project", "teams"])
         for record in stored:
             if record.external_record_id in listed:
                 kept[record.external_record_id] = record

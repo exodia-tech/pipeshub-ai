@@ -103,6 +103,7 @@ def _use_memory_state(connector) -> None:
     processor = connector.data_entities_processor
     for name, value in (
         ("get_records_by_parent", []),
+        ("get_record_by_external_id", None),
         ("get_records_by_record_type", []),
         ("get_records_in_record_group", []),
         ("get_nodes_by_filters", []),
@@ -1438,7 +1439,7 @@ class TestLinearSyncIssuesForTeams:
         assert failed == []
         # ...and once its whole list is stored, the checkpoint (kept under the team's
         # id) moves to the moment the run started.
-        assert c.issues_sync_point.store["team_issues_team-1"]["last_sync_time"] == 1_700_000_000_000
+        assert c.issues_sync_point.store["team_project_issues_team-1"]["last_sync_time"] == 1_700_000_000_000
 
     @pytest.mark.asyncio
     async def test_sync_issues_error_continues(self):
@@ -1448,7 +1449,7 @@ class TestLinearSyncIssuesForTeams:
         team_rg2, perms2 = _make_team_record_group("team-2", "DES")
 
         async def read(key) -> dict:
-            if key == "team_issues_team-1":
+            if key == "team_project_issues_team-1":
                 raise Exception("checkpoint error")
             return {}
 
@@ -1466,8 +1467,8 @@ class TestLinearSyncIssuesForTeams:
         assert full_sync_team_ids == {"team-2"}
         assert fetch.call_count == 1
         assert fetch.call_args.kwargs["team_id"] == "team-2"
-        assert "team_issues_team-1" not in c.issues_sync_point.store
-        assert c.issues_sync_point.store["team_issues_team-2"]["last_sync_time"] == 1_700_000_000_000
+        assert "team_project_issues_team-1" not in c.issues_sync_point.store
+        assert c.issues_sync_point.store["team_project_issues_team-2"]["last_sync_time"] == 1_700_000_000_000
 
     @pytest.mark.asyncio
     async def test_sync_issues_auth_error_stops_the_sync(self) -> None:
@@ -4927,13 +4928,13 @@ class TestSyncIssuesForTeams:
         assert kwargs["last_sync_time"] is None
         assert kwargs["run"].started_at == 1705400000000
         assert kwargs["failures"] == []
-        assert connector.issues_sync_point.store["team_issues_team-1"]["last_sync_time"] == 1705400000000
+        assert connector.issues_sync_point.store["team_project_issues_team-1"]["last_sync_time"] == 1705400000000
 
     @pytest.mark.asyncio
     async def test_sync_issues_incremental_reads_since_last_run_with_overlap(self) -> None:
         connector = _make_connector_fullcov()
         connector._now = MagicMock(return_value=1705400000000)
-        connector.issues_sync_point.store["team_issues_team-1"] = {"last_sync_time": 1705300000000}
+        connector.issues_sync_point.store["team_project_issues_team-1"] = {"last_sync_time": 1705300000000}
         rg, perms = _make_team_record_group_fullcov()
 
         async def fake_batch_gen(**kwargs) -> AsyncIterator[list]:
@@ -4949,12 +4950,12 @@ class TestSyncIssuesForTeams:
 
         assert mock_fetch.call_args.kwargs["last_sync_time"] == 1705300000000 - 60_000
         assert result == (set(), [])
-        assert connector.issues_sync_point.store["team_issues_team-1"]["last_sync_time"] == 1705400000000
+        assert connector.issues_sync_point.store["team_project_issues_team-1"]["last_sync_time"] == 1705400000000
 
     @pytest.mark.asyncio
     async def test_sync_issues_resumes_an_interrupted_run(self) -> None:
         connector = _make_connector_fullcov()
-        connector.issues_sync_point.store["team_issues_team-1"] = {
+        connector.issues_sync_point.store["team_project_issues_team-1"] = {
             "last_sync_time": 0,
             "resume_cursor": "cursor-7",
             "resume_since": 0,
@@ -4978,7 +4979,7 @@ class TestSyncIssuesForTeams:
         assert run.resumed is True
         assert run.is_full is True
         # Finishing a resumed run moves the checkpoint to when that run began.
-        saved = connector.issues_sync_point.store["team_issues_team-1"]
+        saved = connector.issues_sync_point.store["team_project_issues_team-1"]
         assert saved["last_sync_time"] == 1705350000000
         assert saved["resume_cursor"] == ""
 
@@ -4986,7 +4987,7 @@ class TestSyncIssuesForTeams:
     async def test_sync_issues_holds_checkpoint_when_issues_could_not_be_stored(self) -> None:
         connector = _make_connector_fullcov()
         connector._now = MagicMock(return_value=1705400000000)
-        connector.issues_sync_point.store["team_issues_team-1"] = {"last_sync_time": 1705300000000}
+        connector.issues_sync_point.store["team_project_issues_team-1"] = {"last_sync_time": 1705300000000}
         rg, perms = _make_team_record_group_fullcov()
 
         async def fake_batch_gen(**kwargs) -> AsyncIterator[list]:
@@ -5006,7 +5007,7 @@ class TestSyncIssuesForTeams:
         # Three syncs in a row keep the checkpoint and report the team; the fourth
         # gives up on the issue and moves on.
         assert [failed for _, failed in outcomes] == [["Engineering"]] * 3 + [[]]
-        saved = connector.issues_sync_point.store["team_issues_team-1"]
+        saved = connector.issues_sync_point.store["team_project_issues_team-1"]
         assert saved["last_sync_time"] == 1705400000000
         assert saved["held_runs"] == 0
 
@@ -5015,7 +5016,7 @@ class TestSyncIssuesForTeams:
         connector = _make_connector_fullcov()
         connector.data_source = MagicMock()
         connector._now = MagicMock(return_value=1705400000000)
-        connector.issues_sync_point.store["team_issues_team-1"] = {"last_sync_time": 1705300000000}
+        connector.issues_sync_point.store["team_project_issues_team-1"] = {"last_sync_time": 1705300000000}
         rg, perms = _make_team_record_group_fullcov()
         rg2, perms2 = _make_team_record_group_fullcov(team_id="team-2", name="Design", key="DES")
 
@@ -5037,8 +5038,8 @@ class TestSyncIssuesForTeams:
         # untouched; the next team is still synced.
         assert failed == ["Engineering"]
         assert full == {"team-2"}
-        assert connector.issues_sync_point.store["team_issues_team-1"] == {"last_sync_time": 1705300000000}
-        assert connector.issues_sync_point.store["team_issues_team-2"]["last_sync_time"] == 1705400000000
+        assert connector.issues_sync_point.store["team_project_issues_team-1"] == {"last_sync_time": 1705300000000}
+        assert connector.issues_sync_point.store["team_project_issues_team-2"]["last_sync_time"] == 1705400000000
         connector.data_entities_processor.on_new_records.assert_awaited_once()
 
 
