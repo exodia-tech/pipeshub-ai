@@ -150,9 +150,8 @@ from app.utils.time_conversion import get_epoch_timestamp_in_ms
 
 # Config path for Linear connector
 LINEAR_CONFIG_PATH = "/services/connectors/{connector_id}/config"
-# Renamed when projects stopped being shared into their non-lead teams: a key with no
-# checkpoint re-lists every project once, and that rewrite drops the old team edges.
-PROJECTS_CHECKPOINT_KEY = "projects-by-lead-team"
+# A fresh checkpoint re-files stored project records into their team-scoped folders.
+PROJECTS_CHECKPOINT_KEY = "projects-with-folders"
 
 # Placeholder ancestor sweep (parent sub-issue hierarchy left out of sync filters)
 PLACEHOLDER_SWEEP_BATCH: int = 50
@@ -464,6 +463,7 @@ class LinearConnector(BaseConnector):
         self._full_member_emails: set[str] = set()
         self._refreshed_issue_ids: set[str] = set()
         self._refreshed_project_ids: set[str] = set()
+        self._project_folder_names: dict[str, str] = {}
         self._team_visibility: dict[str, str] = {}
         # False once this run skipped something after an error; see full_sync_coverage
         self._read_everything = True
@@ -738,6 +738,7 @@ class LinearConnector(BaseConnector):
             self.logger.info(f"📋 Loaded filters - Sync: {self.sync_filters}, Indexing: {self.indexing_filters}")
             self._refreshed_issue_ids = set()
             self._refreshed_project_ids = set()
+            self._project_folder_names = {}
             self._read_everything = True
             self._issue_parent_ids = set()
 
@@ -1348,7 +1349,8 @@ class LinearConnector(BaseConnector):
         return bool(((data.get("issues") or {}).get("nodes") or []))
 
     def _team_issue_checkpoint(self, team_id: str) -> ListingCheckpoint:
-        return self._checkpoint(self.issues_sync_point, f"team_issues_{team_id}")
+        # Re-read existing issues once to migrate their browse parents, without re-indexing.
+        return self._checkpoint(self.issues_sync_point, f"team_project_issues_{team_id}")
 
     async def _hold_checkpoint(self, checkpoint: ListingCheckpoint, team_key: str, failures: list[str]) -> bool:
         """Some issues of this run could not be stored. Keep the checkpoint so the next
@@ -1763,6 +1765,29 @@ class LinearConnector(BaseConnector):
                     continue
                 raise
 
+    async def _ensure_project_folder(self, project: dict[str, Any], team_id: str) -> None:
+        external_id = f"linear-project-folder:{team_id}:{project['id']}"
+        name = project.get("name") or project["id"]
+        if self._project_folder_names.get(external_id) == name:
+            return
+        existing = await self.data_entities_processor.get_record_by_external_id(
+            connector_id=self.connector_id, external_record_id=external_id,
+        )
+        folder = FileRecord(
+            id=existing.id if existing else str(uuid4()),
+            org_id=self.data_entities_processor.org_id,
+            record_name=name, record_type=RecordType.FILE,
+            external_record_id=external_id, external_revision_id=project["id"],
+            external_record_group_id=team_id, record_group_type=RecordGroupType.PROJECT,
+            connector_id=self.connector_id, connector_name=Connectors.LINEAR,
+            origin=OriginTypes.CONNECTOR, version=0,
+            mime_type=MimeTypes.FOLDER.value, is_file=False,
+            inherit_permissions=True, weburl=project.get("url"),
+            indexing_status=ProgressStatus.AUTO_INDEX_OFF.value,
+        )
+        await self.data_entities_processor.on_new_records([(folder, [])])
+        self._project_folder_names[external_id] = name
+
     async def _issue_to_records(
         self,
         issue_data: dict[str, Any],
@@ -1788,6 +1813,9 @@ class LinearConnector(BaseConnector):
         )
 
         # Transform issue to TicketRecord with existing record info
+        project = issue_data.get("project") or {}
+        if project.get("id"):
+            await self._ensure_project_folder(project, team_id)
         ticket_record = self._transform_issue_to_ticket_record(
             issue_data, team_id, existing_record
         )
@@ -2339,6 +2367,7 @@ class LinearConnector(BaseConnector):
         if not project:
             return None
         for field, operation, size in (
+            ("teams", "projectTeams", NESTED_PAGE_SIZE),
             ("externalLinks", "projectExternalLinks", NESTED_PAGE_SIZE),
             ("documents", "projectDocuments", NESTED_PAGE_SIZE),
             ("projectMilestones", "projectMilestones", NESTED_PAGE_SIZE),
@@ -2380,6 +2409,10 @@ class LinearConnector(BaseConnector):
         project_record = self._transform_to_project_record(
             full_project_data, team_id, existing_record
         )
+        for project_team in ((full_project_data.get("teams") or {}).get("nodes") or []):
+            if project_team.get("id") in scope:
+                await self._ensure_project_folder(full_project_data, project_team["id"])
+        await self._ensure_project_folder(full_project_data, team_id)
         # As for issues: a project stored again unchanged is not re-indexed, so the
         # comment and children-stamp passes must still be able to refresh it.
         if reads_current_content(project_record, existing_record):
@@ -3446,9 +3479,12 @@ class LinearConnector(BaseConnector):
         creator_email = creator.get("email") if creator else None
         creator_name = creator.get("displayName") or creator.get("name") if creator else None
 
-        # Parent issue (for sub-issues)
+        # Project folders organize issues inside their own team, never across teams.
         parent = issue_data.get("parent")
         parent_external_record_id = parent.get("id") if parent else None
+        project_id = (issue_data.get("project") or {}).get("id")
+        if not parent_external_record_id and project_id:
+            parent_external_record_id = f"linear-project-folder:{team_id}:{project_id}"
 
         # Timestamps
         created_at = self._parse_linear_datetime(issue_data.get("createdAt", "")) or 0
@@ -3481,7 +3517,7 @@ class LinearConnector(BaseConnector):
             external_revision_id=external_revision_id,
             external_record_group_id=team_id,
             parent_external_record_id=parent_external_record_id,
-            parent_record_type=RecordType.TICKET if parent_external_record_id else None,
+            parent_record_type=(RecordType.TICKET if parent else RecordType.FILE) if parent_external_record_id else None,
             version=version,
             origin=OriginTypes.CONNECTOR.value,
             connector_name=self.connector_name,
@@ -3634,8 +3670,8 @@ class LinearConnector(BaseConnector):
             external_record_id=project_id,
             external_revision_id=external_revision_id,
             external_record_group_id=team_id,
-            parent_external_record_id=None,  # Projects don't have parents
-            parent_record_type=None,
+            parent_external_record_id=f"linear-project-folder:{team_id}:{project_id}",
+            parent_record_type=RecordType.FILE,
             version=version,
             origin=OriginTypes.CONNECTOR.value,
             connector_name=Connectors.LINEAR,
@@ -4142,8 +4178,26 @@ class LinearConnector(BaseConnector):
         if not team_record_groups:
             return
         team_ids = {g.external_group_id for g, _ in team_record_groups if g.external_group_id}
+        if not team_ids:
+            return
         try:
             removed, listed, stored = await self._reconciler.run_projects(team_ids)
+            for folder in await self.data_entities_processor.get_records_by_record_type(
+                self.connector_id, RecordType.FILE,
+            ) or []:
+                if (folder.external_record_group_id not in team_ids
+                        or getattr(folder, "is_deleted", False) is True
+                        or not (folder.external_record_id or "").startswith("linear-project-folder:")):
+                    continue
+                project = listed.get(folder.external_record_id.rsplit(":", 1)[1])
+                if project is not None and (((project.get("teams") or {}).get("pageInfo") or {}).get("hasNextPage") is not False):
+                    continue  # An unknown team list cannot prove a folder lost its share.
+                project_teams = {t["id"] for t in ((project or {}).get("teams") or {}).get("nodes", [])}
+                if project is None or folder.external_record_group_id not in project_teams:
+                    await self._remover.remove_record(folder)
+                    self._project_folder_names.pop(folder.external_record_id, None)
+                else:
+                    await self._ensure_project_folder(project, folder.external_record_group_id)
             if removed:
                 self.logger.info(f"✅ Removed {removed} projects that are gone from Linear")
             changed = []
@@ -5540,6 +5594,8 @@ class LinearConnector(BaseConnector):
             ticket_record = self._transform_issue_to_ticket_record(issue_data, team_id, record)
             if not self._in_date_scope(ticket_record):
                 return None  # left out by the date filters; the record stays unlinked
+            if (issue_data.get("project") or {}).get("id"):
+                await self._ensure_project_folder(issue_data["project"], team_id)
 
             # Extract permissions (empty list for now, Linear doesn't have explicit permissions)
             permissions = []
@@ -5599,6 +5655,7 @@ class LinearConnector(BaseConnector):
             project_record = self._transform_to_project_record(
                 project_data, team_id, record
             )
+            await self._ensure_project_folder(project_data, team_id)
 
             # Extract issues data directly from project_data and add to related_external_records
             issues_data = ((project_data.get("issues") or {}).get("nodes") or [])

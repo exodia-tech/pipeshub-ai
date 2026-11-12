@@ -1320,3 +1320,67 @@ async def test_slack_huddle_direct_grants_are_independent_and_revocable(backend)
     assert record.id not in (await backend.provider.check_access(alice, ORG, node_ids=[record.id])).node_ids
     await processor.on_new_app_roles([(role, [])])
     assert record.id not in (await backend.provider.check_access(bob, ORG, node_ids=[record.id])).node_ids
+
+
+async def test_linear_project_folders_preserve_issue_team_access_and_moves(backend) -> None:
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.connectors.sources.linear.connector import LinearConnector
+
+    processor, _ = build_processor(backend.provider, ORG)
+    connector_id = f"linear-{_suffix()}"
+    await _seed_app(backend, connector_id, name="Linear", app_type=Connectors.LINEAR.value, app_group="Linear")
+    alice_email, bob_email = f"alice-{_suffix()}@example.test", f"bob-{_suffix()}@example.test"
+    alice, bob = await _seed_user(backend, alice_email), await _seed_user(backend, bob_email)
+    for user in (alice, bob):
+        await backend.provider.batch_create_edges([{
+            "from_id": user, "from_collection": CollectionNames.USERS.value,
+            "to_id": connector_id, "to_collection": CollectionNames.APPS.value,
+            "syncState": "COMPLETED", "lastSyncUpdate": TS,
+        }], collection=CollectionNames.USER_APP_RELATION.value)
+    teams = []
+    for name, email in (("private", alice_email), ("public", bob_email)):
+        group = RecordGroup(
+            org_id=ORG, name=name, external_group_id=f"{name}-{_suffix()}",
+            connector_name=Connectors.LINEAR, connector_id=connector_id,
+            group_type=RecordGroupType.PROJECT, inherit_permissions=False,
+            permission_model=PermissionModel.RECORD_GROUP_LEVEL,
+        )
+        await processor.on_new_record_groups([(group, [Permission(
+            email=email, type=PermissionType.READ, entity_type=EntityType.USER,
+        )])])
+        teams.append(group)
+    connector = LinearConnector(
+        logger=MagicMock(), data_entities_processor=processor, data_store_provider=MagicMock(),
+        config_service=AsyncMock(), connector_id=connector_id, scope="team", created_by=alice,
+    )
+    project = {"id": f"p-{_suffix()}", "name": "Shared project"}
+    for team in teams:
+        await connector._ensure_project_folder(project, team.external_group_id)
+    issue = {"id": f"issue-{_suffix()}", "identifier": "EXO-1", "title": "Private ticket", "project": project}
+    private = connector._transform_issue_to_ticket_record(issue, teams[0].external_group_id)
+    await processor.on_new_records([(private, [])])
+    folder = await processor.get_record_by_external_id(connector_id, private.parent_external_record_id)
+    assert await backend.edge_exists(
+        CollectionNames.NODE_RELATIONS.value, CollectionNames.RECORDS.value, folder.id,
+        CollectionNames.RECORDS.value, private.id,
+    )
+    assert private.id in (await backend.provider.check_access(alice, ORG, node_ids=[private.id])).node_ids
+    assert private.id not in (await backend.provider.check_access(bob, ORG, node_ids=[private.id])).node_ids
+    second_project = {"id": f"p-{_suffix()}", "name": "Another project"}
+    await connector._ensure_project_folder(second_project, teams[0].external_group_id)
+    issue["project"] = second_project
+    reassigned = connector._transform_issue_to_ticket_record(issue, teams[0].external_group_id, private)
+    await processor.on_new_records([(reassigned, [])])
+    assert reassigned.id == private.id
+    assert not await backend.edge_exists(
+        CollectionNames.NODE_RELATIONS.value, CollectionNames.RECORDS.value, folder.id,
+        CollectionNames.RECORDS.value, private.id,
+    )
+    assert reassigned.id not in (await backend.provider.check_access(bob, ORG, node_ids=[reassigned.id])).node_ids
+    await connector._ensure_project_folder(second_project, teams[1].external_group_id)
+    moved = connector._transform_issue_to_ticket_record(issue, teams[1].external_group_id, private)
+    await processor.on_new_records([(moved, [])])
+    assert moved.id == private.id
+    assert moved.id in (await backend.provider.check_access(bob, ORG, node_ids=[moved.id])).node_ids
+    assert moved.id not in (await backend.provider.check_access(alice, ORG, node_ids=[moved.id])).node_ids

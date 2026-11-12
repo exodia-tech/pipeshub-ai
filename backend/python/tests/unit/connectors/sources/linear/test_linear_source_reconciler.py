@@ -425,6 +425,21 @@ class TestReconcileAttachmentsAndDocuments:
 
 class TestRunProjects:
     @pytest.mark.asyncio
+    async def test_shared_project_teams_are_complete_before_any_removal(self) -> None:
+        def respond(operation, variables) -> GraphQLResponse:
+            if operation == "projectIds":
+                return _page("projects", [{"id": "p1", "teams": {
+                    "nodes": [{"id": "team-1"}],
+                    "pageInfo": {"hasNextPage": True, "endCursor": "teams-1"},
+                }}])
+            assert operation == "projectTeams"
+            return _ok({"project": {"teams": {"nodes": [{"id": "team-2"}],
+                        "pageInfo": {"hasNextPage": False}}}})
+        env = _make(respond)
+        _, listed, _ = await env.reconciler.run_projects({"team-1"})
+        assert [t["id"] for t in listed["p1"]["teams"]["nodes"]] == ["team-1", "team-2"]
+
+    @pytest.mark.asyncio
     async def test_trashed_purged_and_unshared_projects_are_removed(self) -> None:
         stored = [
             _record("node-live", "proj-live", RecordType.PROJECT),

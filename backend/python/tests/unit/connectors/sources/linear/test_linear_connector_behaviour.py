@@ -176,6 +176,96 @@ def _issue(issue_id="issue-1", identifier="ENG-1", team_id="team-1", **overrides
 # ---------------------------------------------------------------------------
 
 
+class TestProjectFolders:
+    async def test_issue_is_inside_its_team_project_without_new_grants(self) -> None:
+        connector = _make_connector()
+        records = await connector._issue_to_records(_issue(project={"id": "p1", "name": "Website"}), "team-1")
+        folder, permissions = connector.data_entities_processor.on_new_records.call_args.args[0][0]
+        ticket = records[0][0]
+        assert folder.external_record_id == "linear-project-folder:team-1:p1"
+        assert folder.record_name == "Website"
+        assert folder.is_file is False
+        assert folder.external_record_group_id == ticket.external_record_group_id == "team-1"
+        assert ticket.parent_external_record_id == folder.external_record_id
+        assert ticket.parent_record_type == RecordType.FILE
+        assert folder.inherit_permissions and ticket.inherit_permissions
+        assert permissions == records[0][1] == []
+        connector.data_entities_processor.on_new_app_users.assert_not_called()
+
+    async def test_shared_project_uses_separate_folders_for_each_team(self) -> None:
+        connector = _make_connector()
+        project = {"id": "p1", "name": "Website"}
+        public = (await connector._issue_to_records(_issue(project=project), "public"))[0][0]
+        private = (await connector._issue_to_records(_issue("issue-2", project=project), "private"))[0][0]
+        assert public.parent_external_record_id != private.parent_external_record_id
+        assert public.external_record_group_id == "public"
+        assert private.external_record_group_id == "private"
+
+    async def test_subissue_parent_and_unassigned_root_are_preserved(self) -> None:
+        connector = _make_connector()
+        child = connector._transform_issue_to_ticket_record(
+            _issue(parent={"id": "parent"}, project={"id": "p1"}), "team-1")
+        assert child.parent_external_record_id == "parent"
+        assert child.parent_record_type == RecordType.TICKET
+        root = connector._transform_issue_to_ticket_record(_issue(project=None), "team-1")
+        assert root.parent_external_record_id is None
+
+    async def test_project_move_keeps_ticket_identity_and_content_revision(self) -> None:
+        connector = _make_connector()
+        before = connector._transform_issue_to_ticket_record(_issue(project={"id": "p1"}), "team-1")
+        after = connector._transform_issue_to_ticket_record(_issue(project={"id": "p2"}), "team-1", before)
+        assert after.id == before.id
+        assert after.external_revision_id == before.external_revision_id
+        assert after.parent_external_record_id == "linear-project-folder:team-1:p2"
+
+    async def test_folder_is_written_once_per_name_and_reuses_existing_id(self) -> None:
+        connector = _make_connector()
+        processor = connector.data_entities_processor
+        processor.get_record_by_external_id.return_value = _ticket(record_id="stored-folder")
+        await connector._ensure_project_folder({"id": "p1", "name": "Old"}, "team-1")
+        await connector._ensure_project_folder({"id": "p1", "name": "Old"}, "team-1")
+        assert processor.on_new_records.await_count == 1
+        await connector._ensure_project_folder({"id": "p1", "name": "Renamed"}, "team-1")
+        folder = processor.on_new_records.call_args.args[0][0][0]
+        assert folder.id == "stored-folder"
+        assert folder.record_name == "Renamed"
+
+    async def test_removed_team_share_removes_its_folder_but_keeps_other_team_folder(self) -> None:
+        connector = _make_connector()
+        processor = connector.data_entities_processor
+        await connector._ensure_project_folder({"id": "p1", "name": "Shared"}, "team-1")
+        old_folder = processor.on_new_records.call_args.args[0][0][0]
+        processor.get_records_by_record_type.return_value = [old_folder]
+        connector._reconciler.run_projects = AsyncMock(return_value=(0, {
+            "p1": {"id": "p1", "name": "Shared", "teams": {
+                "nodes": [{"id": "team-2"}], "pageInfo": {"hasNextPage": False},
+            }},
+        }, {}))
+        connector._remover.remove_record = AsyncMock()
+        await connector._sync_deleted_projects([(_team_rg(), []), (_team_rg("team-2"), [])])
+        connector._remover.remove_record.assert_awaited_once_with(old_folder)
+        assert old_folder.external_record_id not in connector._project_folder_names
+
+    async def test_unknown_project_listing_does_not_remove_folders(self) -> None:
+        connector = _make_connector()
+        connector._reconciler.run_projects = AsyncMock(side_effect=LinearTransientError("unavailable"))
+        connector._remover.remove_record = AsyncMock()
+        await connector._sync_deleted_projects([(_team_rg(), [])])
+        connector._remover.remove_record.assert_not_awaited()
+
+    async def test_missing_team_pagination_does_not_prove_a_removed_share(self) -> None:
+        connector = _make_connector()
+        await connector._ensure_project_folder({"id": "p1", "name": "Shared"}, "team-1")
+        folder = connector.data_entities_processor.on_new_records.call_args.args[0][0][0]
+        connector.data_entities_processor.get_records_by_record_type.return_value = [folder]
+        connector._reconciler.run_projects = AsyncMock(return_value=(0, {
+            "p1": {"id": "p1", "teams": {"nodes": []}},
+        }, {}))
+        connector._remover.remove_record = AsyncMock()
+        await connector._sync_deleted_projects([(_team_rg(), [])])
+        connector._remover.remove_record.assert_not_awaited()
+
+
 class TestCollaborators:
     def test_connector_owns_a_gateway_a_remover_and_a_reconciler(self) -> None:
         connector = _make_connector()
@@ -207,7 +297,7 @@ class TestCollaborators:
     def test_team_issue_checkpoint_is_keyed_by_team_id(self) -> None:
         connector = _make_connector()
         checkpoint = connector._team_issue_checkpoint("5f2c-team-uuid")
-        assert checkpoint._key == "team_issues_5f2c-team-uuid"
+        assert checkpoint._key == "team_project_issues_5f2c-team-uuid"
         assert checkpoint._sync_point is connector.issues_sync_point
 
     def test_per_key_checkpoint_helpers_are_gone(self) -> None:
@@ -882,19 +972,19 @@ class TestRemoveStaleTeams:
     @pytest.mark.asyncio
     async def test_removed_team_forgets_its_issue_checkpoint(self) -> None:
         connector = _make_connector()
-        connector.issues_sync_point.store["team_issues_team-gone"] = {
+        connector.issues_sync_point.store["team_project_issues_team-gone"] = {
             "last_sync_time": NOW - 1000, "resume_cursor": "cursor-1",
             "resume_since": 5, "resume_started_at": NOW - 500, "held_runs": 1,
         }
-        connector.issues_sync_point.store["team_issues_team-kept"] = {"last_sync_time": NOW - 1000}
+        connector.issues_sync_point.store["team_project_issues_team-kept"] = {"last_sync_time": NOW - 1000}
         connector._reconciler.remove_stale_teams = AsyncMock(return_value=["team-gone"])
 
         await connector._remove_stale_teams({"team-kept"})
 
         # If the team comes back it is read from the beginning.
-        assert connector.issues_sync_point.store["team_issues_team-gone"] == {
+        assert connector.issues_sync_point.store["team_project_issues_team-gone"] == {
             "last_sync_time": 0, "resume_cursor": "", "resume_since": 0, "resume_started_at": 0, "held_runs": 0}
-        assert connector.issues_sync_point.store["team_issues_team-kept"] == {"last_sync_time": NOW - 1000}
+        assert connector.issues_sync_point.store["team_project_issues_team-kept"] == {"last_sync_time": NOW - 1000}
 
 
 class TestDateScope:
@@ -1358,7 +1448,7 @@ class TestChangeProbe:
 
         connector = _make_connector()
         connector.sync_filters = None
-        connector.issues_sync_point.store["team_issues_team-1"] = {"last_sync_time": 1700000000000}
+        connector.issues_sync_point.store["team_project_issues_team-1"] = {"last_sync_time": 1700000000000}
         datasource = MagicMock()
         datasource.execute_operation = AsyncMock(return_value=GraphQLResponse(
             success=True, data={"issues": {"nodes": [], "pageInfo": {"hasNextPage": False}}}))
@@ -1375,7 +1465,7 @@ class TestChangeProbe:
         assert operation == "issueIds" and variables["first"] == 1
         assert variables["filter"]["team"] == {"id": {"eq": "team-1"}}
         assert "gt" in variables["filter"]["updatedAt"]
-        assert connector.issues_sync_point.store["team_issues_team-1"]["last_sync_time"] > 1700000000000
+        assert connector.issues_sync_point.store["team_project_issues_team-1"]["last_sync_time"] > 1700000000000
         assert connector_module.ISSUE_PAGE_SIZE == 50
 
     @pytest.mark.asyncio
@@ -1527,7 +1617,7 @@ class TestPartialScans:
         assert failed == ["Engineering"]
         assert connector.full_sync_coverage().complete is False
         connector.data_entities_processor.on_new_records.assert_awaited_once()
-        stored = connector.issues_sync_point.store["team_issues_team-1"]
+        stored = connector.issues_sync_point.store["team_project_issues_team-1"]
         assert not stored.get("last_sync_time"), "a partly read team moved its checkpoint"
         assert stored["resume_cursor"] == "cur1"
 
@@ -1545,7 +1635,7 @@ class TestPartialScans:
         assert failed == []
         assert connector.full_sync_coverage().complete is True
         assert connector.data_entities_processor.on_new_records.await_count == 2
-        stored = connector.issues_sync_point.store["team_issues_team-1"]
+        stored = connector.issues_sync_point.store["team_project_issues_team-1"]
         assert stored["last_sync_time"] == NOW and stored["resume_cursor"] == ""
 
     @pytest.mark.asyncio
