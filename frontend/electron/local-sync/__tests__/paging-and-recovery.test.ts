@@ -165,13 +165,18 @@ test('changes made just before quit are reported at the next start', async () =>
   await m2.shutdown();
 });
 
-test('a file that could not be read when it changed is reported once it can be', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async () => {
+test('a file that could not be read when it changed is reported once it can be', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async (t) => {
   const { manager, syncRoot } = setup();
+  const file = path.join(syncRoot, 'locked.txt');
+  t.after(async () => {
+    if (fs.existsSync(file)) fs.chmodSync(file, 0o644);
+    await manager.shutdown();
+  });
   await manager.start({ connectorId: 'c-1', rootPath: syncRoot });
   await drain(manager, 'seed', 'INCREMENTAL');
-  const file = path.join(syncRoot, 'locked.txt');
-  await fsp.writeFile(file, 'secret');
-  fs.chmodSync(file, 0);
+  // A later chmod leaves a window for the watcher to read the file.
+  await fsp.writeFile(file, 'secret', { mode: 0 });
+  assert.throws(() => fs.readFileSync(file), { code: 'EACCES' });
   await sleep(3500);
   const first = await drain(manager, 'while-locked', 'INCREMENTAL');
   assert.ok(!first.events.some((e) => e.path === 'locked.txt' && e.sha256), 'it cannot have a hash yet');
@@ -180,7 +185,6 @@ test('a file that could not be read when it changed is reported once it can be',
     const { events } = await drain(manager, `retry-${Date.now()}`, 'INCREMENTAL');
     return events.some((e) => e.path === 'locked.txt' && Boolean(e.sha256));
   }, 'the file to be reported with its hash');
-  await manager.shutdown();
 });
 
 test('a folder that loses its read permission is not reported as deleted', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async () => {
