@@ -9,6 +9,8 @@ export const TokenScopes = Object.freeze({
   CONVERSATION_PERMISSIONS: 'conversation:permissions',
   VALIDATE_EMAIL: 'email:validate',
   ENTITY_USER_WRITE: 'entity:user:write',
+  ACCESS_GROUP_MANAGE: 'access-group:manage',
+  AUDIT_WRITE: 'audit:write',
   ORG_EMAIL_VERIFY: 'org:email:verify',
   EMAIL_VERIFIED: 'email:verified',
   DESKTOP_COMMAND: 'desktop:command',

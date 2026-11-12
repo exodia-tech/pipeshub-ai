@@ -19589,6 +19589,17 @@ class ArangoHTTPProvider(NamedEntityGraphMixin, IGraphDBProvider):
             "gated_app_ids": list(dict.fromkeys(payload.get("gatedApps") or [])),
         }
 
+    async def update_group_resource_policy(self, org_id: str, group_id: str, policy_json: str, expected_revision: int) -> bool:
+        rows = await self.execute_query("""
+            FOR g IN teams
+              FILTER g._key == @group AND g.orgId == @org AND g.exodiaAccessGroup == true
+              FILTER (g.exodiaResourceRevision == null ? 0 : g.exodiaResourceRevision) == @expected
+              UPDATE g WITH {exodiaResourcePolicy:@policy, exodiaResourceRevision:@expected + 1}
+                IN teams OPTIONS {ignoreRevs:false}
+              RETURN NEW._key
+        """, bind_vars={"org":org_id,"group":group_id,"policy":policy_json,"expected":expected_revision})
+        return bool(rows)
+
     async def get_knowledge_hub_access_v3(
         self,
         user_key: str,
@@ -19662,6 +19673,7 @@ class ArangoHTTPProvider(NamedEntityGraphMixin, IGraphDBProvider):
                 bucket.append(grant["id"])
         return {
             "grantee_ids": grantee_ids,
+            "user_key": user_key,
             "gated_app_ids": gated_app_ids,
             "by_connector": {k: list(dict.fromkeys(v)) for k, v in by_connector.items()},
         }
@@ -26810,7 +26822,7 @@ class ArangoHTTPProvider(NamedEntityGraphMixin, IGraphDBProvider):
 
         except Exception as e:
             self.logger.error(f"Error in delete_team_member_edges: {str(e)}", exc_info=True)
-            return []
+            raise
 
     async def batch_update_team_member_roles(
         self,
@@ -26855,7 +26867,7 @@ class ArangoHTTPProvider(NamedEntityGraphMixin, IGraphDBProvider):
 
         except Exception as e:
             self.logger.error(f"Error in batch_update_team_member_roles: {str(e)}", exc_info=True)
-            return []
+            raise
 
     async def delete_all_team_permissions(
         self,

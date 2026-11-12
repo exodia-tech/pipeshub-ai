@@ -20160,6 +20160,17 @@ class Neo4jProvider(NamedEntityGraphMixin, IGraphDBProvider):
             "gated_app_ids": list(dict.fromkeys(payload.get("gatedApps") or [])),
         }
 
+    async def update_group_resource_policy(self, org_id: str, group_id: str, policy_json: str, expected_revision: int) -> bool:
+        # The dependent SET obtains the write lock before the revision comparison.
+        rows = await self.client.execute_query("""
+            MATCH (g:Teams {id:$group_id, orgId:$org_id, exodiaAccessGroup:true})
+            SET g.exodiaResourceRevision = coalesce(g.exodiaResourceRevision, 0)
+            WITH g WHERE g.exodiaResourceRevision = $expected
+            SET g.exodiaResourcePolicy = $policy, g.exodiaResourceRevision = $expected + 1
+            RETURN g.id AS id
+        """, parameters={"org_id":org_id,"group_id":group_id,"policy":policy_json,"expected":expected_revision})
+        return bool(rows)
+
     async def get_knowledge_hub_access_v3(
         self,
         user_key: str,
@@ -20265,6 +20276,7 @@ class Neo4jProvider(NamedEntityGraphMixin, IGraphDBProvider):
             "grantee_ids": grantee_ids,
             "gated_app_ids": gated_app_ids,
             "by_connector": by_connector,
+            "user_key": user_key,
         }
         self.logger.debug(
             "kh v3 access user=%s -> %d grantees, %d connectors, %d granted ids, %d dropped",
@@ -25326,7 +25338,7 @@ class Neo4jProvider(NamedEntityGraphMixin, IGraphDBProvider):
 
         except Exception as e:
             self.logger.error(f"Error in delete_team_member_edges: {str(e)}", exc_info=True)
-            return []
+            raise
 
     async def batch_update_team_member_roles(
         self,
@@ -25383,7 +25395,7 @@ class Neo4jProvider(NamedEntityGraphMixin, IGraphDBProvider):
             raise
         except Exception as e:
             self.logger.error(f"Error in batch_update_team_member_roles: {str(e)}", exc_info=True)
-            return []
+            raise
 
     async def delete_all_team_permissions(
         self,

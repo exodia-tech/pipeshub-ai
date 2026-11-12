@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { AuditAction, recordAuditEvent } from '../../audit/audit.store';
+import { Logger } from '../../../libs/services/logger.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Container } from 'inversify';
@@ -104,6 +107,40 @@ const UserIdValidationSchema = z.object({
   headers: z.object({}),
 });
 
+export const groupAdminCheck =
+  (action: AuditAction) =>
+  async (
+    req: AuthenticatedUserRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    await userAdminCheck(req, res, async (error?: unknown) => {
+      if (!error) {
+        next();
+        return;
+      }
+      if (req.user?.orgId && req.user?.userId) {
+        try {
+          await recordAuditEvent({
+            org_id: String(req.user.orgId),
+            actor_id: String(req.user.userId),
+            operation_id: randomUUID(),
+            request_id: req.context?.requestId,
+            action,
+            outcome: 'denied',
+            group_ids: [],
+            member_ids: [],
+          });
+        } catch {
+          Logger.getInstance().error(
+            'Group audit denial could not be recorded',
+          );
+        }
+      }
+      next(error);
+    });
+  };
+
 export function createUserGroupRouter(container: Container) {
   const router = Router();
 
@@ -114,7 +151,7 @@ export function createUserGroupRouter(container: Container) {
     authMiddleware.authenticate,
     requireScopes(OAuthScopeNames.USERGROUP_WRITE),
     ValidationMiddleware.validate(groupValidationSchema),
-    userAdminCheck,
+    groupAdminCheck('group.create'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const userGroupController = container.get<UserGroupController>(
@@ -178,7 +215,7 @@ export function createUserGroupRouter(container: Container) {
     '/:groupId',
     authMiddleware.authenticate,
     requireScopes(OAuthScopeNames.USERGROUP_WRITE),
-    userAdminCheck,
+    groupAdminCheck('group.rename'),
     ValidationMiddleware.validate(updateGroupValidationSchema),
     async (
       req: AuthenticatedUserRequest,
@@ -200,7 +237,7 @@ export function createUserGroupRouter(container: Container) {
     '/:groupId',
     authMiddleware.authenticate,
     requireScopes(OAuthScopeNames.USERGROUP_WRITE),
-    userAdminCheck,
+    groupAdminCheck('group.delete'),
     ValidationMiddleware.validate(UserGroupIdValidationSchema),
     async (
       req: AuthenticatedUserRequest,
@@ -222,7 +259,7 @@ export function createUserGroupRouter(container: Container) {
     '/add-users',
     authMiddleware.authenticate,
     requireScopes(OAuthScopeNames.USERGROUP_WRITE),
-    userAdminCheck,
+    groupAdminCheck('group.members.add'),
     ValidationMiddleware.validate(AddUsersToGroupsValidationSchema),
     async (
       req: AuthenticatedUserRequest,
@@ -244,7 +281,7 @@ export function createUserGroupRouter(container: Container) {
     '/remove-users',
     authMiddleware.authenticate,
     requireScopes(OAuthScopeNames.USERGROUP_WRITE),
-    userAdminCheck,
+    groupAdminCheck('group.members.remove'),
     ValidationMiddleware.validate(RemoveUsersFromGroupsValidationSchema),
     async (
       req: AuthenticatedUserRequest,

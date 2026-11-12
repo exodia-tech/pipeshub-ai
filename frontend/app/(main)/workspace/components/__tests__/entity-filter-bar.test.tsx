@@ -27,7 +27,7 @@ describe('EntityFilterBar', () => {
     expect(container.querySelector('style')).toBeNull(); // the shrink rule lives in globals.css
   });
 
-  it('is unchanged on desktop', () => {
+  it('keeps mobile-only styling out of desktop', () => {
     mobile.value = false;
     const { container } = render(<Theme><EntityFilterBar filters={filters} /></Theme>);
     expect(container.querySelector('.entity-filter-bar-mobile')).toBeNull();

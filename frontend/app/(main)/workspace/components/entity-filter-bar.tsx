@@ -34,11 +34,11 @@ export function EntityFilterBar({ filters, renderFilter }: EntityFilterBarProps)
     <Flex
       align="center"
       gap="2"
-      className={compact ? 'entity-filter-bar-mobile no-scrollbar' : undefined}
+      className={compact ? 'entity-filter-bar-mobile no-scrollbar' : 'no-scrollbar'}
       style={{
-        // Below desktop: one row that scrolls sideways instead of clipping chips.
-        flexWrap: compact ? 'nowrap' : undefined,
-        overflowX: compact ? 'auto' : undefined,
+        // Selected filter values can outgrow the row even on desktop.
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
         // 12px around the 28px chips
         minHeight: 52,
         flexShrink: 0,

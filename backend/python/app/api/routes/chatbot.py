@@ -1345,10 +1345,14 @@ async def check_viewer_record_access(
         readable = await accessible_node_ids(
             graph_provider, set(ids) | {r for rs in by_url.values() for r in rs}, viewer_id, org_id,
         )
-    except PermissionVerificationUnavailableError as exc:
+        from app.services.group_resource_policy import GroupResourceAccess
+
+        group_restricted = await GroupResourceAccess(graph_provider).user_has_restrictions(org_id, viewer_id)
+    except (PermissionVerificationUnavailableError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=503, detail="Access check unavailable") from exc
     return {
         "accessible": [r for r in ids if r in readable],
+        "groupRestricted": group_restricted,
         "accessibleUrls": [
             u for u in urls
             if by_url.get(u)

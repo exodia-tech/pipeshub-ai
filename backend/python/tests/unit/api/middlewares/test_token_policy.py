@@ -31,6 +31,7 @@ class TestAcceptedServiceScopes:
                 "document:parse",
                 "document:classify",
                 "entity:user:write",
+                "access-group:manage",
             }
         )
 
@@ -43,6 +44,7 @@ class TestAcceptedServiceScopes:
             TokenScopes.STORAGE_TOKEN,
             TokenScopes.USER_LOOKUP,
             TokenScopes.CALLER_ROLE,
+            TokenScopes.AUDIT_WRITE,
         ],
     )
     def test_node_only_scopes_are_not_accepted(self, user_held_or_node_only_scope):

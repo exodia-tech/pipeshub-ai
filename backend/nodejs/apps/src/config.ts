@@ -18,6 +18,7 @@ export { createConnectorRouter } from './modules/tokens_manager/routes/connector
 // --- User management ---
 export { createUserRouter } from './modules/user_management/routes/users.routes';
 export { createUserGroupRouter } from './modules/user_management/routes/userGroups.routes';
+export { createAuditRouter } from './modules/audit/audit.routes';
 export { createOrgRouter } from './modules/user_management/routes/org.routes';
 export { UserManagerContainer } from './modules/user_management/container/userManager.container';
 
@@ -90,3 +91,4 @@ export { createOAuthAppsRouter } from './modules/oauth_apps/routes/oauth_apps.ro
 
 // --- Edition boot hooks ---
 export { noopEditionBoot as editionBoot } from './libs/edition/edition-boot';
+export { createAccessGroupsRouter } from './modules/user_management/routes/accessGroups.routes';

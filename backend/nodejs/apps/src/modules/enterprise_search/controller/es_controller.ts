@@ -1614,7 +1614,7 @@ export const addMessageStream =
         session,
       )) as IMessage[];
       const previousConversations = formatPreviousConversations(
-        allMessagesSoFar.slice(0, -1),
+        await redactMessagesFor(appConfig,viewerOf(userId,orgId),allMessagesSoFar.slice(0,-1),() => String(confirmedConversation.initiator)),
       );
 
       const followUpProject = await loadProjectForSession(
@@ -3698,9 +3698,9 @@ async function regenerateAnswersInternal(
       if (questionIdx >= 0) regenUserIdx = questionIdx;
     }
     const previousConversations = formatPreviousConversations(
-      regenUserIdx >= 0
+      await redactMessagesFor(appConfig,viewerOf(userId,orgId),regenUserIdx >= 0
         ? allMessagesForRegen.slice(0, regenUserIdx)
-        : allMessagesForRegen.slice(0, -2),
+        : allMessagesForRegen.slice(0, -2),() => String(existingConversation!.initiator)),
     );
 
     // The title of a chat is its first question, so editing that question moves the title too,
@@ -7338,7 +7338,7 @@ export const addMessageStreamToAgentConversation =
         session,
       )) as IMessage[];
       const previousConversations = formatPreviousConversations(
-        allMessagesSoFar.slice(0, -1),
+        await redactMessagesFor(appConfig,viewerOf(userId,orgId),allMessagesSoFar.slice(0,-1),() => String(confirmedConversation.initiator)),
       );
 
       const followUpProject = await loadProjectForSession(

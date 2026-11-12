@@ -12,6 +12,12 @@ from app.exceptions.graph_db_exceptions import PermissionVerificationUnavailable
 VIEWER = {"orgId": "org-1", "userId": "viewer"}
 
 
+@pytest.fixture(autouse=True)
+def unrestricted_viewer():
+    with patch("app.services.group_resource_policy.GroupResourceAccess.user_has_restrictions", AsyncMock(return_value=False)):
+        yield
+
+
 def _request(body: dict) -> MagicMock:
     request = MagicMock()
     request.json = AsyncMock(return_value=body)
@@ -24,7 +30,7 @@ async def test_returns_only_records_the_token_viewer_may_read() -> None:
     with patch("app.api.routes.chatbot.accessible_node_ids", AsyncMock(return_value={"a"})) as check:
         out = await check_viewer_record_access(_request({"recordIds": ["a", "b", "a"]}), graph, VIEWER)
     check.assert_awaited_once_with(graph, {"a", "b"}, "viewer", "org-1")
-    assert out == {"accessible": ["a"], "accessibleUrls": []}
+    assert out == {"accessible": ["a"], "accessibleUrls": [], "groupRestricted": False}
 
 
 @pytest.mark.asyncio
@@ -32,6 +38,26 @@ async def test_check_that_cannot_answer_is_a_503_not_an_empty_or_full_answer() -
     with patch(
         "app.api.routes.chatbot.accessible_node_ids",
         AsyncMock(side_effect=PermissionVerificationUnavailableError("down")),
+    ):
+        with pytest.raises(HTTPException) as err:
+            await check_viewer_record_access(_request({"recordIds": ["a"]}), AsyncMock(), VIEWER)
+    assert err.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_group_history_policy_is_checked_even_without_record_ids() -> None:
+    with patch("app.api.routes.chatbot.accessible_node_ids", AsyncMock(return_value=set())), patch(
+        "app.services.group_resource_policy.GroupResourceAccess.user_has_restrictions", AsyncMock(return_value=True)
+    ) as policy:
+        out = await check_viewer_record_access(_request({}), AsyncMock(), VIEWER)
+    policy.assert_awaited_once_with("org-1", "viewer")
+    assert out == {"accessible": [], "accessibleUrls": [], "groupRestricted": True}
+
+
+@pytest.mark.asyncio
+async def test_unresolved_group_policy_does_not_confirm_unrestricted_history() -> None:
+    with patch("app.api.routes.chatbot.accessible_node_ids", AsyncMock(return_value={"a"})), patch(
+        "app.services.group_resource_policy.GroupResourceAccess.user_has_restrictions", AsyncMock(side_effect=ValueError("unresolved identity"))
     ):
         with pytest.raises(HTTPException) as err:
             await check_viewer_record_access(_request({"recordIds": ["a"]}), AsyncMock(), VIEWER)
@@ -62,7 +88,7 @@ async def test_urls_map_to_records_and_are_readable_only_when_every_record_is() 
     graph.get_records_by_weburls.assert_awaited_once_with(["u1", "u2", "gone"], "org-1", per_address=50)
     check.assert_awaited_once_with(graph, {"a", "r1", "r2", "r3"}, "viewer", "org-1")
     # u2 has an unreadable record at its address, "gone" resolves to nothing.
-    assert out == {"accessible": [], "accessibleUrls": ["u1"]}
+    assert out == {"accessible": [], "accessibleUrls": ["u1"], "groupRestricted": False}
 
 
 @pytest.mark.asyncio
@@ -71,7 +97,7 @@ async def test_no_urls_means_no_url_lookup() -> None:
     with patch("app.api.routes.chatbot.accessible_node_ids", AsyncMock(return_value={"a"})):
         out = await check_viewer_record_access(_request({"recordIds": ["a"]}), graph, VIEWER)
     graph.get_records_by_weburls.assert_not_awaited()
-    assert out == {"accessible": ["a"], "accessibleUrls": []}
+    assert out == {"accessible": ["a"], "accessibleUrls": [], "groupRestricted": False}
 
 
 @pytest.mark.asyncio

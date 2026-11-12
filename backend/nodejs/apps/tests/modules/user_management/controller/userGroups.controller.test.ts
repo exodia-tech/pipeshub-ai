@@ -26,6 +26,7 @@ describe('UserGroupController', () => {
 
   beforeEach(() => {
     controller = new UserGroupController();
+    sinon.stub(mongoose.model('exodiaAuditEvent'), 'create').resolves({} as never);
 
     req = {
       user: {
@@ -869,6 +870,9 @@ describe('UserGroupController', () => {
         groupIds: ['g1', 'g2'],
       };
 
+      sinon.stub(UserGroups, 'findOne').callsFake((() => chain({ _id: 'g1' })) as any);
+      sinon.stub(Users, 'findOne').callsFake((() => chain({ _id: 'u1' })) as any);
+
       sinon.stub(UserGroups, 'updateMany').resolves({
         modifiedCount: 2,
       } as any);
@@ -917,6 +921,9 @@ describe('UserGroupController', () => {
         userIds: ['u1'],
         groupIds: ['nonexistent'],
       };
+
+      sinon.stub(UserGroups, 'findOne').callsFake((() => chain({ _id: 'nonexistent' })) as any);
+      sinon.stub(Users, 'findOne').callsFake((() => chain({ _id: 'u1' })) as any);
 
       sinon.stub(UserGroups, 'updateMany').resolves({
         modifiedCount: 0,

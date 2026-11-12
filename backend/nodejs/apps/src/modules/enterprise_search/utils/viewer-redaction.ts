@@ -3,8 +3,10 @@
  * the owner sees it, except that every structured reference to a record the
  * viewer cannot read (citation, attachment, reference data, applied filter,
  * tool result, search hit) loses its id, name, link and text and shows as a
- * placeholder. The owner sees everything.
- * Free text stays as written: the answer, reasoning prose and follow-up
+ * placeholder. Unrestricted owners retain their original view.
+ * Group-restricted viewers also revalidate owned history, hiding whole replies
+ * with denied sources or unverifiable legacy tool transcripts before display or replay.
+ * For unrestricted shared viewers, free text stays as written: the answer, reasoning prose and follow-up
  * questions (accepted residual risk, as before). Tool steps and their results
  * are shown as written too; per-record redaction of them is a follow-up.
  */
@@ -32,6 +34,7 @@ export const viewerOf = (userId: unknown, orgId: unknown): Viewer => ({
 export interface Readable {
   ids: Set<string>;
   urls: Set<string>;
+  groupRestricted: boolean;
 }
 
 const isStringList = (value: unknown): value is string[] =>
@@ -49,8 +52,11 @@ export const readableRecordIds = async (
 ): Promise<Readable> => {
   const ids = [...new Set(recordIds.filter(Boolean))];
   const urls = [...new Set(webUrls.filter(Boolean))];
-  const readable: Readable = { ids: new Set(), urls: new Set() };
-  if (ids.length === 0 && urls.length === 0) return readable;
+  const readable: Readable = {
+    ids: new Set(),
+    urls: new Set(),
+    groupRestricted: false,
+  };
   try {
     const token = new AuthTokenService(
       appConfig.jwtSecret,
@@ -65,12 +71,13 @@ export const readableRecordIds = async (
     );
     for (
       let i = 0;
-      i < Math.max(ids.length, urls.length);
+      i < Math.max(1, ids.length, urls.length);
       i += ACCESS_CHECK_BATCH
     ) {
       const response = await new AIServiceCommand<{
         accessible?: string[];
         accessibleUrls?: string[];
+        groupRestricted?: boolean;
       }>({
         uri: `${appConfig.aiBackend}/api/v1/chat/records/access`,
         method: HttpMethod.POST,
@@ -91,6 +98,9 @@ export const readableRecordIds = async (
       }
       const accessible: unknown = response.data?.accessible ?? [];
       const accessibleUrls: unknown = response.data?.accessibleUrls ?? [];
+      if (typeof response.data?.groupRestricted !== 'boolean')
+        throw new Error('record access did not confirm the group policy');
+      readable.groupRestricted ||= response.data.groupRestricted;
       // Only lists of strings: a string is read per character, String(['id']) is 'id'.
       if (!isStringList(accessible) || !isStringList(accessibleUrls)) {
         throw new Error('record access returned a malformed body');
@@ -103,7 +113,7 @@ export const readableRecordIds = async (
     logger.error('Viewer access check failed; redacting every source', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return { ids: new Set(), urls: new Set() };
+    return { ids: new Set(), urls: new Set(), groupRestricted: true };
   }
 };
 
@@ -195,7 +205,7 @@ const citedDoc = (c: CitationEntry | null): CitedDoc | string | undefined => {
 
 /**
  * Redacts what `viewer` cannot read in the messages of conversations they do not
- * own. `ownerOf` gives a message's conversation owner; the owner's own pass through.
+ * own. Group restrictions also apply to the owner's stored answers.
  */
 export const redactMessagesFor = async <M extends ViewerMessage>(
   appConfig: AppConfig,
@@ -203,8 +213,7 @@ export const redactMessagesFor = async <M extends ViewerMessage>(
   messages: M[],
   ownerOf: (message: M) => string | undefined,
 ): Promise<M[]> => {
-  const others = messages.filter((m) => ownerOf(m) !== viewer.userId);
-  if (others.length === 0) return messages;
+  const others = messages;
 
   // Citations stored as bare ids (archives) are resolved to their record here.
   const bare = new Set<string>();
@@ -253,7 +262,50 @@ export const redactMessagesFor = async <M extends ViewerMessage>(
   const okUrl = (u?: string): boolean =>
     u !== undefined && readable.urls.has(u);
   return messages.map((m) => {
-    if (ownerOf(m) === viewer.userId) return m;
+    if (!readable.groupRestricted && ownerOf(m) === viewer.userId) return m;
+    const stored = m as M & {
+      messageType?: string;
+      tools?: unknown[];
+      parts?: { type?: string }[];
+    };
+    const deniedSource =
+      (m.citations ?? []).some((c) => !ok(recordIdOf(c))) ||
+      (m.attachments ?? []).some((a) => !ok(a?.recordId)) ||
+      (m.referenceData ?? []).some((e) => !refVisible(e, ok, okUrl));
+    // Old tool transcripts have no complete source provenance, so they cannot be replayed under group restrictions.
+    if (
+      readable.groupRestricted &&
+      stored.messageType !== 'user_query' &&
+      (deniedSource ||
+        !m.citations?.length ||
+        stored.tools?.length ||
+        stored.parts?.some((part) => part.type !== 'text'))
+    ) {
+      const safe: Record<string, unknown> = {};
+      for (const key of [
+        '_id',
+        'messageType',
+        'createdAt',
+        'updatedAt',
+        'status',
+        'modelInfo',
+      ])
+        safe[key] = (m as Record<string, unknown>)[key];
+      const redacted: Record<string, unknown> = {
+        ...safe,
+        content:
+          'This response is hidden because its sources are no longer accessible or cannot be verified.',
+        contentFormat: 'MARKDOWN',
+        citations: [],
+        attachments: [],
+        referenceData: [],
+        parts: [],
+        reasoning: [],
+        tools: [],
+        followUpQuestions: [],
+      };
+      return redacted as M;
+    }
     const view: Record<string, unknown> = { ...(m as object) };
     if (m.citations)
       view.citations = m.citations.map((c) =>
@@ -308,8 +360,7 @@ export const redactSearchesFor = async <S extends ViewerSearch>(
 ): Promise<S[]> => {
   const isOthers = (s: ViewerSearch): boolean =>
     String(s.userId) !== viewer.userId;
-  const others = searches.filter(isOthers).map(plain);
-  if (others.length === 0) return searches;
+  const others = searches.map(plain);
   const readable = await readableRecordIds(
     appConfig,
     viewer,
@@ -319,7 +370,7 @@ export const redactSearchesFor = async <S extends ViewerSearch>(
     ]) as string[],
   );
   return searches.map((s) => {
-    if (!isOthers(s)) return s;
+    if (!readable.groupRestricted && !isOthers(s)) return s;
     const o = plain(s);
     const view: Record<string, unknown> = {
       ...o,

@@ -564,6 +564,7 @@ type Reply =
  */
 export class FakeAIBackend {
   readonly calls: RecordedCall[] = []
+  readonly permissionCalls: RecordedCall[] = []
   private controller: ReadableStreamDefaultController<Uint8Array> | null = null
   private streamReply: Reply | null = null
   private stallStreamOpen = false
@@ -575,10 +576,13 @@ export class FakeAIBackend {
       const url = input instanceof Request ? input.url : input.toString()
       const rawBody = typeof init?.body === 'string' ? init.body : '{}'
       const headers = Object.fromEntries(new Headers(init?.headers).entries())
-      this.calls.push({ url, method: init?.method ?? 'GET', headers, body: JSON.parse(rawBody) as Record<string, unknown> })
+      const call={ url, method: init?.method ?? 'GET', headers, body: JSON.parse(rawBody) as Record<string, unknown> }
+      const permissionCheck=url.endsWith('/chat/records/access')
+      ;(permissionCheck ? this.permissionCalls : this.calls).push(call)
       const registered = this.replies.find((r) => r.path.test(url))
+      if (permissionCheck && !registered) return Promise.resolve(new Response(JSON.stringify({accessible:[],accessibleUrls:[],groupRestricted:false}),{status:200,headers:{'content-type':'application/json'}}))
       if (registered?.reply.kind === 'fn') {
-        const { status, body } = registered.reply.build(this.calls[this.calls.length - 1] as RecordedCall)
+        const { status, body } = registered.reply.build(call)
         return Promise.resolve(
           new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
         )

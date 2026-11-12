@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { recordAuditEvent } from '../../audit/audit.store';
 import { Response } from 'express';
 import { AuthenticatedUserRequest } from '../../../libs/middlewares/types';
 import {
@@ -113,6 +115,16 @@ export class UserGroupController {
       throw new BadRequestError(GROUP_EXISTS_MESSAGE);
     }
 
+    const audit = {
+      org_id: String(req.user?.orgId),
+      operation_id: randomUUID(),
+      request_id: req.context?.requestId,
+      actor_id: String(req.user?.userId),
+      action: 'group.create' as const,
+      group_ids: [] as string[],
+      member_ids: [] as string[],
+    };
+    await recordAuditEvent({ ...audit, outcome: 'intent' });
     const group = await saveGroupName(() =>
       groups.create(req.user?.orgId as string, {
         name: name,
@@ -120,6 +132,11 @@ export class UserGroupController {
       }),
     );
 
+    await recordAuditEvent({
+      ...audit,
+      group_ids: [String(group._id)],
+      outcome: 'success',
+    });
     res.status(201).json(group);
   }
 
@@ -255,6 +272,16 @@ export class UserGroupController {
       }
     }
 
+    const audit = {
+      org_id: orgId,
+      operation_id: randomUUID(),
+      request_id: req.context?.requestId,
+      actor_id: String(req.user?.userId),
+      action: 'group.rename' as const,
+      group_ids: [groupId],
+      member_ids: [],
+    };
+    await recordAuditEvent({ ...audit, outcome: 'intent' });
     const renamed = await saveGroupName(() =>
       groups.rename(orgId, groupId, normalizedName),
     );
@@ -262,6 +289,7 @@ export class UserGroupController {
       throw new NotFoundError('User group not found');
     }
 
+    await recordAuditEvent({ ...audit, outcome: 'success' });
     res.status(200).json(renamed);
   }
 
@@ -284,8 +312,19 @@ export class UserGroupController {
       throw new ForbiddenError('Only custom groups can be deleted');
     }
 
+    const audit = {
+      org_id: orgId,
+      operation_id: randomUUID(),
+      request_id: req.context?.requestId,
+      actor_id: String(userId),
+      action: 'group.delete' as const,
+      group_ids: [groupId],
+      member_ids: [],
+    };
+    await recordAuditEvent({ ...audit, outcome: 'intent' });
     const deleted = await groups.softDelete(orgId, groupId, userId as string);
-
+    if (!deleted) throw new NotFoundError('User group not found');
+    await recordAuditEvent({ ...audit, outcome: 'success' });
     res.status(200).json(deleted);
   }
 
@@ -304,6 +343,34 @@ export class UserGroupController {
       throw new BadRequestError('groupIds array is required');
     }
 
+    // A group may only contain live members and groups from its own organization.
+    // Validate the entire request before modifying any membership.
+    const [groups, users] = await Promise.all([
+      Promise.all(
+        (groupIds as string[]).map((id) =>
+          getGroupRepository().getLive(orgId, id),
+        ),
+      ),
+      Promise.all(
+        (userIds as string[]).map((id) =>
+          getUserRepository().getLive(orgId, id),
+        ),
+      ),
+    ]);
+    if (groups.some((group) => !group) || users.some((user) => !user)) {
+      throw new NotFoundError('One or more groups or users were not found');
+    }
+
+    const audit = {
+      org_id: orgId,
+      operation_id: randomUUID(),
+      request_id: req.context?.requestId,
+      actor_id: String(req.user?.userId),
+      action: 'group.members.add' as const,
+      group_ids: groupIds as string[],
+      member_ids: userIds as string[],
+    };
+    await recordAuditEvent({ ...audit, outcome: 'intent' });
     const modified = await getGroupRepository().addMembers(
       orgId,
       groupIds as string[],
@@ -314,6 +381,7 @@ export class UserGroupController {
       throw new BadRequestError('No groups found or updated');
     }
 
+    await recordAuditEvent({ ...audit, outcome: 'success' });
     res.status(200).json({ message: 'Users added to groups successfully' });
   }
 
@@ -332,6 +400,16 @@ export class UserGroupController {
       throw new BadRequestError('Group IDs are required');
     }
 
+    const audit = {
+      org_id: orgId,
+      operation_id: randomUUID(),
+      request_id: req.context?.requestId,
+      actor_id: String(req.user?.userId),
+      action: 'group.members.remove' as const,
+      group_ids: groupIds as string[],
+      member_ids: userIds as string[],
+    };
+    await recordAuditEvent({ ...audit, outcome: 'intent' });
     const modified = await getGroupRepository().removeMembers(
       orgId,
       groupIds as string[],
@@ -342,6 +420,7 @@ export class UserGroupController {
       throw new BadRequestError('No groups found or updated');
     }
 
+    await recordAuditEvent({ ...audit, outcome: 'success' });
     res.status(200).json({ message: 'Users removed from groups successfully' });
   }
 

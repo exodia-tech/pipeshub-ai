@@ -41,6 +41,7 @@ def _make_request(body_dict=None, query_params=None):
     req.app.container = MagicMock()
     req.app.container.logger.return_value = MagicMock()
     req.app.state.graph_provider = AsyncMock()
+    req.app.state.graph_provider.get_document.return_value = {"_key": "team-1", "orgId": "org-1"}
     # A mock's coroutine is truthy, which would read as "retry" to the idempotent writer.
     req.app.state.graph_provider.is_write_conflict = MagicMock(return_value=False)
     req.app.state.graph_provider.find_team_by_name = AsyncMock(return_value=None)
@@ -817,6 +818,7 @@ class TestUpdateTeam:
     def _setup_authorized_request(self, body_dict):
         req = _make_request(body_dict)
         gp = _graph_provider(req)
+        gp.get_document.return_value = {"_key": "team-1", "orgId": "org-1"}
         gp.get_user_by_user_id.return_value = {"_key": "user-key-1"}
         gp.get_edge.return_value = {"role": "OWNER"}
         gp.update_node.return_value = True
@@ -906,6 +908,26 @@ class TestUpdateTeam:
         with pytest.raises(HTTPException) as exc:
             await update_team(req, "team-1")
         assert exc.value.status_code == 404
+        gp.update_node.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_owner_edge_cannot_authorize_updates_in_another_org(self) -> None:
+        req, gp = self._setup_authorized_request({"name": "X"})
+        gp.get_document.return_value = {"_key": "team-1", "orgId": "other-org"}
+        gp.get_edge.return_value = {"role": "OWNER"}
+        with pytest.raises(HTTPException) as exc:
+            await update_team(req, "team-1")
+        assert exc.value.status_code == 404
+        gp.update_node.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_team_owner_cannot_manage_an_access_group(self) -> None:
+        req, gp = self._setup_authorized_request({"name": "X"})
+        gp.get_document.return_value = {"_key": "team-1", "orgId": "org-1", "exodiaAccessGroup": True}
+        gp.get_edge.return_value = {"role": "OWNER"}
+        with pytest.raises(HTTPException) as exc:
+            await update_team(req, "team-1")
+        assert exc.value.status_code == 403
         gp.update_node.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1171,6 +1193,18 @@ class TestUpdateTeam:
         )
 
     @pytest.mark.asyncio
+    async def test_remove_users_reports_storage_failure(self):
+        body = {"name": "T", "removeUserIds": [MEMBER_MONGO_ID_2]}
+        req, gp = self._setup_authorized_request(body)
+        gp.get_team_owner_removal_info.return_value = {
+            "owners_being_removed": [], "total_owner_count": 1,
+        }
+        gp.delete_team_member_edges.side_effect = RuntimeError("graph unavailable")
+        with pytest.raises(HTTPException) as exc:
+            await update_team(req, "team-1")
+        assert exc.value.status_code == 500
+
+    @pytest.mark.asyncio
     async def test_remove_users_ignores_falsy_ids(self):
         body = {"name": "T", "removeUserIds": ["", MEMBER_MONGO_ID_2]}
         req, gp = self._setup_authorized_request(body)
@@ -1246,7 +1280,7 @@ class TestDeleteTeam:
         req = _make_request()
         gp = _graph_provider(req)
         gp.get_user_by_user_id.return_value = {"_key": "user-key-1"}
-        gp.get_document.return_value = {"_key": "team-1"}
+        gp.get_document.return_value = {"_key": "team-1", "orgId": "org-1"}
         gp.get_edge.return_value = {"role": "OWNER"}
         return req, gp
 
@@ -1325,6 +1359,16 @@ class TestDeleteTeam:
         gp.get_document.return_value = {"_key": "team-1", "orgId": "other-org"}
         gp.get_edge.return_value = None
 
+        with pytest.raises(HTTPException) as exc:
+            await delete_team(req, "team-1")
+        assert exc.value.status_code == 404
+        gp.delete_nodes.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_owner_edge_cannot_authorize_deletion_in_another_org(self) -> None:
+        req, gp = self._setup()
+        gp.get_document.return_value = {"_key": "team-1", "orgId": "other-org"}
+        gp.get_edge.return_value = {"role": "OWNER"}
         with pytest.raises(HTTPException) as exc:
             await delete_team(req, "team-1")
         assert exc.value.status_code == 404

@@ -424,7 +424,7 @@ class TestIsJwtTokenValid:
     @patch("app.api.middlewares.auth.jwt.decode")
     @pytest.mark.parametrize(
         "scope",
-        ["connector:signedUrl", "record:content", "conversation:create", "fetch:config", "entity:user:write"],
+        ["connector:signedUrl", "record:content", "conversation:create", "fetch:config", "entity:user:write", "access-group:manage"],
     )
     async def test_scoped_jwt_with_accepted_scope(self, mock_jwt_decode, mock_get_config, scope):
         """A scoped-secret token carrying an accepted service scope is a service token."""

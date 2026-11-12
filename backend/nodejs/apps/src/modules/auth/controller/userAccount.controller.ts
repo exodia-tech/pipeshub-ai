@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
+import { recordAuditEvent } from '../../audit/audit.store';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
@@ -1743,6 +1744,30 @@ export class UserAccountController {
           { hasLoggedIn: true, email: user.email },
           accessToken,
         );
+      }
+
+      if (user.orgId && user._id) {
+        let auditTimer: NodeJS.Timeout | undefined;
+        try {
+          await Promise.race([
+            recordAuditEvent({
+              org_id: String(user.orgId), actor_id: String(user._id), operation_id: randomUUID(),
+              request_id: req.context?.requestId, action: 'auth.login', outcome: 'success',
+              group_ids: [], member_ids: [],
+            }),
+            new Promise<never>((_, reject) => {
+              auditTimer = setTimeout(() => reject(new Error('Audit timed out')), 1000);
+            }),
+          ]);
+        } catch {
+          this.logger.error('Sign-in audit event could not be recorded', {
+            orgId: String(user.orgId), userId: String(user._id),
+          });
+        } finally {
+          if (auditTimer) clearTimeout(auditTimer);
+        }
+      } else {
+        this.logger.error('Sign-in audit event lacked a verified identity');
       }
 
       res.status(200).json({

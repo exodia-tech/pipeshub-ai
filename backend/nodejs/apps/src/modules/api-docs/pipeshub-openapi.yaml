@@ -804,6 +804,18 @@ components:
             mcp:write: Add, configure and authenticate MCP servers
             mcp:delete: Remove MCP servers and their credentials
   schemas:
+    AgentAuditMetadata:
+      type: object
+      additionalProperties: false
+      required: [run_id, trace_id, agent_id]
+      properties:
+        run_id: { type: string, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' }
+        trace_id: { type: string, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' }
+        agent_id: { type: string, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' }
+        parent_run_id: { type: string, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' }
+        tool_call_id: { type: string, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' }
+        tool_name: { type: string, maxLength: 256, pattern: '^[a-zA-Z0-9_.:/-]+$' }
+        model: { type: string, minLength: 1, maxLength: 256, description: No control characters }
     UsageTotals:
       type: object
       description: Token subsets are not added twice. Spend excludes unpriced calls and is an estimate, not an invoice.
@@ -24825,6 +24837,304 @@ security:
   - bearerAuth: []
   - oauth2: []
 paths:
+  /access-groups:
+    get:
+      tags: [Administration]
+      summary: List access groups
+      security:
+        - bearerAuth: []
+        - oauth2: [usergroup:read]
+      parameters:
+        - { in: query, name: skip, schema: { type: integer, minimum: 0, default: 0 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200': { description: Organization access groups }
+        '403': { description: Administrator access required }
+        '503': { description: Group service unavailable }
+    post:
+      tags: [Administration]
+      summary: Create an access group
+      description: Administrator-only. The creator is not automatically a member of the group.
+      security:
+        - bearerAuth: []
+        - oauth2: [usergroup:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '201': { description: Access group created }
+        '400': { description: Invalid name }
+        '401': { description: Authentication required }
+        '403': { description: Administrator access required }
+        '503': { description: Audit or group service unavailable; check the group list before retrying }
+  /access-groups/{id}:
+    put:
+      tags: [Administration]
+      summary: Rename an access group
+      security:
+        - bearerAuth: []
+        - oauth2: [usergroup:write]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '200': { description: Group renamed }
+        '403': { description: Administrator access required }
+        '404': { description: Group not found }
+        '503': { description: Outcome may be unknown; check the group before retrying }
+    delete:
+      tags: [Administration]
+      summary: Delete an access group and its permissions
+      security:
+        - bearerAuth: []
+        - oauth2: [usergroup:write]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Group deleted }
+        '403': { description: Administrator access required }
+        '404': { description: Group not found }
+        '503': { description: Outcome may be unknown; check the group before retrying }
+  /access-groups/{id}/access:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Administration]
+      summary: Read group restrictions on source resources
+      responses:
+        '200': { description: Saved policy; source permissions remain authoritative }
+        '403': { description: Administrator required }
+        '404': { description: Group not found }
+        '503': { description: Policy storage unavailable }
+    put:
+      tags: [Administration]
+      summary: Save audited group restrictions on source resources with revision checking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [defaultAllow, rules]
+              properties:
+                defaultAllow: { type: boolean }
+                revision: { type: integer, minimum: 0, description: Revision returned by the preceding read }
+                rules:
+                  type: array
+                  maxItems: 1000
+                  items:
+                    type: object
+                    required: [ref, allow]
+                    properties:
+                      ref: { type: string, description: 'apps/id, recordGroups/id or records/id' }
+                      allow: { type: boolean }
+      responses:
+        '200': { description: Policy saved and audited }
+        '409': { description: Stale policy; reload before saving }
+        '400': { description: Invalid policy }
+        '403': { description: Administrator required }
+        '404': { description: Group or resource not found }
+        '503': { description: Save outcome unknown; refresh before retrying }
+  /access-groups/{id}/resources:
+    get:
+      tags: [Administration]
+      summary: Browse resource hierarchy and inherited group restrictions
+      description: Admin catalogue including denied nodes for policy editing. Reader counts reflect saved rules intersected with source permissions and every member's other group restrictions; null means not fully verified. An allow never creates a source permission.
+      security:
+        - bearerAuth: []
+        - oauth2: [usergroup:read]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: parent, schema: { type: string } }
+        - { in: query, name: skip, schema: { type: integer, minimum: 0 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200':
+          description: Resource nodes with explicit and inherited group policy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodes, hasMore, memberCount, policy]
+                properties:
+                  hasMore: { type: boolean }
+                  memberCount: { type: integer, minimum: 0 }
+                  policy: { type: object, description: Saved defaultAllow, revision and rules }
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      required: [ref, name, kind, allowed, navigable, explicit, readableMembers, descendantRuleRefs]
+                      properties:
+                        ref: { type: string }
+                        name: { type: string }
+                        kind: { type: string, enum: [connector, container, record] }
+                        allowed: { type: boolean, description: Allowed by this group policy before source and other group restrictions }
+                        navigable: { type: boolean, description: May contain an allowed descendant }
+                        explicit: { type: boolean, nullable: true }
+                        readableMembers: { type: integer, minimum: 0, nullable: true }
+                        connectorType: { type: string, nullable: true }
+                        descendantRuleRefs: { type: array, items: { type: string } }
+        '403': { description: Administrator required }
+        '404': { description: Group or resource not found }
+        '503': { description: Resource service unavailable }
+  /access-groups/{id}/members:
+    get:
+      tags: [Administration]
+      summary: List access group members
+      security:
+        - bearerAuth: []
+        - oauth2: [usergroup:read]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200': { description: Access group members }
+        '403': { description: Administrator access required }
+        '404': { description: Group not found }
+        '503': { description: Group service unavailable }
+  /access-groups/{id}/members/{operation}:
+    post:
+      tags: [Administration]
+      summary: Add or remove access group members
+      security:
+        - bearerAuth: []
+        - oauth2: [usergroup:write]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: operation, required: true, schema: { type: string, enum: [add, remove] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userIds]
+              properties:
+                userIds: { type: array, minItems: 1, maxItems: 500, items: { type: string, pattern: '^[a-fA-F0-9]{24}$' } }
+      responses:
+        '200': { description: Membership updated }
+        '400': { description: Invalid identifiers }
+        '403': { description: Administrator access required }
+        '404': { description: Group or members not found }
+        '503': { description: Audit or group service unavailable; check the group before retrying }
+  /audit:
+    get:
+      tags: [Administration]
+      summary: Read recent organization audit events
+      description: Administrator-only, scoped to the authenticated organization. Initial coverage includes successful sign-ins, group administration, collection permission changes, selected document stream starts and audit-log access; a stream-start event does not prove that the download completed. Sign-in continues if its audit event cannot be recorded, and a server error is logged. Returns up to 100 events per page, ordered newest first; the end of a time range is exclusive. The export flag records an export request, but cannot detect copies made by other clients.
+      security:
+        - bearerAuth: []
+        - oauth2: [config:read]
+      parameters:
+        - in: query
+          name: action
+          schema: { type: string, enum: [group.members.add, group.members.remove, group.create, group.rename, group.delete, group.access.change, audit.read, audit.export, collection.permission.grant, collection.permission.change, collection.permission.revoke, record.download.start, auth.login, chat.context.read, agent.run, agent.tool] }
+        - { in: query, name: actor_id, schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' } }
+        - { in: query, name: group_id, schema: { type: string }, description: Mongo group ID or access-group UUID }
+        - { in: query, name: resource_id, schema: { type: string, maxLength: 256 }, description: Collection identifier }
+        - { in: query, name: outcome, schema: { type: string, enum: [intent, success, denied, failed, cancelled, pending] } }
+        - { in: query, name: from, schema: { type: string, format: date-time }, description: Inclusive UTC timestamp }
+        - { in: query, name: to, schema: { type: string, format: date-time }, description: Exclusive UTC timestamp }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { in: query, name: cursor, schema: { type: string }, description: Opaque cursor from the previous page }
+        - { in: query, name: export, schema: { type: string, enum: ['true'] }, description: Record this page request as an export }
+      responses:
+        '200':
+          description: Recent content-free audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  next_cursor: { type: string, nullable: true }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        operation_id: { type: string }
+                        request_id: { type: string }
+                        actor_id: { type: string }
+                        action: { type: string }
+                        outcome: { type: string, enum: [intent, success, denied, failed, cancelled, pending] }
+                        agent_event:
+                          $ref: '#/components/schemas/AgentAuditMetadata'
+                        group_ids: { type: array, items: { type: string } }
+                        member_ids: { type: array, items: { type: string } }
+                        resource_id: { type: string, description: Collection identifier when applicable }
+                        permission_role: { type: string, enum: [OWNER, WRITER, READER] }
+                        recorded_at: { type: string, format: date-time }
+        '400': { description: Invalid filter, time range, page size or cursor }
+        '401': { description: Authentication required }
+        '403': { description: Administrator access and config:read scope required }
+        '503': { description: Audit storage is unavailable }
+
+  /audit/internal/events:
+    post:
+      tags: [Administration]
+      summary: Record an upstream agent event (Internal)
+      description: |
+        Requires an expiring scoped service JWT with an array containing audit:write,
+        a Mongo organization ID in orgId and a userId. Identity comes exclusively from
+        verified claims. User sessions, OAuth/PAT tokens and other service scopes do not
+        grant this operation. Unknown body fields, arguments, content and results are rejected.
+        The query service uses existing agent events and POST_AGENT hooks; AG-UI aliases
+        are ignored to avoid duplicate records. Pending approvals are not successful actions.
+        Writes use the same Mongo audit collection as administrator actions. A successful
+        response confirms the write. Identical agent event replays are deduplicated per
+        organization; reusing an event ID with a different actor, action, outcome or metadata
+        returns 409 and preserves the original record. Requests are not automatically retried.
+        Audit reporting failures do not repeat or undo executed tools. This does not change
+        the fail-closed auditing of sensitive administrator mutations.
+      security:
+        - scopedToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [event_id, action, outcome, agent_event]
+              properties:
+                event_id: { type: string, format: uuid }
+                action: { type: string, enum: [agent.run, agent.tool] }
+                outcome: { type: string, enum: [intent, success, denied, failed, cancelled, pending] }
+                agent_event:
+                  allOf:
+                    - $ref: '#/components/schemas/AgentAuditMetadata'
+                  description: tool_name and tool_call_id are also required for agent.tool events
+      responses:
+        '201':
+          description: Event recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recorded: { type: boolean, enum: [true] }
+        '400': { description: Invalid or unexpected fields }
+        '401': { description: Missing, expired or incorrectly scoped service identity }
+        '409': { description: Event ID already recorded with different actor or metadata }
+        '503': { description: Audit event was not confirmed saved }
+
   /usage:
     get:
       tags: [Usage Analytics]

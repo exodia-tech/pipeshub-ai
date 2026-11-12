@@ -52,6 +52,8 @@ import {
   TokenManagerContainer,
   createUserRouter,
   createUserGroupRouter,
+  createAuditRouter,
+  createAccessGroupsRouter,
   createOrgRouter,
   UserManagerContainer,
   AuthServiceContainer,
@@ -658,6 +660,8 @@ export class Application {
       '/api/v1/userGroups',
       createUserGroupRouter(this.entityManagerContainer),
     );
+    this.app.use('/api/v1/audit', createAuditRouter(this.entityManagerContainer));
+    this.app.use('/api/v1/access-groups', createAccessGroupsRouter(this.entityManagerContainer));
     this.app.use('/api/v1/org', createOrgRouter(this.entityManagerContainer));
 
     this.app.use(

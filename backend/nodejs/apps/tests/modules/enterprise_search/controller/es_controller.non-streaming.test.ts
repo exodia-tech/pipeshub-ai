@@ -145,6 +145,18 @@ describe('es_controller non-streaming chat routes', () => {
 
   for (const flow of flows) {
     describe(flow.name, () => {
+      if (!flow.create) it('rechecks group restrictions before replaying the prior answer to a model',async()=>{
+        const r=await run(flow,(ai)=>{
+          ai.reply(/\/chat\/records\/access$/,200,{accessible:[],accessibleUrls:[],groupRestricted:true})
+          ai.reply(exactPath(flow.aiPath),200,answer('A new allowed answer'))
+        })
+        expect(r.next.called).to.equal(false)
+        expect(r.ai.permissionCalls.length).to.equal(1)
+        const history=JSON.stringify(r.ai.calls[0]!.body.previousConversations)
+        expect(history).not.to.contain('An older answer.')
+        expect(history).to.contain('cannot be verified')
+        expect(history).to.contain('What changed in the release?')
+      })
       it('persists the question and the answer and returns the conversation', async () => {
         const r = await run(flow, (ai) => ai.reply(exactPath(flow.aiPath), 200, answer('Release 2.1 shipped SSO.')))
 

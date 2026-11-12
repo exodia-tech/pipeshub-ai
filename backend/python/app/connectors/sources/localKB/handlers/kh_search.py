@@ -283,7 +283,7 @@ async def _run(
     own_grants = {} if grants_read is None else {"user_key": user_key, "grants_out": grants_read}
 
     async def run(app_id: str) -> dict[str, Any]:
-        async def call() -> dict[str, Any]:
+        async def call_page(boundary) -> dict[str, Any]:
             return await provider.get_knowledge_hub_connector_page_v3(
                 app_id=app_id,
                 org_id=org_id,
@@ -294,7 +294,7 @@ async def _run(
                 flatten=True,
                 sort_field=sort_field,
                 sort_dir=sort_dir,
-                after=after,
+                after=boundary,
                 direction=direction,
                 filters=filters,
                 include_total=include_total,
@@ -303,6 +303,11 @@ async def _run(
                 max_depth=max_depth,
                 **own_grants,
             )
+
+        async def call() -> dict[str, Any]:
+            from app.services.group_resource_policy import GroupResourceAccess
+
+            return await GroupResourceAccess(provider).filtered_page(org_id, user_key, call_page, after=after, direction=direction, limit=limit)
 
         if gate is None:
             return await call()

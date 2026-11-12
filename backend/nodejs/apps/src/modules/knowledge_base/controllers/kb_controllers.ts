@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { recordAuditEvent } from '../../audit/audit.store';
 import * as crypto from 'crypto';
 import { AuthenticatedUserRequest } from './../../../libs/middlewares/types';
 import { injectRequestHeaders } from '../../../libs/context/request-context';
@@ -10,6 +11,7 @@ import {
   HttpError,
   InternalServerError,
   NotFoundError,
+  ServiceUnavailableError,
   UnauthorizedError,
 } from '../../../libs/errors/http.errors';
 import {
@@ -1958,6 +1960,14 @@ export const createKBPermission =
         payload.role = role;
       }
 
+      const audit = {
+        org_id: String(req.user!.orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
+        request_id: req.context?.requestId, action: 'collection.permission.grant' as const,
+        resource_id: kbId, permission_role: role as 'OWNER' | 'WRITER' | 'READER' | undefined,
+        group_ids: teamIds, member_ids: userIds,
+      };
+      await recordAuditEvent({ ...audit, outcome: 'intent' });
+
       const response = await executeConnectorCommand(
         `${appConfig.connectorBackend}/api/v1/kb/${encodeURIComponent(kbId)}/permissions`,
         HttpMethod.POST,
@@ -1966,6 +1976,7 @@ export const createKBPermission =
       );
 
       if (response.statusCode !== 200 && response.statusCode !== 201) {
+        if (response.statusCode === 403) await recordAuditEvent({ ...audit, outcome: 'denied' });
         throw handleBackendError(response, 'create permissions');
       }
 
@@ -1973,6 +1984,8 @@ export const createKBPermission =
       if (!permissionResult) {
         throw new NotFoundError('Failed to create permissions');
       }
+
+      await recordAuditEvent({ ...audit, outcome: 'success' });
 
       res.status(201).json({
         kbId: kbId,
@@ -2035,6 +2048,14 @@ export const updateKBPermission =
         `Updating permission for ${userIds.length} users and ${teamIds.length} teams on KB ${kbId} to ${role}`,
       );
 
+      const audit = {
+        org_id: String(req.user!.orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
+        request_id: req.context?.requestId, action: 'collection.permission.change' as const,
+        resource_id: kbId, permission_role: role as 'OWNER' | 'WRITER' | 'READER',
+        group_ids: teamIds, member_ids: userIds,
+      };
+      await recordAuditEvent({ ...audit, outcome: 'intent' });
+
       const response = await executeConnectorCommand(
         `${appConfig.connectorBackend}/api/v1/kb/${encodeURIComponent(kbId)}/permissions`,
         HttpMethod.PUT,
@@ -2047,10 +2068,13 @@ export const updateKBPermission =
       );
 
       if (response.statusCode !== 200) {
+        if (response.statusCode === 403) await recordAuditEvent({ ...audit, outcome: 'denied' });
         throw handleBackendError(response, 'update permissions');
       }
 
       const updateResult = response.data as any;
+
+      await recordAuditEvent({ ...audit, outcome: 'success' });
 
       res.status(200).json({
         kbId: kbId,
@@ -2095,6 +2119,13 @@ export const removeKBPermission =
         `Removing permission for ${userIds.length} users and ${teamIds.length} teams from KB ${kbId}`,
       );
 
+      const audit = {
+        org_id: String(req.user!.orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
+        request_id: req.context?.requestId, action: 'collection.permission.revoke' as const,
+        resource_id: kbId, group_ids: teamIds, member_ids: userIds,
+      };
+      await recordAuditEvent({ ...audit, outcome: 'intent' });
+
       const response = await executeConnectorCommand(
         `${appConfig.connectorBackend}/api/v1/kb/${encodeURIComponent(kbId)}/permissions`,
         HttpMethod.DELETE,
@@ -2106,10 +2137,13 @@ export const removeKBPermission =
       );
 
       if (response.statusCode !== 200) {
+        if (response.statusCode === 403) await recordAuditEvent({ ...audit, outcome: 'denied' });
         throw handleBackendError(response, 'remove permissions');
       }
 
       const removeResult = response.data as any;
+
+      await recordAuditEvent({ ...audit, outcome: 'success' });
 
       res.status(200).json({
         kbId: kbId,
@@ -2175,6 +2209,7 @@ export const getRecordBuffer =
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
+    const auditOperationId = randomUUID();
     try {
       const { recordId } = req.params as { recordId: string };
       const { userId, orgId } = req.user || {};
@@ -2185,6 +2220,13 @@ export const getRecordBuffer =
       if (!userId || !orgId) {
         throw new BadRequestError('User authentication is required');
       }
+
+      const audit = {
+        org_id: String(orgId), actor_id: String(userId), operation_id: auditOperationId,
+        request_id: req.context?.requestId, action: 'record.download.start' as const,
+        resource_id: recordId, group_ids: [] as string[], member_ids: [] as string[],
+      };
+      await recordAuditEvent({ ...audit, outcome: 'intent' });
 
       const queryParams = new URLSearchParams();
       if (convertTo) {
@@ -2208,6 +2250,13 @@ export const getRecordBuffer =
           headers,
         },
       );
+
+      try {
+        await recordAuditEvent({ ...audit, outcome: 'success' });
+      } catch (error) {
+        response.data.destroy();
+        throw error;
+      }
 
       // Set appropriate headers from the FastAPI response
       const contentType = response.headers['content-type'];
@@ -2248,7 +2297,16 @@ export const getRecordBuffer =
         error: error?.message,
         recordId: req.params.recordId,
       });
+      if ([403, 404].includes(error.response?.status) && req.user?.orgId && req.user?.userId) {
+        try {
+          await recordAuditEvent({org_id:String(req.user.orgId),actor_id:String(req.user.userId),operation_id:auditOperationId,request_id:req.context?.requestId,action:'record.download.start',resource_id:String(req.params.recordId),group_ids:[],member_ids:[],outcome:'denied'});
+        } catch (auditError) {next(auditError);return;}
+      }
       if (!res.headersSent) {
+        if (error instanceof ServiceUnavailableError) {
+          next(error);
+          return;
+        }
         if (error.response) {
           let errorMessage = 'Error from AI backend';
           try {
