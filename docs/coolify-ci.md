@@ -5,8 +5,9 @@ GitHub schedules verification jobs; Coolify runs them in disposable containers o
 4 CPUs, 8 GB RAM, a 90-minute job limit and a 240-minute queue limit. The runner
 image is pinned to `ghcr.io/actions/actions-runner:2.338.2`.
 
-The native pool uses **No Docker** mode. It has no production credentials or host
-Docker socket. Pull-request jobs are refused: maintainers dispatch verification
+The native pool uses **Isolated Docker (Sysbox)** with the approved Sysbox 0.7.1
+runtime. Each job gets its own Docker daemon in an unprivileged container. It has
+no production credentials or host Docker socket. Pull-request jobs are refused: maintainers dispatch verification
 against a reviewed branch. This matters because the fork is public. The GitHub
 runner group permits only `exodia-tech/pipeshub-ai` and `unit-test.yml` / `main.yml`
 on `main` and `codex/exodia-audit`. Review that temporary branch entry after merge.
@@ -25,11 +26,15 @@ false, so normal/full runs retain every existing gate. Dispatch `main.yml` for
 the build, type, locale and lint checks. Check the run's commit SHA and runner
 name before treating it as merge evidence.
 
-The Redis cluster integration job needs Docker. No Docker mode cannot run it;
-use an approved isolated Docker runner before claiming that full workflow is
-green. Do not enable privileged Docker or restart the production host's Docker
-daemon just to make a check pass. Full Python coverage and live connector/bot
-acceptance also need their own evidence.
+The Redis cluster integration and entrypoint ownership checks need the private
+Docker daemon. Do not enable privileged Docker or restart the production host's
+Docker daemon just to make a check pass. Full Python coverage and live
+connector/bot acceptance also need their own evidence.
+
+The deployment validation job installs the checksum-pinned Compose CLI inside
+its disposable runner to render configuration. The config checks start no
+containers; the separate entrypoint checks use the private daemon. Npm caching
+is disabled because post-job cache uploads stalled the disposable workers.
 
 Runner settings and executions:
 https://coolify.exodia.ws/server/fnbahuvghsbyyoewxacg1dho/github-runners

@@ -51,8 +51,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: backend/nodejs/apps/package-lock.json
+          package-manager-cache: false
 
       - name: Install backend dependencies
         run: |
@@ -96,8 +95,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          package-manager-cache: false
 
       - name: Install frontend dependencies
         run: |
@@ -256,6 +254,20 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No Docker Compose deployment files changed, skipping validation."
           fi
+
+      - name: Install pinned Compose CLI for config rendering
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          COMPOSE_VERSION: 5.7.0
+          COMPOSE_SHA256: 7758048ad38e580f22559603312874fec8bb638d021a9e64182385fc17cc12a2
+        run: |
+          set -euo pipefail
+          plugin="$HOME/.docker/cli-plugins/docker-compose"
+          mkdir -p "$(dirname "$plugin")"
+          curl -fsSL "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o "$plugin"
+          printf '%s  %s\n' "$COMPOSE_SHA256" "$plugin" | sha256sum -c -
+          chmod 0755 "$plugin"
+          docker compose version
 
       - name: Validate MongoDB compose stability settings
         if: steps.changes.outputs.changed == 'true'

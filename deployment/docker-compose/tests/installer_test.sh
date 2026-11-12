@@ -766,6 +766,20 @@ echo "== In-tree installer: --upgrade honours --version / PIPESHUB_VERSION =="
   cp "$INNER_INSTALLER" "$work/install.sh"
   [[ -f "$COMPOSE_DIR/docker-compose.yml" ]] && cp "$COMPOSE_DIR/docker-compose.yml" "$work/"
 
+  # These print-only cases must never depend on or inspect the host Docker daemon.
+  nodocker="$TMP_ROOT/upgrade-docker"; mkdir -p "$nodocker"
+  cat >"$nodocker/docker" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "--version ") echo 'Docker version 29.9.2' ;;
+  "compose version") echo '5.7.0' ;;
+  info*|ps*) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+  chmod +x "$nodocker/docker"
+  export PATH="$nodocker:$PATH"
+
   seed_env() {
     printf 'IMAGE_TAG=%s\nSECRET_KEY=do-not-touch\nMONGO_PASSWORD=keep-me\nAPP_PORT=3000\nPROJECT_NAME=testproj\n' \
       "$1" >"$work/.env"
@@ -857,19 +871,14 @@ echo "== In-tree installer: --upgrade honours --version / PIPESHUB_VERSION =="
   run_installer "an initial heap equal to the maximum in other units" -- --reconfigure --yes
 
   # ArangoDB does not read the Neo4j heap settings, so they must not block it.
-  # A docker stub with no volumes keeps the host's own stacks from steering the
-  # graph DB choice. Its own directory: the cases above may run the installer
-  # through sudo, and a root-owned .env backup from the same second would block
-  # this unprivileged run from writing its backup.
+  # A separate directory keeps timestamped .env backups independent of earlier cases.
   work="$TMP_ROOT/arango-ignores-neo4j-heap"; mkdir -p "$work"
   cp "$INNER_INSTALLER" "$work/install.sh"
   [[ -f "$COMPOSE_DIR/docker-compose.yml" ]] && cp "$COMPOSE_DIR/docker-compose.yml" "$work/"
   seed_env "0.6.0-slim"
-  nodocker="$work/nodocker"; mkdir -p "$nodocker"
-  printf '#!/bin/sh\n[ "$1" = volume ] && exit 1\nexit 0\n' >"$nodocker/docker"; chmod +x "$nodocker/docker"
   printf 'NEO4J_HEAP_INITIAL=2G\nNEO4J_HEAP_MAX=1G\n' >>"$work/.env"
   run_installer "an ArangoDB install ignores the Neo4j heap settings" \
-    PIPESHUB_GRAPH_DB=arango PATH="$nodocker:$PATH" -- --reconfigure --yes
+    PIPESHUB_GRAPH_DB=arango -- --reconfigure --yes
   check "the ArangoDB install was chosen" "$(cat "$work/.env")" $'\nDATA_STORE=arangodb\n'
 )
 
