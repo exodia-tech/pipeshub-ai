@@ -16,7 +16,7 @@ from slack_behaviour_setup import (
 )
 
 from app.connectors.sources.slack.common import voice
-from app.models.entities import ProgressStatus
+from app.models.entities import PermissionModel, ProgressStatus
 
 
 @pytest.fixture
@@ -51,6 +51,8 @@ async def test_company_channel_folders_separate_grants_and_message_links(workspa
     assert public.record_group_id == store.record_groups[GENERAL].id
     assert public.record_name == "🎤 Voice & note — transcript.md"
     assert private.record_group_id == store.record_groups[SECRET].id
+    assert store.record_groups[GENERAL].permission_model == PermissionModel.RECORD_LEVEL
+    assert store.record_groups[SECRET].permission_model == PermissionModel.RECORD_LEVEL
     assert not private.inherit_permissions and not public.inherit_permissions
     assert {p.email for p in store.record_permissions[private.external_record_id]} == {"alice@acme.com", "bob@acme.com"}
     assert "workspace_member" in {p.external_id for p in store.record_permissions[public.external_record_id]}

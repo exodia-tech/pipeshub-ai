@@ -58,7 +58,8 @@ RECORD_GROUP_LEVEL_SITES = [
     ("app/connectors/sources/google/gmail/team/connector.py", 2),
     ("app/connectors/sources/microsoft/outlook/connector.py", 3),
     ("app/connectors/sources/notion/connector.py", 2),
-    ("app/connectors/sources/slack/team/connector.py", 2),
+    # Channel folders use record-level checks for independently shared transcripts.
+    ("app/connectors/sources/slack/team/connector.py", 1),
     ("app/connectors/sources/slack/individual/connector.py", 2),
 ]
 
