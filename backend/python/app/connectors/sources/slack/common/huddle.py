@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from html import unescape
 from typing import TYPE_CHECKING, Any
 
+import emoji
 from fastapi import HTTPException
 from markdown_it import MarkdownIt
 
@@ -131,7 +133,48 @@ async def canvas_content(connector: HuddleConnector, file_id: str, *, retry_rate
         raise slack_stream_error(response, connector=connector.display_name)
     if not isinstance(response.data, dict) or not isinstance(response.data.get("content"), str):
         raise ValueError("Slack returned incomplete Canvas content")
-    return response.data["content"]
+    return await _readable_content(connector, response.data["content"])
+
+
+async def _readable_content(connector: HuddleConnector, content: str) -> str:
+    """Resolve identities for readers and retrieval, never for permission grants."""
+    await connector._warm_user_cache_for_messages([{"text": unescape(content)}])
+    mentioned: dict[str, str] = {}
+
+    def replace(match: re.Match[str]) -> str:
+        text = match.group()
+        if text.startswith(("`", "https://", "http://")):
+            return text
+        decoded = unescape(text)
+        user = re.fullmatch(r"<@([UW]\w+)(?:\|[^>]+)?>", decoded)
+        if user:
+            uid = user[1]
+            email = connector.user_id_to_email_cache.get(uid)
+            name = connector.user_id_to_name_cache.get(uid) or email or uid
+            label = re.sub(r"([\\`*{}\[\]()<>_!])", r"\\\1", name)
+            domain = connector.workspace_domain
+            url = f"https://{domain}.slack.com/team/{uid}" if domain else f"https://app.slack.com/team/{uid}"
+            details = f"Slack ID: {uid}" + (f"; Email: {email}" if email else "")
+            mentioned[uid] = f"- [@{label}]({url}) — {details}"
+            return f"[@{label}]({url})"
+        if decoded.startswith("<#"):
+            return connector._replace_mentions_in_text(
+                decoded, connector.user_id_to_name_cache, connector.channel_id_to_name_cache,
+            )
+        text = re.sub(r":skin-tone-([2-6]):", lambda tone: chr(0x1F3F9 + int(tone[1])), text)
+        return emoji.emojize(text, language="alias")
+
+    lines = content.splitlines(keepends=True)
+    code_lines: set[int] = set()
+    for token in MarkdownIt("commonmark").parse(content):
+        if token.type in ("fence", "code_block") and token.map:
+            code_lines.update(range(*token.map))
+    pattern = r"(`+).*?\1|https?://[^\s<>]+|(?:<|&lt;)[@#][^\n>]*?(?:>|&gt;)|:[\w+\-]+:(?::skin-tone-[2-6]:)?"
+    rendered = "".join(line if index in code_lines else re.sub(pattern, replace, line)
+                       for index, line in enumerate(lines))
+    if mentioned:
+        rendered += "\n\n## Mentioned users\n\n" + "\n".join(mentioned.values()) + "\n"
+    return rendered
 
 
 async def stream_huddle(connector: HuddleConnector, channel_id: str, file_id: str) -> bytes:
@@ -235,7 +278,7 @@ async def sync_huddles(
                             title = heading
                             break
                 title = connector._replace_mentions_in_text(
-                    unescape(title).replace(":headphones:", "\U0001f3a7"),
+                    emoji.emojize(unescape(title), language="alias"),
                     connector.user_id_to_name_cache, connector.channel_id_to_name_cache,
                 )
                 record = FileRecord(
