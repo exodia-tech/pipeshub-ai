@@ -22,7 +22,7 @@ from app.services.model_identity.principal import (
     warmup_principal,
 )
 from app.services.model_identity.workload import Workload
-from app.services.usage.ledger import UsageLedger
+from app.services.usage.ledger import UsageLedger, catalog_rates
 from app.services.usage.meter import (
     chat_callback,
     emit,
@@ -51,6 +51,23 @@ def context(
 
 
 class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
+    async def test_langchain_resolves_configured_model_for_pricing(self) -> None:
+        from app.agents.agent_loop.langchain_transport import LangChainTransport
+
+        class NamedModel(GenericFakeChatModel):
+            model: str = "gemini-3.8-flash"
+
+        llm = NamedModel(messages=iter([AIMessage(content="done", usage_metadata={
+            "input_tokens": 10, "output_tokens": 5, "total_tokens": 15,
+        })]))
+        with bind_call_context(context()), patch("app.services.usage.ledger.catalog_rates", return_value={
+            "input": "0.3", "output": "2.5", "cache_read": "0.03", "cache_write": "0.3",
+        }):
+            await MeteredTransport(LangChainTransport(llm)).complete([])
+        self.assertEqual(self.events()[0]["model"], "gemini-3.8-flash")
+        self.assertGreater(self.events()[0]["cost_usd"], 0)
+        self.assertEqual(LangChainTransport(llm, model_name="explicit-model").model_name, "explicit-model")
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -327,6 +344,37 @@ class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
                 "private",
                 str([tuple(row) for row in db.execute("SELECT * FROM usage_events")]),
             )
+
+    async def test_gemini_embedding_is_estimated_and_priced_in_ledger(self) -> None:
+        class FakeGemini(Embeddings):
+            def embed_documents(
+                self, texts: list[str], **kwargs: object
+            ) -> list[list[float]]:
+                return [[1.0] for _ in texts]
+
+            def embed_query(self, text: str, **kwargs: object) -> list[float]:
+                return [1.0]
+
+        prices = {
+            "gemini/gemini-embedding-2": {
+                "mode": "embedding",
+                "input_cost_per_token": 0.0000002,
+                "output_cost_per_token": 0,
+            }
+        }
+        with (
+            patch("app.services.usage.ledger.catalog", return_value=prices),
+            patch("app.services.usage.ledger.catalog_rates", new=catalog_rates),
+            bind_call_context(context()),
+        ):
+            metered_embeddings(
+                FakeGemini(), "gemini", "models/gemini-embedding-2"
+            ).embed_documents(["x" * 4000])
+        recorded = self.events()[0]
+        self.assertEqual(recorded["measurement"], "estimated")
+        self.assertEqual(recorded["input_tokens"], 1000)
+        self.assertEqual(recorded["cost_usd"], 0.0002)
+        self.assertEqual(recorded["pricing_source"], "catalog")
 
     async def test_missing_embedding_counters_are_estimated_instead_of_reported_zero(
         self,

@@ -29,6 +29,7 @@ vi.mock('@/lib/hooks/use-secret-reveal-available', async (importOriginal) => {
 });
 
 import { ModelConfigDialog } from '../components/model-config-dialog';
+vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
 
 const field = (name: string, extra: Record<string, unknown>) => ({
   name,
@@ -113,6 +114,40 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+describe('model reasoning defaults', () => {
+  const legacyModel: ConfiguredModel = {
+    modelKey: 'legacy', provider: 'azureAI', modelType: 'llm',
+    configuration: { model: 'gpt-test' }, defaultReasoningEffort: 'high',
+    isReasoning: true, isMultimodal: false, isDefault: true,
+  };
+
+  it('preserves legacy High and hidden credentials on an unrelated edit', async () => {
+    api.updateProvider.mockResolvedValue({});
+    renderDialog(undefined, undefined, { mode: 'edit', editModel: legacyModel });
+    expect(screen.getByRole('combobox', { name: /Model default reasoning/ }).textContent).toBe('High');
+    fireEvent.change(screen.getByPlaceholderText('Friendly name'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update model' }));
+    await waitFor(() => expect(api.updateProvider).toHaveBeenCalledTimes(1));
+    const payload = api.updateProvider.mock.calls[0][2];
+    expect(payload.configuration.defaultReasoningEffort).toBe('high');
+    expect(payload.configuration).not.toHaveProperty('apiKey');
+    expect(payload.isDefault).toBe(true);
+  });
+
+  it.each([
+    ['Low', 'low'],
+    ['Use platform default (Low)', ''],
+  ])('saves %s explicitly', async (label, expected) => {
+    api.updateProvider.mockResolvedValue({});
+    renderDialog(undefined, undefined, { mode: 'edit', editModel: legacyModel });
+    fireEvent.click(screen.getByRole('combobox', { name: /Model default reasoning/ }));
+    fireEvent.click(await screen.findByRole('option', { name: label, exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Update model' }));
+    await waitFor(() => expect(api.updateProvider).toHaveBeenCalledTimes(1));
+    expect(api.updateProvider.mock.calls[0][2].configuration.defaultReasoningEffort).toBe(expected);
+  });
+});
+
 describe('ModelConfigDialog without a model list', () => {
   it('saves one typed model through the single-model path with the form flags', async () => {
     api.addProvider.mockResolvedValue({});
@@ -175,7 +210,7 @@ describe('ModelConfigDialog without a model list', () => {
 
     await waitFor(() => expect(api.batchAddModels).toHaveBeenCalledTimes(1));
     const body = api.batchAddModels.mock.calls[0][0];
-    expect(body.configuration).toEqual({ apiKey: 'sk-1' });
+    expect(body.configuration).toEqual({ apiKey: 'sk-1', defaultReasoningEffort: '' });
     expect(body.models).toEqual([
       expect.objectContaining({ model: 'model-a', modelFriendlyName: 'Model A', isReasoning: false, isMultimodal: true }),
       expect.objectContaining({ model: 'model-b', isReasoning: true, isMultimodal: true, contextLength: 64000 }),

@@ -706,7 +706,7 @@ class KnowledgeHubService:
         permissions_task: asyncio.Task | None = None
         try:
             page = max(1, page)
-            limit = min(max(1, limit), 200)  # Max 200
+            limit = min(max(1, limit), 200)
 
             # Get user key
             user = await self._shared(("user", user_id, org_id), lambda: self._resolve_user(user_id, org_id))

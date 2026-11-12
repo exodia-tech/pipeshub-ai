@@ -4,6 +4,7 @@ const electronStaticExport =
     process.env.ELECTRON_STATIC === '1' || process.env.ELECTRON_STATIC_EXPORT === '1';
 
 const nextConfig = {
+    eslint: { dirs: ['pages', 'components', 'app', 'src', 'lib', 'addons'] },
     ...(electronStaticExport ? { output: 'export' } : {}),
     trailingSlash: true,
     // app/global-not-found.tsx: the app has two root layouts, so unmatched URLs

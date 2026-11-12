@@ -105,6 +105,12 @@ from app.connectors.core.registry.filters import (
 )
 from app.connectors.core.sync.full_sync_coverage import FullSyncCoverage
 from app.connectors.sources.slack.common.apps import SlackApp
+from app.connectors.sources.slack.common.file_urls import slack_file_url
+from app.connectors.sources.slack.common.huddle import (
+    parse_huddle_id,
+    stream_huddle,
+    sync_huddles,
+)
 from app.connectors.sources.slack.common.people import file_uploader
 from app.connectors.sources.slack.common.stream_errors import (
     sanitize_retry_after,
@@ -331,6 +337,13 @@ class RateLimiter:
     .with_categories(["Messaging"])\
     .with_scopes([ConnectorScope.PERSONAL.value])\
     .with_permission_model(PermissionModel.APP_LEVEL)\
+    .with_resilience_config(
+        # A ceiling across all methods; RateLimiter below paces each Slack tier.
+        rate_limit=20,
+        max_retries=3,  # a 429 is retried after its Retry-After, up to max_delay
+        base_delay=1.0,
+        max_delay=60.0,
+    )\
     .with_auth([
         AuthBuilder.type(AuthType.OAUTH).oauth(
             connector_name="Slack",
@@ -345,7 +358,7 @@ class RateLimiter:
                     "im:read",            "im:history",
                     "users:read",         "users:read.email",
                     "users.profile:read",
-                    "files:read",
+                    "files:read", "canvases:read",
                 ],
                 team_sync=[],
                 agent=[]
@@ -677,13 +690,20 @@ class SlackIndividualConnector(BaseConnector):
     def _token_renewal(self) -> SlackTokenRenewal:
         return SlackTokenRenewal(
             self.connector_id, type(self)._connector_metadata["name"], self.config_service, self.logger,
+            resilience=self.resilience,
         )
 
-    async def _fresh_datasource(self) -> RenewingSlackDataSource:
-        """Return a SlackDataSource backed by the always-current token, renewed when it expires."""
+    async def _fresh_datasource(self, *, retry_rate_limits: bool = True) -> RenewingSlackDataSource:
+        """Return a SlackDataSource backed by the always-current token, renewed when it expires.
+
+        Sync retries a 429 after its Retry-After. Streaming passes ``retry_rate_limits=False``:
+        a user is waiting, so the 429 goes back with its Retry-After instead.
+        """
         if not self.external_client:
             raise RuntimeError("Call init() first.")
-        return await self._token_renewal.datasource(self.external_client, self._current_token)
+        return await self._token_renewal.datasource(
+            self.external_client, self._current_token, retry_rate_limits=retry_rate_limits,
+        )
 
     async def _current_token(self) -> tuple[dict[str, Any], str]:
         cfg = await self.config_service.get_config(
@@ -789,6 +809,15 @@ class SlackIndividualConnector(BaseConnector):
 
             # Phase 4 — Thread-growth detection (edit detection bypassed for now)
             await self._sync_thread_growth()
+
+            try:
+                await sync_huddles(
+                    self, {rg.external_group_id: [] for rg in channels if rg.external_group_id},
+                    personal=True,
+                )
+            except Exception as exc:
+                self._full_sync_read_failed = True
+                self.logger.warning("Huddle sync failed: %s", exc)
 
             self.logger.info("✅ Slack Individual sync complete")
 
@@ -1382,7 +1411,7 @@ class SlackIndividualConnector(BaseConnector):
                 source_created_at=src_ts,
                 source_updated_at=upd_ts,
                 inherit_permissions=True,
-                hide_children=True,
+                hide_children=False,
             )
         except Exception as exc:
             self.logger.error(f"_to_channel_record_group({cid}): {exc}")
@@ -2700,16 +2729,16 @@ class SlackIndividualConnector(BaseConnector):
         the parent record has been created.
         """
         fid = fd.get("id")
-        if not fid:
+        if not fid or fd.get("is_huddle_canvas") is True or fd.get("filetype") in ("canvas", "quip"):
             return None
 
         file_hash: Optional[str] = None
-        url_dl = fd.get("url_private_download") or fd.get("url_private")
+        url_dl = slack_file_url(fd)
         if url_dl:
             try:
                 await ctx.rate_limiter.acquire(Tier.T4)
                 token = (await self._fresh_datasource()).access_token
-                async with httpx.AsyncClient(timeout=30.0) as http:
+                async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as http:
                     headers = {"Authorization": f"Bearer {token}"} if token else {}
                     r = await http.get(url_dl, headers=headers)
                     # Slack answers a token it no longer accepts with 200 and its sign-in
@@ -4125,7 +4154,7 @@ class SlackIndividualConnector(BaseConnector):
                 raise HTTPException(400, f"Burst record {ext_id} missing start_ts/end_ts")
 
             await self.rate_limiter.acquire(Tier.T3)
-            ds   = await self._fresh_datasource()
+            ds   = await self._fresh_datasource(retry_rate_limits=False)
             resp = await ds.conversations_history(
                 channel=ch, oldest=start_ts, latest=end_ts,
                 inclusive=True, limit=200,
@@ -4181,7 +4210,7 @@ class SlackIndividualConnector(BaseConnector):
                 )
 
             await self.rate_limiter.acquire(Tier.T3)
-            ds   = await self._fresh_datasource()
+            ds   = await self._fresh_datasource(retry_rate_limits=False)
             resp = await ds.conversations_replies(
                 channel=ch, ts=thread_ts_val,
                 oldest=start_ts, latest=end_ts,
@@ -4228,7 +4257,7 @@ class SlackIndividualConnector(BaseConnector):
         # ── Single message record ─────────────────────────────────────────
         else:
             await self.rate_limiter.acquire(Tier.T3)
-            ds   = await self._fresh_datasource()
+            ds   = await self._fresh_datasource(retry_rate_limits=False)
             resp = await ds.conversations_history(
                 channel=ch, oldest=ext_id, latest=ext_id,
                 inclusive=True, limit=1,
@@ -4243,7 +4272,7 @@ class SlackIndividualConnector(BaseConnector):
                 tid = getattr(record, "thread_id", None)
                 if tid and tid != ext_id:
                     await self.rate_limiter.acquire(Tier.T3)
-                    resp = await (await self._fresh_datasource()).conversations_replies(
+                    resp = await (await self._fresh_datasource(retry_rate_limits=False)).conversations_replies(
                         channel=ch, ts=tid, oldest=ext_id, latest=ext_id,
                         inclusive=True, limit=1,
                     )
@@ -4289,15 +4318,19 @@ class SlackIndividualConnector(BaseConnector):
         fid = record.external_record_id
         if not fid:
             raise HTTPException(400, f"No file ID for {record.id}")
+        huddle = parse_huddle_id(fid)
+        if huddle:
+            yield await stream_huddle(self, *huddle)
+            return
 
         await self.rate_limiter.acquire(Tier.T4)
-        ds   = await self._fresh_datasource()
+        ds   = await self._fresh_datasource(retry_rate_limits=False)
         info = await ds.files_info(file=fid)
         if not info or not info.success:
             raise slack_stream_error(info, connector=self.display_name)
 
         fd  = info.data.get("file", {})
-        url = fd.get("url_private_download") or fd.get("url_private")
+        url = slack_file_url(fd)
         if not url:
             raise not_downloadable(
                 f"Slack does not expose a download URL for file {fid}.",
@@ -4305,7 +4338,7 @@ class SlackIndividualConnector(BaseConnector):
             )
 
         token = ds.access_token
-        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as http:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=False) as http:
             headers = {"Authorization": f"Bearer {token}"} if token else {}
             async with http.stream("GET", url, headers=headers) as r:
                 if r.status_code != 200:

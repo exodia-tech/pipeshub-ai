@@ -1,10 +1,16 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import locale from "@/lib/i18n/locales/en-US.json";
 import UsagePage from "../page";
-import type { UsageReport } from "../api";
+import { usageApi, type UsageReport } from "../api";
 
 const fixture: { admin: boolean; report: UsageReport | null } = vi.hoisted(
   () => ({ admin: false, report: null }),
@@ -133,7 +139,7 @@ describe("usage dashboard", () => {
   it("does not present entirely unpriced activity as free", () => {
     show();
     expect(
-      screen.getByRole("heading", { name: "—", exact: true }),
+      screen.getAllByRole("heading", { name: "—", exact: true })[0],
     ).toBeTruthy();
     expect(
       screen.queryByRole("heading", { name: "$0.00", exact: true }),
@@ -145,6 +151,91 @@ describe("usage dashboard", () => {
       screen.queryByRole("combobox", { name: "Member", exact: true }),
     ).toBeNull();
     expect(screen.queryByRole("tab", { name: /^Model pricing/ })).toBeNull();
+  });
+  it("keeps secondary filters collapsed and makes chart values accessible without an extra dropdown", () => {
+    fixture.report!.timeline = [
+      {
+        ...fixture.report!.summary,
+        id: "day",
+        label: "2026-11-07",
+        unpriced_requests: 0,
+        unknown_requests: 0,
+      },
+    ];
+    show();
+    const filters = screen.getByRole("button", { name: "Filters" });
+    expect(filters.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("combobox", { name: "Provider" })).toBeNull();
+    fireEvent.click(filters);
+    expect(filters.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
+    expect(screen.getByRole("table", { name: "Usage over time" })).toBeTruthy();
+    expect(screen.queryByText("View chart data")).toBeNull();
+  });
+  it("lets an administrator create an organization budget from the default view", async () => {
+    fixture.admin = true;
+    vi.mocked(usageApi.saveBudget).mockResolvedValue({} as never);
+    show();
+    fireEvent.keyDown(screen.getByRole("tab", { name: /^Budgets/ }), {
+      key: "Enter",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /set monthly budget/i }),
+    );
+    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(usageApi.saveBudget).toHaveBeenCalledWith({
+        scope: "organization",
+        subject: "",
+        amount_usd: "20",
+        warning_percent: 80,
+      }),
+    );
+  });
+  it("shows an error when saving a budget fails", async () => {
+    fixture.admin = true;
+    vi.mocked(usageApi.saveBudget).mockRejectedValueOnce(new Error("offline"));
+    show();
+    fireEvent.keyDown(screen.getByRole("tab", { name: /^Budgets/ }), {
+      key: "Enter",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /set monthly budget/i }),
+    );
+    fireEvent.change(screen.getByLabelText("Monthly limit (USD)"), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Could not save changes.")).toBeTruthy();
+  });
+  it("shows no-data charts when there was no activity", () => {
+    fixture.report!.summary.requests = 0;
+    fixture.report!.summary.unpriced_requests = 0;
+    fixture.report!.summary.unknown_requests = 0;
+    show();
+    expect(screen.queryByRole("img", { name: "Usage over time" })).toBeNull();
+    expect(screen.getAllByText(translations.noData).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "$0.00" })).toBeTruthy();
+  });
+  it("shows a visible point for one known timeline value", () => {
+    fixture.report!.timeline = [
+      {
+        ...fixture.report!.summary,
+        id: "one",
+        label: "2026-11-07",
+        unknown_requests: 0,
+        input_tokens: 100,
+      },
+    ];
+    show();
+    const chart = screen.getByRole("img", { name: "Usage over time" });
+    expect(chart.querySelector("circle")).toBeTruthy();
+    expect(
+      screen.getByRole("table", { name: "Usage over time" }).textContent,
+    ).toContain("100");
   });
   it("shows unknown counters distinctly in call history", () => {
     show();

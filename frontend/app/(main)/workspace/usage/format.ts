@@ -1,6 +1,22 @@
 import type { Totals } from "./api";
 
 export type UsageMetric = "tokens" | "cost" | "requests";
+
+export function timelineTicks(labels: string[], interval: string, locale: string, count: number) {
+  const step = Math.max(1, Math.ceil((labels.length - 1) / Math.max(1, count - 1)));
+  const size = labels.length ? Math.floor((labels.length - 1) / step) + 1 : 0;
+  return Array.from({ length: size }, (_, tick) => {
+    const index = tick * step;
+    const raw = labels[index];
+    // Server buckets are UTC, including timestamps without a zone suffix.
+    const date = new Date(raw.includes("T") ? raw : `${raw.length === 7 ? raw + "-01" : raw}T00:00:00Z`);
+    const options: Intl.DateTimeFormatOptions = interval === "hour"
+      ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }
+      : interval === "month" ? { month: "short", year: "numeric" } : { month: "short", day: "numeric" };
+    return { index, position: index / Math.max(1, labels.length - 1) * 100,
+      label: Number.isNaN(date.getTime()) ? raw : new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(date), raw };
+  });
+}
 export function metricValue(row: Totals, metric: UsageMetric): number | null {
   if (metric === "cost")
     return row.requests > 0 && row.unpriced_requests === row.requests
@@ -10,6 +26,10 @@ export function metricValue(row: Totals, metric: UsageMetric): number | null {
   return row.requests > 0 && row.unknown_requests === row.requests
     ? null
     : row.input_tokens + row.output_tokens;
+}
+
+export function chartMaximum(rows: Totals[], metric: UsageMetric): number {
+  return Math.max(0, ...rows.map((row) => metricValue(row, metric) ?? 0));
 }
 
 export function seriesSegments(rows: Totals[], metric: UsageMetric) {
@@ -38,6 +58,6 @@ export function money(value: number | null, locale: string): string {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
-    maximumFractionDigits: value > 0 && value < 0.01 ? 8 : 4,
+    maximumFractionDigits: value > 0 && value < 0.01 ? 9 : 4,
   }).format(value);
 }

@@ -1,74 +1,4 @@
 {
-  "groupAccess": {
-    "currentAccess": "目前可讀人數",
-    "empty": "此處沒有可存取的資源。",
-    "expand": "展開",
-    "allow": "允許",
-    "allowed": "已允許",
-    "blocked": "已封鎖",
-    "inherited": "繼承",
-    "reset": "使用繼承權限",
-    "description": "這些規則限制成員在 Brain 中可讀取的內容。Slack 和 Drive 的權限仍然適用。每位成員都受到其所有群組限制的約束。",
-    "all": "來源允許的所有資源",
-    "selected": "僅選定資源",
-    "manage": "管理存取",
-    "allWithExceptions": "來源系統允許的所有資源（有例外）",
-    "partial": "部分存取",
-    "noReaders": "目前無人可讀",
-    "countsHint": "可讀人數反映已儲存的規則、來源系統權限及其他群組限制。— 表示未驗證。"
-  },
-  "accessGroups": {
-    "title": "存取群組",
-    "adminOnly": "只有管理員可以管理存取群組。",
-    "help": "新增成員後，在存取權限中管理其連接器、頻道及資料夾存取權限。集合共用權限仍然適用。",
-    "error": "無法確認操作。請重新整理並檢查目前狀態後再試。",
-    "name": "群組名稱",
-    "create": "建立群組",
-    "previous": "上一頁",
-    "next": "下一頁",
-    "rename": "重新命名",
-    "delete": "刪除",
-    "confirmDelete": "刪除此群組並撤銷其存取權限？",
-    "members": "成員",
-    "remove": "移除",
-    "search": "搜尋人員",
-    "add": "新增"
-  },
-  "audit": {
-    "agentId": "代理程式 ID",
-    "runId": "執行 ID",
-    "traceId": "追蹤 ID",
-    "parentRunId": "父執行 ID",
-    "tool": "工具",
-    "toolCallId": "工具呼叫 ID",
-    "model": "模型",
-    "agentCoverage": "也會記錄代理程式執行結果及工具發出的活動事件，包括拒絕和待核准狀態。不儲存參數或結果。稽核儲存空間故障時代理程式會繼續執行，未儲存的事件會記錄於伺服器日誌。",
-    "subtitle": "檢視工作區活動及權限變更。",
-    "coverageTitle": "稽核涵蓋範圍",
-    "title": "稽核日誌",
-    "adminOnly": "只有管理員可以檢視稽核日誌。",
-    "coverage": "目前記錄成功登入、群組管理、集合權限變更、部分文件下載開始與稽核日誌存取，其他平台活動尚未包含。沒有成功記錄的操作結果可能未知。",
-    "loginWarning": "稽核儲存可用時會記錄成功登入。稽核儲存故障期間仍允許登入，因此記錄可能缺漏。",
-    "action": "操作",
-    "outcome": "結果",
-    "actorId": "執行者 ID",
-    "groupId": "群組 ID",
-    "members": "成員 ID",
-    "operation": "操作 ID",
-    "resource": "資源 ID",
-    "role": "角色",
-    "invalidFilters": "請輸入完整 ID 和有效的日期範圍。",
-    "from": "開始（UTC）",
-    "to": "結束（UTC）",
-    "all": "全部",
-    "loading": "正在載入稽核日誌…",
-    "error": "無法載入稽核日誌。請檢查篩選條件後重試。",
-    "empty": "找不到事件。",
-    "time": "時間",
-    "previous": "上一頁",
-    "next": "下一頁",
-    "exportPage": "將此頁匯出為 JSON"
-  },
   "collections": {
     "stats": {
       "title": "分析",
@@ -399,7 +329,8 @@
     "searchChats": "搜尋對話",
     "inbox": "收件匣",
     "notifications": "通知",
-    "home": "首頁"
+    "home": "首頁",
+    "addons": "附加元件"
   },
   "artifacts": {
     "title": "所有產物",
@@ -1227,7 +1158,7 @@
         ]
       }
     },
-    "demoBanner": "您正在檢視 Acme Corp，這是以示範資料載入的虛構小公司。試試下列問題，或是",
+    "demoBanner": "您正在檢視 Mobart Ben，這是以示範資料載入的虛構小公司。試試下列問題，或是",
     "demoConnectYourOwn": "連接您自己的來源",
     "askMoreQuestionSets": [
       [
@@ -1466,38 +1397,30 @@
     "scrollAttachmentsRight": "向右捲動附件",
     "demoSuggestions": {
       "1": {
-        "text": "付款服務的架構為何變更，這項決定是如何做出的？",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "哪些客戶回報了匯出逾時的問題，最後是如何解決的？",
-        "icons": [
-          "jira",
-          "github"
-        ]
-      },
-      "3": {
-        "text": "關於國定假日值班，我們的政策是什麼？",
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
         "icons": [
           "sheets"
         ]
       },
+      "3": {
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
+      },
       "4": {
-        "text": "計費 worker 中的 PR #482 由誰審查並核准，合併前 Dana 提出了什麼要求？",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "2026 年的企業定價策略是什麼？",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -1669,6 +1592,20 @@
         "done": "已完成",
         "error": "失敗"
       }
+    },
+    "timeGreeting": {
+      "morning": "早安",
+      "morningNamed": "{{name}}，早安",
+      "afternoon": "午安",
+      "afternoonNamed": "{{name}}，午安",
+      "evening": "晚安",
+      "eveningNamed": "{{name}}，晚安",
+      "night": "夜深了，你好",
+      "nightNamed": "{{name}}，夜深了，你好"
+    },
+    "companion": {
+      "sayHello": "打聲招呼",
+      "hello": "你好！"
     }
   },
   "workspaceMenu": {
@@ -4335,8 +4272,8 @@
       },
       "demoData": {
         "title": "示範資料",
-        "description": "Acme Corp 是為了讓您體驗 EXODIA Brain 而載入的虛構公司。這只會改變您看到的內容，不會刪除任何資料。",
-        "label": "在我的回覆、搜尋與記錄中顯示 Acme Corp 示範資料",
+        "description": "Mobart Ben 是為了讓您體驗 EXODIA Brain 而載入的虛構公司。這只會改變您看到的內容，不會刪除任何資料。",
+        "label": "在我的回覆、搜尋與記錄中顯示 Mobart Ben 示範資料",
         "followingDefault": "遵循預設值：在您的組織擁有自己的資料之前會持續顯示，之後便隱藏。",
         "yourChoice": "您自己的選擇。",
         "useDefault": "使用預設值",
@@ -5754,17 +5691,17 @@
   "demoData": {
     "badge": {
       "label": "示範",
-      "tooltip": "來自 Acme Corp 示範的範例資料，並非貴公司的記錄"
+      "tooltip": "來自 Mobart Ben 示範的範例資料，並非貴公司的記錄"
     },
     "removalNotice": {
-      "title": "Acme Corp 示範資料仍在您的工作區中",
+      "title": "Mobart Ben 示範資料仍在您的工作區中",
       "description": "貴公司自己的資料現已在 EXODIA Brain 中。示範資料預設不會出現在回覆裡，但任何人都可以重新開啟，其範例帳戶也仍可登入。請為所有人關閉，或永久移除。",
       "remove": "永久移除",
       "keep": "暫時保留",
       "turnOff": "為所有人關閉"
     },
     "removeDialog": {
-      "title": "永久移除 Acme Corp 示範資料？",
+      "title": "永久移除 Mobart Ben 示範資料？",
       "description": "此操作會刪除 Demo 連接器及其所有記錄、群組與權限。若只想隱藏而不刪除任何內容，請改為為所有人關閉。之後您可以在連接器頁面重新新增。",
       "deleteAccounts": "同時刪除範例帳戶：{{names}}",
       "deleteAccountsHint": "它們建立時帶有初始密碼，因此任何知道密碼的人都能以這些帳戶登入。",
@@ -5780,7 +5717,7 @@
     "switch": {
       "errorTitle": "無法變更示範資料設定",
       "errorDescription": "沒有任何變更。請稍後重試。",
-      "hiddenTitle": "已隱藏 Acme Corp 示範資料",
+      "hiddenTitle": "已隱藏 Mobart Ben 示範資料",
       "hiddenDescription": "它已從您的回覆、搜尋與記錄中移除。您可以隨時在「個人資料 → 示範資料」中重新開啟。",
       "undo": "復原"
     },
@@ -5838,6 +5775,7 @@
     "metric": "圖表指標",
     "overTime": "用量趨勢",
     "chartData": "檢視圖表資料",
+    "filters": "篩選",
     "topModels": "最常使用的模型",
     "byWorkload": "依工作負載統計用量",
     "byMember": "依成員統計用量",
@@ -5878,6 +5816,189 @@
     "averageLatency": "平均延遲",
     "noConnector": "無連接器",
     "useCatalog": "使用目錄價格"
+  },
+  "agentSchedule": {
+    "title": "代理程式排程",
+    "description": "僅研究公開資訊。每份簡報都會標記為草稿。",
+    "loading": "載入中…",
+    "enabled": "自動執行",
+    "days": "日期",
+    "time": "時間",
+    "timezone": "時區",
+    "prompt": "簡報指示",
+    "next": "下次執行",
+    "slackEnabled": "已啟用 Slack 傳送。",
+    "brainOnly": "草稿儲存在 Brain 中。",
+    "runs": "最近執行",
+    "empty": "尚無執行紀錄。",
+    "open": "開啟草稿",
+    "close": "關閉",
+    "working": "處理中…",
+    "run": "立即執行",
+    "save": "儲存",
+    "failed": "無法更新排程。",
+    "invalid": "請選擇日期、時間並填寫簡報指示。",
+    "status": {
+      "running": "執行中",
+      "draft": "草稿已就緒",
+      "needs_review": "審閱草稿",
+      "needs_reconciliation": "檢查中斷的執行"
+    },
+    "slackTitle": "Slack 傳送",
+    "sendSlack": "將摘要傳送至 Slack",
+    "slackBot": "Slack 機器人",
+    "chooseBot": "選擇機器人",
+    "slackChannel": "Slack 頻道",
+    "channelPlaceholder": "貼上 Slack 頻道連結或 ID",
+    "channelHelp": "啟用傳送前，請先邀請所選機器人加入此頻道。",
+    "slackAdminOnly": "Slack 傳送由組織管理員管理。你可以將其關閉。",
+    "manageBots": "管理 Slack 機器人",
+    "noBots": "請先為此代理連接機器人。",
+    "slackLoadFailed": "無法載入 Slack 設定。請關閉後重新開啟以重試。",
+    "invalidSlack": "請選擇機器人，並輸入有效的 Slack 頻道連結或 ID。",
+    "saveBeforeRun": "執行前請先儲存變更。",
+    "projectDescription": "私人專案草稿。僅使用已核准的專案來源；無法傳送至 Slack。"
+  },
+  "agentPicture": {
+    "title": "變更代理圖片",
+    "description": "更新此代理在 Brain 中的圖片。",
+    "choose": "選擇圖片",
+    "remove": "移除圖片",
+    "formats": "PNG、JPEG 或 WebP · 最大 5 MB",
+    "preview": "圖片預覽",
+    "invalid": "請選擇小於 5 MB 的 PNG、JPEG 或 WebP 圖片。",
+    "failed": "無法儲存代理圖片，請重試。",
+    "saving": "儲存中…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "模型預設推理強度",
+    "inheritPlatform": "使用平台預設值（低）",
+    "inheritModel": "繼承模型預設值",
+    "priority": "優先順序：訊息選擇 → 代理 → 模型 → 低。"
+  },
+  "graph": {
+    "title": "知識圖譜",
+    "overviewIntro": "以互相連接的群組探索知識，放大查看其中的文件與概念。",
+    "arranging": "正在尋找群組並排列圖譜…",
+    "progress": "正在載入文件：{{loaded}} / {{total}}",
+    "counts": "{{nodes}} 個節點 · {{edges}} 條連線 · {{clusters}} 個群組",
+    "findNode": "尋找節點…",
+    "empty": "你的帳戶目前沒有可見的知識內容。",
+    "retry": "重試",
+    "error": "無法載入圖譜，請重試。",
+    "rendererError": "此瀏覽器無法繪製圖譜。請啟用 WebGL 或嘗試其他瀏覽器。你仍可在下方瀏覽群組及搜尋節點。",
+    "canvasLabel": "3D 知識圖譜。旋轉、縮放並選取群組以探索節點。",
+    "zoomIn": "放大",
+    "zoomOut": "縮小",
+    "fit": "顯示完整圖譜",
+    "openRecord": "開啟文件",
+    "searchResults": "符合的節點",
+    "noResults": "沒有符合的節點。",
+    "clusters": "群組",
+    "unconnected": "未連接的節點",
+    "clusterHint": "選擇群組以放大，選擇節點以查看詳情。",
+    "coverage": "所有可存取的文件及其儲存的連線。群組遵循你的權限。同步後請重新整理。",
+    "entity": "實體",
+    "kinds": {
+      "record": "文件",
+      "folder": "資料夾",
+      "kb": "集合",
+      "app": "來源",
+      "recordGroup": "文件群組",
+      "department": "部門",
+      "category": "類別",
+      "subcategory": "子類別",
+      "topic": "主題",
+      "language": "語言",
+      "named_entity": "命名實體"
+    },
+    "preparing": "正在準備知識圖譜",
+    "rendering": "正在繪製地圖…",
+    "metricLegend": "群組大小：節點數 · 點大小：連線數",
+    "refresh": "重新整理圖譜",
+    "connections": "連線數：{{value}}",
+    "layout": {
+      "progress": "正在排列節點：{{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "向左旋轉",
+    "rotateRight": "向右旋轉",
+    "controls3d": "拖曳旋轉 · 捲動縮放 · 右鍵拖曳平移。觸控：單指旋轉，雙指縮放或平移。",
+    "connectionHint": "選取節點以查看其連線。",
+    "visibleNodes": "顯示 {{total}} 個節點中的 {{shown}} 個 · 放大查看更多細節。",
+    "cacheHint": "檢查更新時會重用近期配置。重新整理可檢查新資料。",
+    "updating": "正在檢查圖譜更新…",
+    "refreshError": "無法重新整理。仍顯示已儲存的圖譜。"
+  },
+  "groupAccess": {
+    "currentAccess": "目前可讀人數",
+    "empty": "此處沒有可存取的資源。",
+    "expand": "展開",
+    "allow": "允許",
+    "allowed": "已允許",
+    "blocked": "已封鎖",
+    "inherited": "繼承",
+    "reset": "使用繼承權限",
+    "description": "這些規則限制成員在 Brain 中可讀取的內容。Slack 和 Drive 的權限仍然適用。每位成員都受到其所有群組限制的約束。",
+    "all": "來源允許的所有資源",
+    "selected": "僅選定資源",
+    "manage": "管理存取",
+    "allWithExceptions": "來源系統允許的所有資源（有例外）",
+    "partial": "部分存取",
+    "noReaders": "目前無人可讀",
+    "countsHint": "可讀人數反映已儲存的規則、來源系統權限及其他群組限制。— 表示未驗證。"
+  },
+  "accessGroups": {
+    "title": "存取群組",
+    "adminOnly": "只有管理員可以管理存取群組。",
+    "help": "新增成員後，在存取權限中管理其連接器、頻道及資料夾存取權限。集合共用權限仍然適用。",
+    "error": "無法確認操作。請重新整理並檢查目前狀態後再試。",
+    "name": "群組名稱",
+    "create": "建立群組",
+    "previous": "上一頁",
+    "next": "下一頁",
+    "rename": "重新命名",
+    "delete": "刪除",
+    "confirmDelete": "刪除此群組並撤銷其存取權限？",
+    "members": "成員",
+    "remove": "移除",
+    "search": "搜尋人員",
+    "add": "新增"
+  },
+  "audit": {
+    "agentId": "代理程式 ID",
+    "runId": "執行 ID",
+    "traceId": "追蹤 ID",
+    "parentRunId": "父執行 ID",
+    "tool": "工具",
+    "toolCallId": "工具呼叫 ID",
+    "model": "模型",
+    "agentCoverage": "也會記錄代理程式執行結果及工具發出的活動事件，包括拒絕和待核准狀態。不儲存參數或結果。稽核儲存空間故障時代理程式會繼續執行，未儲存的事件會記錄於伺服器日誌。",
+    "subtitle": "檢視工作區活動及權限變更。",
+    "coverageTitle": "稽核涵蓋範圍",
+    "title": "稽核日誌",
+    "adminOnly": "只有管理員可以檢視稽核日誌。",
+    "coverage": "目前記錄成功登入、群組管理、集合權限變更、部分文件下載開始與稽核日誌存取，其他平台活動尚未包含。沒有成功記錄的操作結果可能未知。",
+    "loginWarning": "稽核儲存可用時會記錄成功登入。稽核儲存故障期間仍允許登入，因此記錄可能缺漏。",
+    "action": "操作",
+    "outcome": "結果",
+    "actorId": "執行者 ID",
+    "groupId": "群組 ID",
+    "members": "成員 ID",
+    "operation": "操作 ID",
+    "resource": "資源 ID",
+    "role": "角色",
+    "invalidFilters": "請輸入完整 ID 和有效的日期範圍。",
+    "from": "開始（UTC）",
+    "to": "結束（UTC）",
+    "all": "全部",
+    "loading": "正在載入稽核日誌…",
+    "error": "無法載入稽核日誌。請檢查篩選條件後重試。",
+    "empty": "找不到事件。",
+    "time": "時間",
+    "previous": "上一頁",
+    "next": "下一頁",
+    "exportPage": "將此頁匯出為 JSON"
   },
   "datePicker": {
     "on": "當天",

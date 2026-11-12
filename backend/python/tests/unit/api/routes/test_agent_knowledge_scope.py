@@ -74,6 +74,7 @@ def _services(
 
 async def _run(
     agent: dict, body: dict, *, graph_out: list | None = None, frames_out: list | None = None,
+    model_config: dict | None = None,
     **graph_kwargs,
 ) -> dict:
     """Run chat_stream for a saved agent; return the query_info the loop got."""
@@ -104,7 +105,7 @@ async def _run(
                                     "return_value": {"email": "u@x.com", "_key": "caller-key"}}),
             ("_get_org_info", {"new_callable": AsyncMock,
                                "return_value": {"orgId": ORG, "accountType": "enterprise"}}),
-            ("get_llm_for_chat", {"new_callable": AsyncMock, "return_value": (MagicMock(), {}, {})}),
+            ("get_llm_for_chat", {"new_callable": AsyncMock, "return_value": (MagicMock(), model_config or {}, {})}),
             ("load_entity_vector_store", {"new_callable": AsyncMock, "return_value": None}),
             ("run_agent_loop_stream", {"new": _recording_loop}),
         ]:
@@ -126,6 +127,20 @@ def _agent(*, service_account: bool) -> dict:
         "createdBy": "creator-key",
         "isServiceAccount": service_account,
     }
+
+
+async def test_scheduled_scope_requires_the_approved_model_before_the_loop() -> None:
+    config = {"configuration": {"model": "model-a, model-b", "temperature": 1}, "modelKey": "key", "provider": "provider"}
+    body = {"query": "q", "safeRetrievalOnly": True, "modelKey": "key", "modelName": "model-b",
+            "safeModelFingerprint": "18c343c2b2f55158d0626d4625aedfc7b8b9ac4dd4d4b449db927e7389df268a",
+            "filters": {"apps": ["jira-1", "foreign"], "kb": []}, "strictScope": True}
+    query_info = await _run(_agent(service_account=False), body, model_config=config)
+    assert query_info["safeRetrievalOnly"] is True
+    assert query_info["filters"]["apps"] == ["jira-1"]
+    frames: list[str] = []
+    denied = await _run(_agent(service_account=False), body, model_config={**config, "provider": "changed"}, frames_out=frames)
+    assert not denied
+    assert "model_approval_changed" in "".join(frames)
 
 
 @pytest.mark.parametrize("service_account", [False, True])

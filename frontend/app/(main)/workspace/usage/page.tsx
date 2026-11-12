@@ -9,24 +9,29 @@ import {
   Grid,
   Text,
   Heading,
-  Card,
   Button,
+  IconButton,
+  Tooltip,
   Select,
   Tabs,
   TextField,
   Table,
   Callout,
+  VisuallyHidden,
 } from "@radix-ui/themes";
 import { MaterialIcon } from "@/app/components/ui/MaterialIcon";
 import { useUserStore, selectIsAdmin } from "@/lib/store/user-store";
 import { onSessionEnd } from "@/lib/api/session-cache";
 import { ConnectorsApi } from "../connectors/api";
+import { SettingsPageContainer, SettingsSection } from "../components";
 import { usageApi, type Breakdown, type Rate } from "./api";
 import {
   exclusiveEnd,
+  chartMaximum,
   metricValue,
   money,
   seriesSegments,
+  timelineTicks,
   type UsageMetric,
 } from "./format";
 
@@ -45,8 +50,11 @@ const inputStyle = {
   color: "var(--gray-12)",
   border: "1px solid var(--gray-6)",
   borderRadius: "var(--radius-2)",
-  padding: "10px",
-  minHeight: 44,
+  padding: "0 10px",
+  height: 44,
+  minWidth: 0,
+  boxSizing: "border-box" as const,
+  font: "inherit",
   width: "100%",
 };
 
@@ -62,6 +70,7 @@ export default function UsagePage() {
   const [tab, setTab] = useState("overview");
   const [interval, setInterval] = useState("day");
   const [metric, setMetric] = useState<UsageMetric>("tokens");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [offset, setOffset] = useState(0);
   const [budgetScope, setBudgetScope] = useState("organization");
@@ -81,6 +90,7 @@ export default function UsagePage() {
       onSessionEnd(() => {
         setView("personal");
         setFilters({});
+        setFiltersOpen(false);
         setOffset(0);
         setTab("overview");
         setBudgetSubject("");
@@ -119,6 +129,7 @@ export default function UsagePage() {
   const {
     data: budgetData,
     error: budgetError,
+    isLoading: budgetsLoading,
     mutate: refreshBudgets,
   } = useSWR(
     tab === "budgets" ? ["usage-budgets", view] : null,
@@ -165,6 +176,41 @@ export default function UsagePage() {
         ? { ...row, label: connectorLabel(row.id) }
         : row,
     );
+  const filterControl = (field: (typeof FIELDS)[number]) => (
+    <Flex direction="column" gap="1">
+      <Text size="2">{label(field)}</Text>
+      <Select.Root
+        value={filters[field] || "__all__"}
+        onValueChange={(v) => updateFilter(field, v)}
+      >
+        <Select.Trigger
+          aria-label={label(field)}
+          style={{ minHeight: 44, width: "100%", minWidth: 0 }}
+        />
+        <Select.Content>
+          <Select.Item value="__all__">{label("all")}</Select.Item>
+          {(field === "user_id" || field === "connector_id") &&
+            rows(field).some((r) => r.id === null) && (
+              <Select.Item value="__none__">
+                {label(field === "user_id" ? "background" : "noConnector")}
+              </Select.Item>
+            )}
+          {rows(field)
+            .filter((r) => r.id)
+            .map((r) => (
+              <Select.Item key={r.id} value={r.id!}>
+                {r.label}
+              </Select.Item>
+            ))}
+          {filters[field] &&
+            filters[field] !== "__none__" &&
+            !rows(field).some((r) => r.id === filters[field]) && (
+              <Select.Item value={filters[field]}>{filters[field]}</Select.Item>
+            )}
+        </Select.Content>
+      </Select.Root>
+    </Flex>
+  );
   const targetLabel = (scope: string, subject: string) =>
     scope === "organization"
       ? label("organization")
@@ -205,9 +251,9 @@ export default function UsagePage() {
               )
             : row.label,
       }));
-    const max = Math.max(1, ...top.map((row) => metricValue(row, metric) ?? 0));
+    const max = chartMaximum(top, metric) || 1;
     return (
-      <Card>
+      <SettingsSection>
         <Heading size="3" mb="4">
           {title}
         </Heading>
@@ -243,43 +289,46 @@ export default function UsagePage() {
             </Box>
           ))}
         </Flex>
-      </Card>
+      </SettingsSection>
     );
   };
   const timeline = data?.timeline ?? [];
-  const maxTimeline = Math.max(
-    1,
-    ...timeline.map((row) => metricValue(row, metric) ?? 0),
+  const maxTimeline = chartMaximum(timeline, metric);
+  const chartScale = maxTimeline || 1;
+  const hasKnownActivity = timeline.some(
+    (row) => row.requests > 0 && metricValue(row, metric) !== null,
   );
   const segments = seriesSegments(timeline, metric);
   const point = (index: number, value: number) =>
-    `${40 + (index / Math.max(1, timeline.length - 1)) * 700},${170 - (value / maxTimeline) * 140}`;
+    `${(index / Math.max(1, timeline.length - 1)) * 700},${140 - (value / chartScale) * 125}`;
 
   return (
-    <Box
-      p={{ initial: "4", md: "6" }}
-      style={{ width: "100%", maxWidth: 1600, margin: "0 auto" }}
-    >
-      <Flex justify="between" align="start" wrap="wrap" gap="3" mb="4">
-        <Box pl={{ initial: "6", md: "0" }}>
-          <Heading size="6">{label("title")}</Heading>
+    <SettingsPageContainer>
+      <Flex justify="between" align="start" gap="3" mb="5">
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Heading size="5" weight="medium" style={{ color: "var(--slate-12)" }}>{label("title")}</Heading>
           <Text as="p" color="gray" mt="2">
             {label("subtitle")}
           </Text>
         </Box>
-        <Button
-          variant="soft"
-          onClick={() => {
-            void mutate();
-            void refreshBudgets();
-          }}
-        >
-          <MaterialIcon name="refresh" size={18} />
-          {label("refresh")}
-        </Button>
+        <Tooltip content={label("refresh")}>
+          <IconButton
+            className="touch-hit"
+            variant="soft"
+            aria-label={label("refresh")}
+            style={{ minWidth: 44, minHeight: 44 }}
+            onClick={() => {
+              void mutate();
+              void refreshBudgets();
+            }}
+          >
+            <MaterialIcon name="refresh" size={18} />
+          </IconButton>
+        </Tooltip>
       </Flex>
-      <Card mb="4">
-        <Grid columns={{ initial: "1", sm: "2", lg: "4" }} gap="3">
+      <Box mb="4">
+        <SettingsSection>
+        <Grid columns={{ initial: "2", md: "3" }} gap="3">
           <Flex direction="column" gap="1">
             <Text as="label" htmlFor="usage-from" size="2">
               {label("from")}
@@ -313,30 +362,34 @@ export default function UsagePage() {
               }}
             />
           </Flex>
-          <Flex direction="column" gap="1">
-            <Text size="2">{label("view")}</Text>
-            <Select.Root
-              value={view}
-              onValueChange={(v) => {
-                setView(v);
-                setFilters({});
-                setOffset(0);
-              }}
-            >
-              <Select.Trigger
-                aria-label={label("view")}
-                style={{ minHeight: 44 }}
-              />
-              <Select.Content>
-                <Select.Item value="personal">{label("personal")}</Select.Item>
-                {isAdmin && (
-                  <Select.Item value="organization">
-                    {label("organization")}
+          {isAdmin && (
+            <Flex direction="column" gap="1">
+              <Text size="2">{label("view")}</Text>
+              <Select.Root
+                value={view}
+                onValueChange={(v) => {
+                  setView(v);
+                  setFilters({});
+                  setOffset(0);
+                }}
+              >
+                <Select.Trigger
+                  aria-label={label("view")}
+                  style={{ minHeight: 44 }}
+                />
+                <Select.Content>
+                  <Select.Item value="personal">
+                    {label("personal")}
                   </Select.Item>
-                )}
-              </Select.Content>
-            </Select.Root>
-          </Flex>
+                  {isAdmin && (
+                    <Select.Item value="organization">
+                      {label("organization")}
+                    </Select.Item>
+                  )}
+                </Select.Content>
+              </Select.Root>
+            </Flex>
+          )}
           <Flex direction="column" gap="1">
             <Text size="2">{label("interval")}</Text>
             <Select.Root value={interval} onValueChange={setInterval}>
@@ -353,63 +406,62 @@ export default function UsagePage() {
               </Select.Content>
             </Select.Root>
           </Flex>
-          {FIELDS.filter(
-            (field) => view === "organization" || field !== "user_id",
-          ).map((field) => (
-            <Flex key={field} direction="column" gap="1">
-              <Text size="2">{label(field)}</Text>
-              <Select.Root
-                value={filters[field] || "__all__"}
-                onValueChange={(v) => updateFilter(field, v)}
-              >
-                <Select.Trigger
-                  aria-label={label(field)}
-                  style={{ minHeight: 44 }}
-                />
-                <Select.Content>
-                  <Select.Item value="__all__">{label("all")}</Select.Item>
-                  {(field === "user_id" || field === "connector_id") &&
-                    rows(field).some((r) => r.id === null) && (
-                      <Select.Item value="__none__">
-                        {label(
-                          field === "user_id" ? "background" : "noConnector",
-                        )}
-                      </Select.Item>
-                    )}
-                  {rows(field)
-                    .filter((r) => r.id)
-                    .map((r) => (
-                      <Select.Item key={r.id} value={r.id!}>
-                        {r.label}
-                      </Select.Item>
-                    ))}
-                  {filters[field] &&
-                    filters[field] !== "__none__" &&
-                    !rows(field).some((r) => r.id === filters[field]) && (
-                      <Select.Item value={filters[field]}>
-                        {filters[field]}
-                      </Select.Item>
-                    )}
-                </Select.Content>
-              </Select.Root>
-            </Flex>
-          ))}
+          {filterControl("model")}
+          <Flex direction="column" justify="end">
+            <Button
+              className="touch-hit"
+              variant={filtersOpen ? "solid" : "soft"}
+              style={{ minHeight: 44, width: "100%" }}
+              aria-expanded={filtersOpen}
+              aria-controls="usage-advanced-filters"
+              onClick={() => setFiltersOpen(!filtersOpen)}
+            >
+              <MaterialIcon name="filter_list" size={16} />
+              {label("filters")}
+              {Object.values(filters).filter(Boolean).length > 0 &&
+                ` (${Object.values(filters).filter(Boolean).length})`}
+            </Button>
+          </Flex>
         </Grid>
-        <Flex mt="3" justify="between" wrap="wrap" gap="2">
+        <Flex mt="3" justify="between" align="center" wrap="wrap" gap="2">
           <Text size="1" color="gray">
             {label("utc")}
           </Text>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setFilters({});
-              setOffset(0);
-            }}
-          >
-            {label("clear")}
-          </Button>
+          <Flex gap="2" align="center" wrap="wrap">
+            {Object.values(filters).some(Boolean) && (
+              <Button
+                className="touch-hit"
+                variant="ghost"
+                onClick={() => {
+                  setFilters({});
+                  setOffset(0);
+                }}
+              >
+                {label("clear")}
+              </Button>
+            )}
+          </Flex>
         </Flex>
-      </Card>
+        {filtersOpen && (
+          <Grid
+            id="usage-advanced-filters"
+            columns={{ initial: "2", md: "3", lg: "4" }}
+            gap="3"
+            mt="4"
+          >
+            {FIELDS.filter(
+              (field) =>
+                field !== "model" &&
+                (view === "organization" || field !== "user_id"),
+            ).map((field) => (
+              <Box key={field} style={{ minWidth: 0 }}>
+                {filterControl(field)}
+              </Box>
+            ))}
+          </Grid>
+        )}
+      </SettingsSection>
+      </Box>
       {!validDates && (
         <Callout.Root color="amber" mb="4">
           <Callout.Text>{label("invalidRange")}</Callout.Text>
@@ -432,12 +484,9 @@ export default function UsagePage() {
       )}
       {data && (
         <>
-          <Grid columns={{ initial: "1", sm: "2", lg: "4" }} gap="3" mb="4">
+          <Grid columns={{ initial: "2", lg: "4" }} gap="3" mb="4">
             {[
-              [
-                "tokens",
-                number(data.summary.input_tokens + data.summary.output_tokens),
-              ],
+              ["tokens", number(metricValue(data.summary, "tokens"))],
               [
                 "cost",
                 money(
@@ -451,159 +500,205 @@ export default function UsagePage() {
               ["requests", number(data.summary.requests)],
               ["unpriced", number(data.summary.unpriced_requests)],
             ].map(([key, value]) => (
-              <Card key={key}>
-                <Text color="gray" size="2">
-                  {label(key)}
-                </Text>
-                <Heading size="6" mt="2">
-                  {value}
-                </Heading>
-              </Card>
+              <Box key={key}><SettingsSection><Box>
+                <Text color="gray" size="2">{label(key)}</Text>
+                <Heading size="5" mt="2" style={{ overflowWrap: "anywhere" }}>{value}</Heading>
+              </Box></SettingsSection>
+              </Box>
             ))}
           </Grid>
-          <Callout.Root color="blue" mb="4">
-            <Callout.Text>
-              {label("costNote")} {label("measurementNote")} {label("since")}:{" "}
-              {data.tracking_since
-                ? new Date(data.tracking_since).toLocaleString(i18n.language)
-                : label("noData")}
-              .
-            </Callout.Text>
-          </Callout.Root>
+          <Text as="p" size="1" color="gray" mb="3">
+            {label("costNote")}
+          </Text>
           {(data.tracking_health.failed > 0 ||
             data.tracking_health.missing_identity > 0) && (
             <Callout.Root color="amber" mb="4">
               <Callout.Text>{label("coverageGap")}</Callout.Text>
             </Callout.Root>
           )}
-          <Text as="p" size="2" color="gray" mb="4">
-            {label("estimated")}: {number(data.summary.estimated_requests)} ·{" "}
-            {label("unknown")}: {number(data.summary.unknown_requests)} ·{" "}
-            {label("incomplete")}: {number(data.summary.incomplete_requests)}
-          </Text>
+          {(data.summary.estimated_requests > 0 ||
+            data.summary.unknown_requests > 0 ||
+            data.summary.incomplete_requests > 0) && (
+            <Text as="p" size="2" color="gray" mb="3">
+              {label("estimated")}: {number(data.summary.estimated_requests)} ·{" "}
+              {label("unknown")}: {number(data.summary.unknown_requests)} ·{" "}
+              {label("incomplete")}: {number(data.summary.incomplete_requests)}
+            </Text>
+          )}
           <Text as="p" size="2" color="gray" mb="4">
             {label("input")}: {number(data.summary.input_tokens)} ·{" "}
-            {label("output")}: {number(data.summary.output_tokens)} ·
-            {label("cache_read")}: {number(data.summary.cache_read_tokens)} ·{" "}
-            {label("cache_write")}: {number(data.summary.cache_write_tokens)} ·
-            {label("reasoning")}: {number(data.summary.reasoning_tokens)} ·{" "}
-            {label("averageLatency")}:{" "}
-            {number(data.summary.average_duration_ms)} ms
+            {label("output")}: {number(data.summary.output_tokens)}
           </Text>
         </>
       )}
       <Tabs.Root value={tab} onValueChange={setTab}>
-        <Tabs.List>
-          <Tabs.Trigger value="overview">{label("overview")}</Tabs.Trigger>
-          <Tabs.Trigger value="history">{label("history")}</Tabs.Trigger>
-          <Tabs.Trigger value="budgets">{label("budgets")}</Tabs.Trigger>
+        <Tabs.List style={{ flexWrap: "wrap", height: "auto" }}>
+          <Tabs.Trigger
+            style={{ minHeight: 44, paddingInline: 6 }}
+            value="overview"
+          >
+            {label("overview")}
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            style={{ minHeight: 44, paddingInline: 6 }}
+            value="history"
+          >
+            {label("history")}
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            style={{ minHeight: 44, paddingInline: 6 }}
+            value="budgets"
+          >
+            {label("budgets")}
+          </Tabs.Trigger>
           {isAdmin && (
-            <Tabs.Trigger value="pricing">{label("pricing")}</Tabs.Trigger>
+            <Tabs.Trigger
+              style={{ minHeight: 44, paddingInline: 6 }}
+              value="pricing"
+            >
+              {label("pricing")}
+            </Tabs.Trigger>
           )}
         </Tabs.List>
         <Tabs.Content value="overview">
-          <Flex mt="4" mb="3" justify="end">
-            <Select.Root
-              value={metric}
-              onValueChange={(v) => setMetric(v as UsageMetric)}
-            >
-              <Select.Trigger aria-label={label("metric")} />
-              <Select.Content>
-                {["tokens", "cost", "requests"].map((v) => (
-                  <Select.Item key={v} value={v}>
-                    {label(v)}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
-          </Flex>
-          <Card mb="4">
-            <Heading size="3">{label("overTime")}</Heading>
-            {timeline.length > 0 && Boolean(data?.summary.requests) ? (
-              <>
-                <svg
-                  viewBox="0 0 780 210"
-                  role="img"
-                  aria-label={label("overTime")}
-                  style={{ width: "100%", minHeight: 160 }}
+          {data && (
+            <Box mt="4" mb="4">
+              <SettingsSection>
+              <Flex justify="between" align="center" wrap="wrap" gap="3" mb="3">
+                <Heading size="3">{label("overTime")}</Heading>
+                <Select.Root
+                  value={metric}
+                  onValueChange={(v) => setMetric(v as UsageMetric)}
                 >
-                  <title>{label("overTime")}</title>
-                  <line
-                    x1="40"
-                    y1="170"
-                    x2="740"
-                    y2="170"
-                    stroke="var(--gray-7)"
+                  <Select.Trigger
+                    aria-label={label("metric")}
+                    style={{ minHeight: 44 }}
                   />
-                  <text x="40" y="20" fill="var(--gray-11)" fontSize="12">
+                  <Select.Content>
+                    {["tokens", "cost", "requests"].map((v) => (
+                      <Select.Item key={v} value={v}>
+                        {label(v)}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </Flex>
+              {timeline.length > 0 &&
+              Boolean(data.summary.requests) &&
+              hasKnownActivity ? (
+                <>
+                  <Text as="p" size="1" color="gray">
                     {display(maxTimeline)}
-                  </text>
-                  {segments.map((segment, i) => (
-                    <polyline
-                      key={i}
-                      points={segment
-                        .map(({ index, value }) => point(index, value))
-                        .join(" ")}
-                      fill="none"
-                      stroke="var(--accent-9)"
-                      strokeWidth="3"
-                    />
-                  ))}
-                  {segments.flat().map(({ index, value }) => (
-                    <circle
-                      key={timeline[index].label}
-                      cx={40 + (index / Math.max(1, timeline.length - 1)) * 700}
-                      cy={170 - (value / maxTimeline) * 140}
-                      r="4"
-                      fill="var(--accent-9)"
-                    >
-                      <title>
-                        {timeline[index].label}: {display(value)}
-                      </title>
-                    </circle>
-                  ))}
-                  <text x="40" y="200" fill="var(--gray-11)" fontSize="12">
-                    {timeline[0].label}
-                  </text>
-                  <text
-                    x="740"
-                    y="200"
-                    textAnchor="end"
-                    fill="var(--gray-11)"
-                    fontSize="12"
+                  </Text>
+                  <svg
+                    viewBox="0 0 700 150"
+                    preserveAspectRatio="none"
+                    role="img"
+                    aria-label={label("overTime")}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      height: 160,
+                      marginTop: 8,
+                    }}
                   >
-                    {timeline[timeline.length - 1].label}
-                  </text>
-                </svg>
-                <details>
-                  <summary>{label("chartData")}</summary>
-                  <Table.Root>
-                    <Table.Body>
-                      {timeline.map((r) => (
-                        <Table.Row key={r.label}>
-                          <Table.Cell>{r.label}</Table.Cell>
-                          <Table.Cell>
-                            {display(metricValue(r, metric))}
-                          </Table.Cell>
-                        </Table.Row>
+                    {[15, 77.5, 140].map((y) => (
+                      <line
+                        key={y}
+                        x1="0"
+                        y1={y}
+                        x2="700"
+                        y2={y}
+                        stroke="var(--gray-5)"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                    {segments.map((segment, i) =>
+                      segment.length === 1 ? (
+                        <circle
+                          key={i}
+                          cx={
+                            point(segment[0].index, segment[0].value).split(
+                              ",",
+                            )[0]
+                          }
+                          cy={
+                            point(segment[0].index, segment[0].value).split(
+                              ",",
+                            )[1]
+                          }
+                          r="4"
+                          fill="var(--accent-9)"
+                        />
+                      ) : (
+                        <polyline
+                          key={i}
+                          points={segment
+                            .map(({ index, value }) => point(index, value))
+                            .join(" ")}
+                          fill="none"
+                          stroke="var(--accent-9)"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      ),
+                    )}
+                  </svg>
+                  {[3, 5].map((count) => (
+                    <Box key={count} display={count === 3 ? { initial: "block", sm: "none" } : { initial: "none", sm: "block" }}
+                      style={{ position: "relative", height: 40 }}>
+                      {timelineTicks(timeline.map((row) => row.label), interval, i18n.language, count).map((tick, index) => (
+                        <Box key={tick.index} style={{ position: "absolute", left: `${tick.position}%`, top: 0,
+                          transform: index === 0 ? undefined : tick.position === 100 ? "translateX(-100%)" : "translateX(-50%)" }}>
+                          <Box style={{ position: "relative", height: 6, marginBottom: 6 }}>
+                            <Box style={{ position: "absolute", left: index === 0 ? "0%" : tick.position === 100 ? "100%" : "50%", height: 6, borderLeft: "1px solid var(--gray-7)" }} />
+                          </Box>
+                          <Text size="1" color="gray" title={tick.raw} style={{ whiteSpace: "nowrap" }}>{tick.label}</Text>
+                        </Box>
                       ))}
-                    </Table.Body>
-                  </Table.Root>
-                </details>
-              </>
-            ) : (
-              <Text as="p" mt="4" color="gray">
-                {label("noData")}
-              </Text>
-            )}
-          </Card>
-          <Grid columns={{ initial: "1", md: "2" }} gap="4">
-            {bars(data?.model ?? [], label("topModels"))}
-            {bars(data?.workload ?? [], label("byWorkload"))}
-            {view === "organization" &&
-              bars(data?.user_id ?? [], label("byMember"))}
-            {bars(rows("connector_id"), label("byConnector"))}
-          </Grid>
+                    </Box>
+                  ))}
+                  <VisuallyHidden asChild>
+                    <table>
+                      <caption>{label("overTime")}</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">{label("time")}</th>
+                          <th scope="col">{label(metric)}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timeline.map((r) => (
+                          <tr key={r.label}>
+                            <td>{r.label}</td>
+                            <td>{display(metricValue(r, metric))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </VisuallyHidden>
+                </>
+              ) : (
+                <Text as="p" mt="4" color="gray">
+                  {data.summary.requests && !hasKnownActivity
+                    ? "—"
+                    : label("noData")}
+                </Text>
+              )}
+            </SettingsSection>
+            </Box>
+          )}
+          {data && (
+            <Grid columns={{ initial: "1", md: "2" }} gap="4">
+              {bars(data.model, label("topModels"))}
+              {bars(data?.workload ?? [], label("byWorkload"))}
+              {view === "organization" &&
+                bars(data?.user_id ?? [], label("byMember"))}
+              {bars(rows("connector_id"), label("byConnector"))}
+            </Grid>
+          )}
         </Tabs.Content>
         <Tabs.Content value="history">
           <Box mt="4" style={{ overflowX: "auto" }}>
@@ -691,6 +786,7 @@ export default function UsagePage() {
           </Box>
           <Flex mt="4" gap="3" align="center">
             <Button
+              className="touch-hit"
               variant="soft"
               disabled={!offset}
               onClick={() => setOffset(Math.max(0, offset - 50))}
@@ -703,6 +799,7 @@ export default function UsagePage() {
               {number(data?.summary.requests ?? 0)}
             </Text>
             <Button
+              className="touch-hit"
               variant="soft"
               disabled={!data || offset + 50 >= data.summary.requests}
               onClick={() => setOffset(offset + 50)}
@@ -718,13 +815,15 @@ export default function UsagePage() {
           {budgetError && <Text color="red">{label("loadFailed")}</Text>}
           <Grid columns={{ initial: "1", md: "2" }} gap="3">
             {budgetData?.budgets.map((budget) => (
-              <Card key={budget.id}>
+              <Box key={budget.id}>
+                <SettingsSection><Box>
                 <Flex justify="between" gap="2">
                   <Heading size="3">
                     {targetLabel(budget.scope, budget.subject)}
                   </Heading>
                   {isAdmin && (
                     <Button
+                      className="touch-hit"
                       size="1"
                       variant="ghost"
                       color="red"
@@ -776,16 +875,36 @@ export default function UsagePage() {
                   {label(budget.state)} · {label("unpriced")}:{" "}
                   {number(budget.unpriced_requests)}
                 </Text>
-              </Card>
+              </Box></SettingsSection>
+              </Box>
             ))}
           </Grid>
-          {!budgetData?.budgets.length && !budgetError && (
+          {budgetsLoading && (
+            <Text as="p" mt="4" color="gray">
+              {label("loading")}
+            </Text>
+          )}
+          {budgetData && !budgetData.budgets.length && !budgetError && (
             <Text as="p" mt="4" color="gray">
               {label("noBudgets")}
             </Text>
           )}
+          {isAdmin && view === "personal" && (
+            <Button
+              className="touch-hit"
+              mt="3"
+              onClick={() => {
+                setView("organization");
+                setFilters({});
+                setOffset(0);
+              }}
+            >
+              {label("setBudget")}
+            </Button>
+          )}
           {isAdmin && view === "organization" && (
-            <Card mt="4">
+            <Box mt="4">
+              <SettingsSection><Box>
               <Heading size="3" mb="3">
                 {label("setBudget")}
               </Heading>
@@ -873,6 +992,7 @@ export default function UsagePage() {
                   </label>
                 </Grid>
                 <Button
+                  className="touch-hit"
                   type="submit"
                   mt="3"
                   disabled={
@@ -882,7 +1002,8 @@ export default function UsagePage() {
                   {label("save")}
                 </Button>
               </form>
-            </Card>
+            </Box></SettingsSection>
+            </Box>
           )}
         </Tabs.Content>
         {isAdmin && (
@@ -891,7 +1012,7 @@ export default function UsagePage() {
               <Callout.Text>{label("pricingNote")}</Callout.Text>
             </Callout.Root>
             {rateError && <Text color="red">{label("loadFailed")}</Text>}
-            <Card>
+            <SettingsSection>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -959,50 +1080,53 @@ export default function UsagePage() {
                   {label("save")}
                 </Button>
               </form>
-            </Card>
-            <Table.Root mt="4">
-              <Table.Header>
-                <Table.Row>
-                  {["provider", "model", ...RATE_FIELDS].map((f) => (
-                    <Table.ColumnHeaderCell key={f}>
-                      {label(f)}
-                    </Table.ColumnHeaderCell>
-                  ))}
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {rateData?.rates.map((r) => (
-                  <Table.Row key={`${r.provider}/${r.model}`}>
-                    <Table.Cell>{r.provider}</Table.Cell>
-                    <Table.Cell>
-                      <Button variant="ghost" onClick={() => setRate(r)}>
-                        {r.model}
-                      </Button>
-                      <Button
-                        variant="soft"
-                        size="1"
-                        ml="3"
-                        disabled={saving}
-                        onClick={() =>
-                          void save(
-                            () => usageApi.resetRate(r.provider, r.model),
-                            refreshRates,
-                          )
-                        }
-                      >
-                        {label("useCatalog")}
-                      </Button>
-                    </Table.Cell>
-                    {RATE_FIELDS.map((f) => (
-                      <Table.Cell key={f}>{r.rates[f]}</Table.Cell>
+            </SettingsSection>
+            <Box mt="4" style={{ overflowX: "auto" }}>
+              <Table.Root>
+                <Table.Header>
+                  <Table.Row>
+                    {["provider", "model", ...RATE_FIELDS].map((f) => (
+                      <Table.ColumnHeaderCell key={f}>
+                        {label(f)}
+                      </Table.ColumnHeaderCell>
                     ))}
                   </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
+                </Table.Header>
+                <Table.Body>
+                  {rateData?.rates.map((r) => (
+                    <Table.Row key={`${r.provider}/${r.model}`}>
+                      <Table.Cell>{r.provider}</Table.Cell>
+                      <Table.Cell>
+                        <Button variant="ghost" onClick={() => setRate(r)}>
+                          {r.model}
+                        </Button>
+                        <Button
+                          className="touch-hit"
+                          variant="soft"
+                          size="1"
+                          ml="3"
+                          disabled={saving}
+                          onClick={() =>
+                            void save(
+                              () => usageApi.resetRate(r.provider, r.model),
+                              refreshRates,
+                            )
+                          }
+                        >
+                          {label("useCatalog")}
+                        </Button>
+                      </Table.Cell>
+                      {RATE_FIELDS.map((f) => (
+                        <Table.Cell key={f}>{r.rates[f]}</Table.Cell>
+                      ))}
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            </Box>
           </Tabs.Content>
         )}
       </Tabs.Root>
-    </Box>
+    </SettingsPageContainer>
   );
 }

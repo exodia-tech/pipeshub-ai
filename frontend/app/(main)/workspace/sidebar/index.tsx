@@ -69,6 +69,7 @@ const GROUPS_NAV_ITEM: NavItem = {
 };
 
 const WORKSPACE_ITEMS: NavItem[] = [
+  { icon: 'analytics', labelKey: 'usage.title', route: '/workspace/usage' },
   { icon: 'security', labelKey: 'workspace.sidebar.nav.authentication', route: '/workspace/authentication', adminOnly: true },
   { icon: 'hub', labelKey: 'workspace.sidebar.nav.connectors', route: '/workspace/connectors/team', adminOnly: true },
   { icon: 'device_hub', labelKey: 'workspace.sidebar.nav.mcpServers', route: '/workspace/mcp-servers/team', adminOnly: true, requiresFlag: 'mcp' },
@@ -134,7 +135,7 @@ export default function WorkspaceSidebar() {
 
   const allRoutes = [
     ...OVERVIEW_ITEMS.map((item) => item.route),
-    ...(isAdmin ? WORKSPACE_ITEMS.filter(isNavItemVisible).map((item) => item.route) : []),
+    ...WORKSPACE_ITEMS.filter(isNavItemVisible).map((item) => item.route),
     ...DEVELOPER_SETTINGS_ITEMS.map((item) => item.route),
     ...PERSONAL_ITEMS.filter(isNavItemVisible).map((item) => item.route),
     ...PEOPLE_SUB_ITEMS.map((item) => item.route),
@@ -227,7 +228,7 @@ export default function WorkspaceSidebar() {
         </Flex>
 
         {/* ── Workspace section ── */}
-        {isAdmin && (
+        {visibleWorkspaceItems.length > 0 && (
           <Flex direction="column" gap="1">
             <SectionHeader title={t('workspace.sidebar.sections.workspace')} />
             {visibleWorkspaceItems.map((item) => (

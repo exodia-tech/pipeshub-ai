@@ -301,7 +301,11 @@ class PipesHubToolLoader:
         (used by the caller for mutually exclusive tool groups, e.g.
         coding_sandbox vs agent_loop_lib's built-in code execution).
         """
-        registry = ToolRegistry()
+        if context.tool_state.get("safe_retrieval_only") is True:
+            from app.agents.agent_loop.read_only_registry import ReadOnlyRetrievalRegistry
+            registry = ReadOnlyRetrievalRegistry()
+        else:
+            registry = ToolRegistry()
         skip_apps = skip_apps or set()
 
         state = context.tool_state
@@ -321,6 +325,8 @@ class PipesHubToolLoader:
         configured_apps = self._build_configured_apps_set(context.agent_toolsets)
 
         for ts_name, ts_meta in toolset_reg.get_all_toolsets().items():
+            if context.tool_state.get("safe_retrieval_only") is True and ts_name != "retrieval":
+                continue
             ts_class = ts_meta.get("class")
             if ts_class is None:
                 continue

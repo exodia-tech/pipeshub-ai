@@ -297,8 +297,8 @@ interface ConvertOptions {
     // Links: [text](url) → <url|text>
     if (!preserveLinks) {
       text = text.replace(
-        /\[([^\]]+)\]\((\S+?)(?:\s+"[^"]*")?\)/g,
-        (_m, label, url) => `<${url}|${label}>`
+        /\[([^\]]+)\]\(((?:[^\s()]|\([^()\s]*\))+?)(?:\s+"[^"]*")?\)/g,
+        (_m, label: string, url: string) => `<${url.replace(/\|/g, '%7C')}|${label.replace(/\|/g, '¦').replace(/</g, '&lt;').replace(/>/g, '&gt;')}>`
       );
     }
   

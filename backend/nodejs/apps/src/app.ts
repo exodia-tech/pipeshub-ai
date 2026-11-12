@@ -982,6 +982,7 @@ export class Application {
         });
       });
       await editionBoot.afterListen(this.logger, this.editionContainers());
+      EnterpriseSearchAgentContainer.startSchedules();
     } catch (error) {
       this.logger.error('Failed to start server', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -1058,6 +1059,7 @@ export class Application {
       // requests already in flight have finished — otherwise they fail
       // mid-request on closed clients. Socket.IO connections are closed by
       // the gateway shutdowns below, so they don't hold the drain open.
+      await EnterpriseSearchAgentContainer.stopSchedules();
       const drained = this.closeHttpServer();
       try {
         await editionBoot.stop(this.logger, this.editionContainers());

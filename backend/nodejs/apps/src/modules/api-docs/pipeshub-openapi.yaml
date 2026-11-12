@@ -816,6 +816,75 @@ components:
         tool_call_id: { type: string, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' }
         tool_name: { type: string, maxLength: 256, pattern: '^[a-zA-Z0-9_.:/-]+$' }
         model: { type: string, minLength: 1, maxLength: 256, description: No control characters }
+    AgentScheduleInput:
+      type: object
+      additionalProperties: false
+      required: [enabled, days, hour, minute, timezone, prompt]
+      properties:
+        enabled: { type: boolean }
+        days:
+          type: array
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items: { type: integer, minimum: 0, maximum: 6 }
+          description: Weekdays; Sunday is 0. Uses the named IANA timezone.
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minute: { type: integer, minimum: 0, maximum: 59 }
+        timezone: { type: string, minLength: 1, maxLength: 100, example: Europe/Rome }
+        prompt: { type: string, minLength: 1, maxLength: 8000 }
+        revision: { type: integer, minimum: 0 }
+        slackBotId: { type: string, format: uuid, nullable: true }
+        projectId:
+          type: string
+          nullable: true
+          description: Approved project for a private draft; omit to preserve the existing mode, or set null to return to public research.
+        slackChannelId:
+          type: string
+          nullable: true
+          pattern: '^[CG][A-Z0-9]{8,20}$'
+          description: Approved channel. Delivery requires a current admin and a bot bound to this agent.
+    AgentSchedule:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        days: { type: array, items: { type: integer } }
+        hour: { type: integer }
+        minute: { type: integer }
+        timezone: { type: string }
+        prompt: { type: string }
+        revision: { type: integer }
+        slackBotId: { type: string, nullable: true }
+        slackChannelId: { type: string, nullable: true }
+        projectId: { type: string, nullable: true }
+        projectGrantId: { type: string, format: uuid, nullable: true, readOnly: true }
+        orgId: { type: string }
+        userId: { type: string }
+        agentId: { type: string, format: uuid }
+        nextRunAt: { type: number, nullable: true, description: Unix milliseconds; null when paused. }
+        lastSuccessfulEnd: { type: number }
+        coveredLinks: { type: array, maxItems: 100, items: { type: string } }
+        runs:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              status: { type: string, enum: [running, draft, needs_review, needs_reconciliation] }
+              startedAt: { type: number }
+              finishedAt: { type: number }
+              periodStart: { type: number }
+              periodEnd: { type: number }
+              conversationId: { type: string }
+              slackTs: { type: string }
+    AgentScheduleResponse:
+      type: object
+      properties:
+        schedule:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/AgentSchedule'
     UsageTotals:
       type: object
       description: Token subsets are not added twice. Spend excludes unpriced calls and is an estimate, not an invoice.
@@ -14229,6 +14298,12 @@ components:
         forwarded by the Node gateway. It is not the full detail projection
         used by `GET /agents/{agentKey}`.
       properties:
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 200
+          pattern: '^(/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)|/api/v1/agents/[0-9a-f-]{36}/avatar/[0-9a-f-]{36})$'
+          description: Deployment-owned raster asset or private versioned picture URL for this agent. External and data URLs are refused as metadata.
         _id:
           type: string
           description: Full document id in the backing graph store.
@@ -14677,6 +14752,12 @@ components:
       required:
         - name
       properties:
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 200
+          pattern: '^(/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)|/api/v1/agents/[0-9a-f-]{36}/avatar/[0-9a-f-]{36})$'
+          description: Deployment-owned raster asset or private versioned picture URL for this agent. External and data URLs are refused as metadata.
         name:
           type: string
           minLength: 1
@@ -15052,6 +15133,12 @@ components:
         Fields the gateway validator does not know are dropped before the
         request reaches the AI backend; they are not refused.
       properties:
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 200
+          pattern: '^(/assets/agents/[a-z0-9][a-z0-9._-]*\.(png|webp|jpg)|/api/v1/agents/[0-9a-f-]{36}/avatar/[0-9a-f-]{36})$'
+          description: Deployment-owned raster asset or private versioned picture URL for this agent. External and data URLs are refused as metadata.
         name:
           type: string
           minLength: 1
@@ -18896,7 +18983,7 @@ components:
           description: |
             Reasoning effort for this model when a chat or agent request doesn't
             choose one. Applies only when `isReasoning` is true. Empty or absent
-            means the platform default (`high`). `none` is accepted for
+            means the platform default (`low`). `none` is accepted for
             compatibility and treated as `low`.
         identityForwardingEnabled:
           type: boolean
@@ -25135,6 +25222,229 @@ paths:
         '409': { description: Event ID already recorded with different actor or metadata }
         '503': { description: Audit event was not confirmed saved }
 
+  /agents/{agentKey}/avatar:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Agents]
+      summary: Upload or replace an agent's private profile picture
+      description: |
+        Requires agent:read, agent:write and creator ownership. Accepts PNG, JPEG or WebP
+        bytes up to 5 MiB and 16 megapixels, regardless of the supplied MIME type.
+        Re-encodes to a metadata-free 512px square WebP, at most 256 KiB, stored in the
+        organization's persistent KV store. Returns a versioned authenticated API URL.
+        Updates Brain only; does not change the Slack application's icon.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Picture saved and agent metadata updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [avatarUrl]
+                properties:
+                  avatarUrl: { type: string }
+        '400': { description: Missing, oversized or invalid image. }
+        '403': { description: Caller lacks scope or creator ownership. }
+    delete:
+      tags: [Agents]
+      summary: Remove an agent's profile picture
+      description: Requires agent:read, agent:write and creator ownership. Clears metadata before deleting stored image bytes.
+      responses:
+        '200':
+          description: Picture removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  avatarUrl: { type: string, nullable: true, enum: [null] }
+        '403': { description: Caller lacks scope or creator ownership. }
+  /agents/{agentKey}/avatar/{version}:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: version, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Agents]
+      summary: Read the current private agent picture
+      description: Requires agent:read and current agent visibility. Organization and active version are checked on every read. Responses use Cache-Control private, no-store.
+      responses:
+        '200':
+          description: Authenticated raster image data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dataUrl]
+                properties:
+                  dataUrl: { type: string, description: Base64 WebP data URL for display after an authenticated fetch. }
+        '403': { description: Agent visibility or scope denied. }
+        '404': { description: Picture missing or version no longer active. }
+  /agents/{agentKey}/schedule/slack-bots:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Agents]
+      summary: List existing Slack bots bound to this agent
+      description: Requires agent:read and creator ownership. Live organization administrators receive bot IDs and names only; other creators receive canManage false and an empty list. Never returns credentials or expands Slack scopes.
+      responses:
+        '200':
+          description: Available delivery settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canManage, bots]
+                properties:
+                  canManage: { type: boolean }
+                  bots:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+        '403': { description: Caller lacks scope or creator ownership. }
+  /agents/{agentKey}/schedule/project-grant/preview:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+      - { in: query, name: projectId, required: true, schema: { type: string, maxLength: 128 } }
+    get:
+      tags: [Agents]
+      summary: Review the sources and model for a project draft schedule
+      description: Requires agent:read, project:read, agent ownership, live organization administrator role and direct or organization-wide project access. The returned fingerprint binds the exact current agent, project and model configuration. No credentials are returned.
+      responses:
+        '200':
+          description: Reviewable source and model scope with an approval fingerprint
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [projectId, projectName, agentKnowledge, projectSources, model, fingerprint]
+                properties:
+                  projectId: { type: string }
+                  projectName: { type: string }
+                  agentKnowledge: { type: array, items: { type: object, additionalProperties: true } }
+                  projectSources: { type: object, additionalProperties: true }
+                  linkedKnowledgeBaseId: { type: string, nullable: true }
+                  model:
+                    type: object
+                    properties:
+                      modelKey: { type: string }
+                      modelName: { type: string }
+                      provider: { type: string }
+                  fingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
+        '403': { description: Missing privilege, inaccessible project, unsupported agent or invalid model. }
+  /agents/{agentKey}/schedule/project-grant:
+    parameters:
+      - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      summary: Approve the exact reviewed project and model scope
+      description: Requires agent:read, agent:write, agent:execute, project:read, agent ownership and a live organization administrator. Preview first; approval fails when the fingerprint changed. Approving a replacement invalidates any schedule bound to the earlier grant until it is saved again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [projectId, fingerprint]
+              properties:
+                projectId: { type: string, minLength: 1, maxLength: 128 }
+                fingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
+      responses:
+        '201': { description: Project scope approved; response contains the bound grant metadata. }
+        '403': { description: Scope or privilege changed, or caller lacks ownership. }
+    delete:
+      tags: [Agents]
+      summary: Revoke a project schedule approval
+      description: Requires agent:read, agent:write, project:read and agent ownership. Future runs fail closed. A run already underway cannot be recalled.
+      responses:
+        '204': { description: Approval revoked. }
+        '403': { description: Scope or creator ownership denied. }
+  /agents/{agentKey}/schedule:
+    parameters:
+      - in: path
+        name: agentKey
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Agents]
+      summary: Read the creator's native agent schedule and recent runs
+      description: Requires agent:read and agent ownership. Returns null before a schedule is saved.
+      responses:
+        '200':
+          description: Owner-scoped schedule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
+        '403': { description: Caller is not the agent creator or lacks scope. }
+    put:
+      tags: [Agents]
+      summary: Save or pause a native agent schedule
+      description: |
+        Requires agent:read, agent:write and agent:execute and agent ownership. With
+        projectId, enabling or changing the project additionally requires project:read,
+        a matching approved project grant, current organization admin status and access
+        to that project. Project runs use only that project's scope, current owner ACLs,
+        and the approved model; action tools, MCP, skills, web search, Slack delivery,
+        service-agent delegation and user-context injection are unavailable. The draft
+        remains private to its owner. An omitted projectId preserves the existing mode;
+        null explicitly chooses public research. Public runs retain the original policy.
+        Slack delivery additionally requires current organization-admin permission
+        and a stored Slack bot mapped to this agent. No secrets are accepted here.
+        Destination edits are validated even while paused. A creator can pause or
+        clear unchanged delivery settings after losing administrator permission.
+        Revision prevents lost updates. Interrupted/uncertain runs pause the schedule
+        for reconciliation; they are not automatically repeated. Missed ticks are
+        coalesced into one run, whose reporting window covers the gap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AgentScheduleInput' }
+      responses:
+        '200':
+          description: Saved schedule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
+        '400': { description: Invalid settings or timezone. }
+        '403': { description: Ownership, scopes, public-research or delivery policy denied. }
+        '409': { description: Stale revision; reload before saving. }
+  /agents/{agentKey}/schedule/run:
+    parameters:
+      - in: path
+        name: agentKey
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Agents]
+      summary: Run the saved native schedule now
+      description: |
+        Requires agent:read, agent:execute and ownership, plus project:read and a valid
+        project approval for a project schedule. Works while automatic runs are paused.
+        Returns after execution; on a transport timeout read the ledger before taking
+        further action. Never blindly retry. A saved draft does not prove source coverage.
+      responses:
+        '200':
+          description: Updated run ledger; inspect run status and conversation before publication.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
+        '403': { description: Owner, agent policy or delivery authorization denied. }
+        '409': { description: No saved schedule, or another run is active. }
   /usage:
     get:
       tags: [Usage Analytics]
@@ -25169,6 +25479,40 @@ paths:
         '403': { description: Insufficient scope or organization administrator required }
         '422': { description: Invalid filters, date range or pagination }
         '503': { description: Persistent tracking storage is not configured }
+  /usage/observability:
+    get:
+      tags: [Usage Analytics]
+      summary: Read the organization's observability export setting
+      description: Requires an organization administrator and config:read. Disabled by default; server-side collector configuration is also required.
+      responses:
+        '200':
+          description: Organization setting
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled]
+                properties:
+                  enabled: { type: boolean }
+        '403': { description: Administrator or config:read scope required }
+    put:
+      tags: [Usage Analytics]
+      summary: Enable or disable usage export for the organization
+      description: Requires an organization administrator and config:write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { description: Organization setting saved }
+        '403': { description: Administrator or config:write scope required }
+        '422': { description: Invalid setting }
   /usage/rates:
     get:
       tags: [Usage Analytics]
@@ -74218,6 +74562,77 @@ paths:
           description: The AI search service is temporarily unavailable or could not be reached.
         '504':
           description: The AI search service did not answer in time.
+
+  /search/graph:
+    post:
+      tags: [Semantic Search]
+      summary: Page through the caller's knowledge graph
+      operationId: graphOverview
+      description: |
+        Lists up to 200 items through the same access checks as All Records,
+        with readable parents, taxonomy and enabled named-entity mention edges.
+        Follow nextCursor until null to cover the whole visible listing. Cursors
+        are signed and bound to the caller and organization. Each page rechecks
+        access; refresh the graph after permission changes or new syncs. Graph
+        counts and communities must be calculated from returned nodes only.
+        This is a knowledge view, not an export of database administration nodes.
+        Source-limited connected-app tokens are refused; use the signed-in
+        dashboard session or an app authorized for the user's full knowledge.
+      security:
+        - bearerAuth: []
+        - oauth2: [semantic:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 16384
+      responses:
+        '200':
+          description: One access-filtered graph page. A failed read is never returned as an empty graph.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodes, edges, listed, total, nextCursor]
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, kind]
+                      properties:
+                        id: {type: string}
+                        name: {type: string}
+                        kind: {type: string}
+                        recordId: {type: string}
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      required: [source, target]
+                      properties:
+                        source: {type: string}
+                        target: {type: string}
+                  listed: {type: integer, minimum: 0}
+                  total: {type: integer, minimum: 0}
+                  nextCursor: {type: string, nullable: true}
+        '400':
+          description: Invalid or expired cursor.
+        '401':
+          description: Missing user authentication.
+        '403':
+          description: Missing semantic:read or semantic:write scope, or a source-limited connected-app token.
+        '503':
+          description: Graph listing, adjacency or signed pagination is unavailable.
+        '504':
+          description: The graph service timed out.
 
   /search/entities:
     post:

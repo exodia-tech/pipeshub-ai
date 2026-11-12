@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Badge, Flex } from '@radix-ui/themes';
+import { addons } from '@/addons/registry';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { ICON_SIZE_DEFAULT } from '@/app/components/sidebar';
 import { useCommandStore } from '@/lib/store/command-store';
@@ -158,11 +159,15 @@ export function StaticNavSection() {
           href={item.route}
           onClick={closeOnMobile}
           isActive={
-            item.route.startsWith('/artifacts') &&
-            pathname.startsWith('/artifacts')
+            (item.route.startsWith('/artifacts') && pathname.startsWith('/artifacts'))
           }
         />
       ))}
+      {addons.map(addon => <SidebarItem key={addon.id}
+        icon={<MaterialIcon name={addon.icon} size={ICON_SIZE_DEFAULT} color={NAV_ICON_COLOR} />}
+        label={t(addon.labelKey)} href={addon.route} textColor={NAV_ICON_COLOR}
+        onClick={closeOnMobile} isActive={pathname.startsWith(addon.route)}
+      />)}
     </Flex>
   );
 }

@@ -1,74 +1,4 @@
 {
-  "groupAccess": {
-    "currentAccess": "Current readers",
-    "empty": "No accessible resources here.",
-    "expand": "Expand",
-    "allow": "Allow",
-    "allowed": "Allowed",
-    "blocked": "Blocked",
-    "inherited": "Inherited",
-    "reset": "Use inherited access",
-    "description": "These rules restrict what group members may read in Brain. Slack and Drive permissions still apply. All configured group restrictions apply to each member.",
-    "all": "All source-permitted resources",
-    "selected": "Selected resources only",
-    "manage": "Manage access",
-    "allWithExceptions": "All source-permitted resources, with exceptions",
-    "partial": "Partial access",
-    "noReaders": "No current readers",
-    "countsHint": "Reader counts reflect saved rules, source permissions and other group restrictions. — means unverified."
-  },
-  "accessGroups": {
-    "title": "Access groups",
-    "adminOnly": "Only administrators can manage access groups.",
-    "help": "Add members, then control their connector, channel and folder access in Access permissions. Collection sharing still applies.",
-    "error": "The operation could not be confirmed. Refresh and check the current state before retrying.",
-    "name": "Group name",
-    "create": "Create group",
-    "previous": "Previous",
-    "next": "Next",
-    "rename": "Rename",
-    "delete": "Delete",
-    "confirmDelete": "Delete this group and revoke its access?",
-    "members": "Members",
-    "remove": "Remove",
-    "search": "Search people",
-    "add": "Add"
-  },
-  "audit": {
-    "agentId": "Agent ID",
-    "runId": "Run ID",
-    "traceId": "Trace ID",
-    "parentRunId": "Parent run ID",
-    "tool": "Tool",
-    "toolCallId": "Tool call ID",
-    "model": "Model",
-    "agentCoverage": "Also records agent run outcomes and emitted tool activity, including refusals and pending approvals. Arguments and results are excluded. Agent execution continues if audit storage fails; missing events are reported in server logs.",
-    "subtitle": "Review workspace activity and permission changes.",
-    "coverageTitle": "Audit coverage",
-    "title": "Audit log",
-    "adminOnly": "Only administrators can view audit history.",
-    "coverage": "Currently records successful sign-ins, group administration, collection permission changes, selected document stream starts, and audit-log access. Other platform activity is not yet included. An intent without a success may have an unknown outcome.",
-    "loginWarning": "Successful sign-ins are recorded when audit storage is available. Sign-in remains available during audit outages, so records may be missing.",
-    "action": "Action",
-    "outcome": "Outcome",
-    "actorId": "Actor ID",
-    "groupId": "Group ID",
-    "members": "Member IDs",
-    "operation": "Operation ID",
-    "resource": "Resource ID",
-    "role": "Role",
-    "invalidFilters": "Enter complete IDs and a valid date range.",
-    "from": "From (UTC)",
-    "to": "To (UTC)",
-    "all": "All",
-    "loading": "Loading audit history…",
-    "error": "Unable to load audit history. Check the filters and try again.",
-    "empty": "No events found.",
-    "time": "Time",
-    "previous": "Previous",
-    "next": "Next",
-    "exportPage": "Export this page as JSON"
-  },
   "collections": {
     "stats": {
       "title": "Analytics",
@@ -399,7 +329,8 @@
     "searchChats": "Search chats",
     "inbox": "Inbox",
     "notifications": "Notifications",
-    "home": "Home"
+    "home": "Home",
+    "addons": "Add-ons"
   },
   "artifacts": {
     "title": "All artifacts",
@@ -1227,42 +1158,34 @@
         ]
       }
     },
-    "demoBanner": "You're looking at Acme Corp, a small fictional company loaded as demo data. Try one of these, or",
+    "demoBanner": "You're looking at Mobart Ben, a small fictional company loaded as demo data. Try one of these, or",
     "demoConnectYourOwn": "connect your own sources",
     "demoSuggestions": {
       "1": {
-        "text": "Why was the payment service architecture changed, and how was the decision made?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "Which customers reported export timeouts, and what fixed it?",
-        "icons": [
-          "jira",
-          "github"
-        ]
-      },
-      "3": {
-        "text": "What's our policy on being on-call over a public holiday?",
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
         "icons": [
           "sheets"
         ]
       },
+      "3": {
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
+      },
       "4": {
-        "text": "Who reviewed and approved PR #482 in the billing worker, and what did Dana ask for before it merged?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "What is the enterprise pricing strategy for 2026?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -1673,6 +1596,20 @@
         "done": "Done",
         "error": "Failed"
       }
+    },
+    "timeGreeting": {
+      "morning": "Good morning",
+      "morningNamed": "Good morning, {{name}}",
+      "afternoon": "Good afternoon",
+      "afternoonNamed": "Good afternoon, {{name}}",
+      "evening": "Good evening",
+      "eveningNamed": "Good evening, {{name}}",
+      "night": "Good night",
+      "nightNamed": "Good night, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Say hello",
+      "hello": "Hello!"
     }
   },
   "workspaceMenu": {
@@ -4355,11 +4292,11 @@
       "moreAgents": "More agents",
       "moreChats": "More chats",
       "demoData": {
-        "description": "Acme Corp is a fictional company loaded so you can try EXODIA Brain. This only changes what you see; nothing is deleted.",
+        "description": "Mobart Ben is a fictional company loaded so you can try EXODIA Brain. This only changes what you see; nothing is deleted.",
         "everyoneDescription": "Turning it off hides the demo from everyone's answers, search and records, and stops the sample accounts signing in. Nothing is deleted.",
         "everyoneLabel": "Offer the demo to everyone",
         "followingDefault": "Following the default: shown until your organization has data of its own, then hidden.",
-        "label": "Show Acme Corp demo data in my answers, search and records",
+        "label": "Show Mobart Ben demo data in my answers, search and records",
         "offForEveryone": "Turned off for everyone by an admin.",
         "title": "Demo data",
         "useDefault": "Use the default",
@@ -5788,17 +5725,17 @@
   "demoData": {
     "badge": {
       "label": "Demo",
-      "tooltip": "Sample data from the Acme Corp demo, not one of your company's records"
+      "tooltip": "Sample data from the Mobart Ben demo, not one of your company's records"
     },
     "removalNotice": {
-      "title": "The Acme Corp demo data is still in your workspace",
+      "title": "The Mobart Ben demo data is still in your workspace",
       "description": "Your company's own data is now in EXODIA Brain. The demo is hidden from answers by default, but anyone can turn it back on, and its sample accounts can still sign in. Turn it off for everyone, or remove it permanently.",
       "remove": "Remove permanently",
       "keep": "Keep for now",
       "turnOff": "Turn off for everyone"
     },
     "removeDialog": {
-      "title": "Remove the Acme Corp demo data permanently?",
+      "title": "Remove the Mobart Ben demo data permanently?",
       "description": "This deletes the Demo connector with all of its records, groups and permissions. To hide it without deleting anything, turn it off for everyone instead. You can add it again later from the Connectors page.",
       "deleteAccounts": "Also delete the sample accounts: {{names}}",
       "deleteAccountsHint": "They were created with a starting password, so anyone who knows it can sign in as them.",
@@ -5814,7 +5751,7 @@
     "switch": {
       "errorTitle": "Couldn't change the demo data setting",
       "errorDescription": "Nothing changed. Try again in a moment.",
-      "hiddenTitle": "Acme Corp demo data hidden",
+      "hiddenTitle": "Mobart Ben demo data hidden",
       "hiddenDescription": "It's out of your answers, search and records. Turn it back on anytime in Profile → Demo data.",
       "undo": "Undo"
     },
@@ -5872,6 +5809,7 @@
     "metric": "Chart metric",
     "overTime": "Usage over time",
     "chartData": "View chart data",
+    "filters": "Filters",
     "topModels": "Most used models",
     "byWorkload": "Usage by workload",
     "byMember": "Usage by member",
@@ -5912,6 +5850,189 @@
     "averageLatency": "Average latency",
     "noConnector": "No connector",
     "useCatalog": "Use catalog"
+  },
+  "agentSchedule": {
+    "title": "Agent schedule",
+    "description": "Public research only. Every briefing is marked as a draft.",
+    "loading": "Loading…",
+    "enabled": "Run automatically",
+    "days": "Days",
+    "time": "Time",
+    "timezone": "Time zone",
+    "prompt": "Briefing instructions",
+    "next": "Next run",
+    "slackEnabled": "Slack delivery is enabled.",
+    "brainOnly": "Drafts are saved in Brain.",
+    "runs": "Recent runs",
+    "empty": "No runs yet.",
+    "open": "Open draft",
+    "close": "Close",
+    "working": "Working…",
+    "run": "Run now",
+    "save": "Save",
+    "failed": "Could not update the schedule.",
+    "invalid": "Choose days, a time and briefing instructions.",
+    "status": {
+      "running": "Running",
+      "draft": "Draft ready",
+      "needs_review": "Review draft",
+      "needs_reconciliation": "Check interrupted run"
+    },
+    "slackTitle": "Slack delivery",
+    "sendSlack": "Send briefings to Slack",
+    "slackBot": "Slack bot",
+    "chooseBot": "Choose a bot",
+    "slackChannel": "Slack channel",
+    "channelPlaceholder": "Paste a Slack channel link or ID",
+    "channelHelp": "Invite the selected bot to this channel before enabling delivery.",
+    "slackAdminOnly": "An organization admin manages Slack delivery. You can disable it.",
+    "manageBots": "Manage Slack bots",
+    "noBots": "Connect a bot to this agent first.",
+    "slackLoadFailed": "Slack settings couldn't load. Close and reopen to retry.",
+    "invalidSlack": "Choose a bot and enter a valid Slack channel link or ID.",
+    "saveBeforeRun": "Save your changes before running.",
+    "projectDescription": "Private project draft. Only the approved project sources are used; Slack delivery is unavailable."
+  },
+  "agentPicture": {
+    "title": "Change agent picture",
+    "description": "Update this agent's picture in Brain.",
+    "choose": "Choose image",
+    "remove": "Remove picture",
+    "formats": "PNG, JPEG or WebP · up to 5 MB",
+    "preview": "Picture preview",
+    "invalid": "Choose a PNG, JPEG or WebP image smaller than 5 MB.",
+    "failed": "Couldn't save the agent picture. Please try again.",
+    "saving": "Saving…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "Model default reasoning",
+    "inheritPlatform": "Use platform default (Low)",
+    "inheritModel": "Inherit model default",
+    "priority": "Priority: message choice → agent default → model default → Low."
+  },
+  "graph": {
+    "title": "Knowledge graph",
+    "overviewIntro": "Explore your knowledge as connected clusters. Zoom in to discover the records and ideas within them.",
+    "arranging": "Finding clusters and arranging the graph…",
+    "progress": "Loading records: {{loaded}} / {{total}}",
+    "counts": "{{nodes}} nodes · {{edges}} connections · {{clusters}} clusters",
+    "findNode": "Find a node…",
+    "empty": "No knowledge is visible to your account yet.",
+    "retry": "Try again",
+    "error": "The graph could not be loaded. Try again.",
+    "rendererError": "This browser could not render the graph. Enable WebGL or try another browser. You can still browse clusters and search nodes below.",
+    "canvasLabel": "3D knowledge graph. Rotate, zoom and select a cluster to explore its nodes.",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Show whole graph",
+    "openRecord": "Open record",
+    "searchResults": "Matching nodes",
+    "noResults": "No matching nodes.",
+    "clusters": "Clusters",
+    "unconnected": "Unconnected nodes",
+    "clusterHint": "Select a cluster to zoom in. Select a node to inspect it.",
+    "coverage": "All readable records and their stored connections. Clusters reflect your permissions. Refresh after syncing.",
+    "entity": "Entity",
+    "kinds": {
+      "record": "Record",
+      "folder": "Folder",
+      "kb": "Collection",
+      "app": "Source",
+      "recordGroup": "Record group",
+      "department": "Department",
+      "category": "Category",
+      "subcategory": "Subcategory",
+      "topic": "Topic",
+      "language": "Language",
+      "named_entity": "Named entity"
+    },
+    "preparing": "Preparing your knowledge graph",
+    "rendering": "Rendering the map…",
+    "metricLegend": "Cluster size: nodes · Dot size: connections",
+    "refresh": "Refresh graph",
+    "connections": "Connections: {{value}}",
+    "layout": {
+      "progress": "Arranging nodes: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Rotate left",
+    "rotateRight": "Rotate right",
+    "controls3d": "Drag to rotate · Scroll to zoom · Right-drag to pan. On touch: one finger rotates, two fingers zoom or pan.",
+    "connectionHint": "Select a node to see its connections.",
+    "visibleNodes": "Showing {{shown}} of {{total}} nodes · Zoom in for more detail.",
+    "cacheHint": "Recent layouts are reused while checking for updates. Refresh checks for new data.",
+    "updating": "Checking for graph updates…",
+    "refreshError": "Could not refresh. The saved graph is still shown."
+  },
+  "groupAccess": {
+    "currentAccess": "Current readers",
+    "empty": "No accessible resources here.",
+    "expand": "Expand",
+    "allow": "Allow",
+    "allowed": "Allowed",
+    "blocked": "Blocked",
+    "inherited": "Inherited",
+    "reset": "Use inherited access",
+    "description": "These rules restrict what group members may read in Brain. Slack and Drive permissions still apply. All configured group restrictions apply to each member.",
+    "all": "All source-permitted resources",
+    "selected": "Selected resources only",
+    "manage": "Manage access",
+    "allWithExceptions": "All source-permitted resources, with exceptions",
+    "partial": "Partial access",
+    "noReaders": "No current readers",
+    "countsHint": "Reader counts reflect saved rules, source permissions and other group restrictions. — means unverified."
+  },
+  "accessGroups": {
+    "title": "Access groups",
+    "adminOnly": "Only administrators can manage access groups.",
+    "help": "Add members, then control their connector, channel and folder access in Access permissions. Collection sharing still applies.",
+    "error": "The operation could not be confirmed. Refresh and check the current state before retrying.",
+    "name": "Group name",
+    "create": "Create group",
+    "previous": "Previous",
+    "next": "Next",
+    "rename": "Rename",
+    "delete": "Delete",
+    "confirmDelete": "Delete this group and revoke its access?",
+    "members": "Members",
+    "remove": "Remove",
+    "search": "Search people",
+    "add": "Add"
+  },
+  "audit": {
+    "agentId": "Agent ID",
+    "runId": "Run ID",
+    "traceId": "Trace ID",
+    "parentRunId": "Parent run ID",
+    "tool": "Tool",
+    "toolCallId": "Tool call ID",
+    "model": "Model",
+    "agentCoverage": "Also records agent run outcomes and emitted tool activity, including refusals and pending approvals. Arguments and results are excluded. Agent execution continues if audit storage fails; missing events are reported in server logs.",
+    "subtitle": "Review workspace activity and permission changes.",
+    "coverageTitle": "Audit coverage",
+    "title": "Audit log",
+    "adminOnly": "Only administrators can view audit history.",
+    "coverage": "Currently records successful sign-ins, group administration, collection permission changes, selected document stream starts, and audit-log access. Other platform activity is not yet included. An intent without a success may have an unknown outcome.",
+    "loginWarning": "Successful sign-ins are recorded when audit storage is available. Sign-in remains available during audit outages, so records may be missing.",
+    "action": "Action",
+    "outcome": "Outcome",
+    "actorId": "Actor ID",
+    "groupId": "Group ID",
+    "members": "Member IDs",
+    "operation": "Operation ID",
+    "resource": "Resource ID",
+    "role": "Role",
+    "invalidFilters": "Enter complete IDs and a valid date range.",
+    "from": "From (UTC)",
+    "to": "To (UTC)",
+    "all": "All",
+    "loading": "Loading audit history…",
+    "error": "Unable to load audit history. Check the filters and try again.",
+    "empty": "No events found.",
+    "time": "Time",
+    "previous": "Previous",
+    "next": "Next",
+    "exportPage": "Export this page as JSON"
   },
   "datePicker": {
     "on": "On",

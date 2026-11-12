@@ -34,13 +34,13 @@ DEMO_APP = "demo"
 _DEMO_SEARCH_RULE = " Leave the organization's name out of searches of the Demo source."
 
 DEMO_SOURCE_NOTE = (
-    "**Demo data.** The Demo source holds sample records for Acme Corp, a small "
+    "**Demo data.** The Demo source holds sample records for Mobart Ben, a fictional "
     "fictional company loaded into this workspace so people can try it out; its "
     "records carry GitHub, Jira, Slack, Google Drive and ServiceNow labels. Only "
-    "records from the Demo source are Acme Corp's: never call a record from any "
-    "other source (a Collection, another connector) Acme Corp's, and never present "
-    "an Acme Corp fact as the user's organization's. When you answer from Acme Corp "
-    "records, name Acme Corp (\"Acme Corp's on-call policy is ...\"). Do not decline "
+    "records from the Demo source are Mobart Ben's: never call a record from any "
+    "other source (a Collection, another connector) Mobart Ben's, and never present "
+    "a Mobart Ben fact as the user's organization's. When you answer from Mobart Ben "
+    "records, name Mobart Ben (\"Mobart Ben's Villa Aurora project is ...\"). Do not decline "
     "or discard them only because this workspace's organization has a different name."
     + _DEMO_SEARCH_RULE
 )
@@ -49,10 +49,10 @@ DEMO_SOURCE_NOTE = (
 # so it answers "our" questions instead of standing aside as a fallback.
 DEMO_ONLY_SOURCE_NOTE = (
     "**Demo data.** The Demo source, the only knowledge here, is sample data provided "
-    "for this workspace: records for Acme Corp, a small fictional company, labelled "
+    "for this workspace: records for Mobart Ben, a fictional company, labelled "
     "GitHub, Jira, Slack, Google Drive and ServiceNow. Answer from it as from this "
     "workspace's own data, \"our\" questions included, and say the answer comes from the "
-    "demo data (\"In the Acme Corp demo data, the on-call policy is ...\"). The "
+    "demo data (\"In the Mobart Ben demo data, the Villa Aurora project is ...\"). The "
     "organization's different name is expected: never decline Demo records because of it."
     + _DEMO_SEARCH_RULE
 )

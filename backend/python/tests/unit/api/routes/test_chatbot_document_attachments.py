@@ -790,6 +790,7 @@ class TestLongPdfAttachment:
         error, processor, _ = await self._upload(False, CHAT_PDF_PAGE_CAP)
 
         processor.parse_document.assert_awaited_once()
+        assert processor.parse_document.await_args.kwargs["use_layout_model"] is False
         assert "pages a PDF can have" not in str(error.detail)
 
 

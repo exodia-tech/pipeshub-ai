@@ -5,6 +5,10 @@ import { KeyValueStoreService } from '../../../libs/services/keyValueStore.servi
 import { AuthTokenService } from '../../../libs/services/authtoken.service';
 import { AuthMiddleware } from '../../../libs/middlewares/auth.middleware';
 import { AppConfig } from '../../tokens_manager/config/config';
+import { AgentPictures } from '../services/agent-pictures';
+import { AgentSchedules } from '../services/agent-schedules';
+import { ScheduledAgentRuntime } from '../services/scheduled-agent-runtime';
+import { AgentProjectGrants } from '../services/agent-project-grants';
 
 const loggerConfig = {
   service: 'Enterprise Search Service',
@@ -63,6 +67,15 @@ export class EnterpriseSearchAgentContainer {
       container
         .bind<AuthMiddleware>('AuthMiddleware')
         .toConstantValue(authMiddleware);
+      const grants = new AgentProjectGrants(keyValueStoreService);
+      const runtime = new ScheduledAgentRuntime(() => container.get<AppConfig>('AppConfig'), keyValueStoreService, grants);
+      const schedules = new AgentSchedules(keyValueStoreService, runtime.execute, () => {
+        this.logger.error('Native agent schedule failed; inspect its run history');
+      }, Date.now, () => runtime.isReady());
+      container.bind(ScheduledAgentRuntime).toConstantValue(runtime);
+      container.bind(AgentProjectGrants).toConstantValue(grants);
+      container.bind(AgentPictures).toConstantValue(new AgentPictures(keyValueStoreService, runtime));
+      container.bind(AgentSchedules).toConstantValue(schedules);
       this.logger.info(
         'Enterprise Search Agent services initialized successfully',
       );
@@ -77,6 +90,14 @@ export class EnterpriseSearchAgentContainer {
     }
   }
 
+  static startSchedules(): void {
+    this.instance.get(AgentSchedules).start();
+  }
+
+  static async stopSchedules(): Promise<void> {
+    if (this.instance?.isBound(AgentSchedules)) await this.instance.get(AgentSchedules).stop();
+  }
+
   static getInstance(): Container {
     if (!this.instance) {
       throw new Error('Service container not initialized');
@@ -86,6 +107,7 @@ export class EnterpriseSearchAgentContainer {
 
   static async dispose(): Promise<void> {
     try {
+      if (this.instance.isBound(AgentSchedules)) await this.instance.get(AgentSchedules).stop();
       // Get only services that need to be disconnected
       const keyValueStoreService = this.instance.isBound('KeyValueStoreService')
         ? this.instance.get<KeyValueStoreService>('KeyValueStoreService')

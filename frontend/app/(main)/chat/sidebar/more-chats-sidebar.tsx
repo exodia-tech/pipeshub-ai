@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Flex, Box, Text, TextField } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
-import { LottieLoader } from '@/app/components/ui/lottie-loader';
+import { ChatCompanion } from '@/app/(main)/chat/components/chat-companion';
 import { SecondaryPanel, SidebarBackHeader } from '@/app/components/sidebar';
 import { useChatStore } from '@/chat/store';
 import { useMobileSidebarStore } from '@/lib/store/mobile-sidebar-store';
@@ -199,7 +199,7 @@ export const MoreChatsSidebar = React.memo(function MoreChatsSidebar({ sectionTy
         >
           {isLoading ? (
             <Flex align="center" justify="center" style={{ padding: 'var(--space-5) var(--space-3)' }}>
-              <LottieLoader variant="loader" size={28} showLabel />
+              <ChatCompanion variant="loader" size={28} showLabel />
             </Flex>
           ) : rows.length > 0 ? (
             rows.map((conv) => (
@@ -230,7 +230,7 @@ export const MoreChatsSidebar = React.memo(function MoreChatsSidebar({ sectionTy
             <Box ref={sentinelRef} style={{ padding: 'var(--space-2) 0', textAlign: 'center' }}>
               {isLoadingMore && (
                 <Flex align="center" justify="center" gap="2" style={{ padding: 'var(--space-1) 0' }}>
-                  <LottieLoader variant="loader" size={20} showLabel />
+                  <ChatCompanion variant="loader" size={20} showLabel />
                 </Flex>
               )}
             </Box>

@@ -139,6 +139,10 @@ export class SlackActivityBuilder {
   private timeline: TimelineEntry[] = [];
   private openToolName: string | null = null;
 
+  getStatus(): string {
+    return this.statusMessage;
+  }
+
   setStatus(message: string): void {
     // Empty string clears the live status line after the run finishes.
     this.statusMessage = message.trim();
@@ -323,7 +327,10 @@ export class SlackActivityBuilder {
       }
     }
 
-    if (this.statusMessage.trim()) {
+    const running = [...this.timeline].reverse().find((entry) => entry.kind === 'tool' && !entry.row.done);
+    const repeatsRunningTool = running?.kind === 'tool' &&
+      [running.row.label, toolDisplayLabel(running.row)].some((label) => this.statusMessage === `${label}...`);
+    if (this.statusMessage.trim() && !repeatsRunningTool) {
       sections.push(`_${this.statusMessage}_`);
     }
 

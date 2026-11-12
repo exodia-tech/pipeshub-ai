@@ -202,7 +202,7 @@ def emit(
         return
     counts, detected = normalize_usage(raw, normalized=normalized, kind=kind)
     try:
-        UsageLedger().record(
+        event = UsageLedger().record(
             {
                 "id": event_id or str(uuid.uuid4()),
                 "org_id": ctx.principal.org_id,
@@ -236,6 +236,14 @@ def emit(
             "Usage ledger write failed; accounting coverage is incomplete",
             exc_info=True,
         )
+        return
+    if event:
+        try:
+            from app.services.usage.observability import export_usage
+
+            export_usage(event)
+        except Exception:
+            logger.warning("Observability export unavailable; local usage is unaffected")
 
 
 async def emit_async(

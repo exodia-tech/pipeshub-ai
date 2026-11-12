@@ -65,6 +65,8 @@ Related services and ports are listed in `AGENTS.md`.
 
 ---
 
+Embedding-provider throttling also signals the shared admission pause. For Gemini, the retry policy follows an explicit LangChain exception cause to Google's API error and honors `Retry-After` or `google.rpc.RetryInfo.retryDelay`. A 429 without a valid delay pauses admissions for 30 seconds. The per-batch retry budget stays bounded; this pause does not raise spending limits or make exhausted quota recover without provider-side action.
+
 ## 2. Record lifecycle and data flow
 
 ### 2.1 Status state machine

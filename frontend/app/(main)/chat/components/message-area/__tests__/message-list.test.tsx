@@ -29,8 +29,8 @@ const viewport = vi.hoisted(() => ({ isMobile: false }));
 
 vi.mock('@/lib/hooks/use-is-mobile', () => ({ useIsMobile: () => viewport.isMobile }));
 
-vi.mock('@/app/components/ui/lottie-loader', () => ({
-  LottieLoader: ({ size }: { size?: number }) => (
+vi.mock('@/app/(main)/chat/components/chat-companion', () => ({
+  ChatCompanion: ({ size }: { size?: number }) => (
     <div role="status" data-size={size}>
       Loading
     </div>

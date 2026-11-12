@@ -14,7 +14,7 @@ export const DEMO_ACCOUNT_DOMAIN = 'acme-demo.example';
  * The sample record only Acme's pricing committee can open, and a committee
  * member's account. Kept in step with the fixture by test_demo_fixture.py.
  */
-export const RESTRICTED_RECORD_TITLE = 'Enterprise pricing strategy 2026';
+export const RESTRICTED_RECORD_TITLE = 'Nota interna riservata — etichetta fittizia bozza variante — Villa Aurora';
 export const RESTRICTED_RECORD_READER = `bob@${DEMO_ACCOUNT_DOMAIN}`;
 
 /** How long "Keep for now" hides the removal notice. */

@@ -19,6 +19,7 @@ import time
 from typing import TYPE_CHECKING, Any, Literal
 
 import regex
+from app.addons import register_search_addons
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
@@ -615,3 +616,5 @@ async def entity_neighbors(
         **({"relatedNote": "Related entities are counted over the records listed here, not the whole entity."} if page.next_cursor else {}),
     })
 
+
+register_search_addons(router, identity=_user, provider=_graph_provider)

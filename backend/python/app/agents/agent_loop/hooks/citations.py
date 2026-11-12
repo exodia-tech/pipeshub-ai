@@ -450,6 +450,9 @@ def citation_tracking(
     async def _middleware(ctx: ToolResultContext, next_fn: "Next") -> None:
         await next_fn()
 
+        if context.tool_state.get("safe_retrieval_only") is True:
+            return
+
         run_scope = ctx.scope.turn.run if ctx.scope is not None else None
         registry = run_scope.runtime.tool_registry if run_scope is not None else None
         if registry is None:
@@ -498,6 +501,8 @@ def ensure_fetch_full_record_available(
     responsible for ensuring the tool is visible (e.g. via ``_grant``
     directly).  When provided they mirror ``citation_tracking``'s behaviour.
     """
+    if context.tool_state.get("safe_retrieval_only") is True:
+        return
     collector = CitationCollector(context)
     if registry is not None:
         registry.register_tool_if_absent(_FetchFullRecordTool(collector, context))

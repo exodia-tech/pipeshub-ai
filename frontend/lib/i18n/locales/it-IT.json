@@ -1,74 +1,4 @@
 {
-  "groupAccess": {
-    "currentAccess": "Lettori attuali",
-    "empty": "Nessuna risorsa accessibile qui.",
-    "expand": "Espandi",
-    "allow": "Consenti",
-    "allowed": "Consentito",
-    "blocked": "Bloccato",
-    "inherited": "Ereditato",
-    "reset": "Usa accesso ereditato",
-    "description": "Queste regole limitano ciò che i membri possono leggere in Brain. Restano valide le autorizzazioni di Slack e Drive. Ogni membro è soggetto alle restrizioni di tutti i suoi gruppi.",
-    "all": "Tutte le risorse consentite dalla fonte",
-    "selected": "Solo risorse selezionate",
-    "manage": "Gestisci accesso",
-    "allWithExceptions": "Tutte le risorse consentite dalla fonte, con eccezioni",
-    "partial": "Accesso parziale",
-    "noReaders": "Nessun lettore attuale",
-    "countsHint": "Il numero di lettori riflette le regole salvate, i permessi della fonte e le restrizioni degli altri gruppi. — indica dati non verificati."
-  },
-  "accessGroups": {
-    "title": "Gruppi di accesso",
-    "adminOnly": "Solo gli amministratori possono gestire i gruppi di accesso.",
-    "help": "Aggiungi membri e controlla il loro accesso a connettori, canali e cartelle in Permessi di accesso. Restano valide le condivisioni delle raccolte.",
-    "error": "Impossibile confermare l’operazione. Aggiorna e controlla lo stato prima di riprovare.",
-    "name": "Nome del gruppo",
-    "create": "Crea gruppo",
-    "previous": "Precedente",
-    "next": "Successiva",
-    "rename": "Rinomina",
-    "delete": "Elimina",
-    "confirmDelete": "Eliminare il gruppo e revocare il suo accesso?",
-    "members": "Membri",
-    "remove": "Rimuovi",
-    "search": "Cerca persone",
-    "add": "Aggiungi"
-  },
-  "audit": {
-    "agentId": "ID agente",
-    "runId": "ID esecuzione",
-    "traceId": "ID traccia",
-    "parentRunId": "ID esecuzione padre",
-    "tool": "Strumento",
-    "toolCallId": "ID chiamata strumento",
-    "model": "Modello",
-    "agentCoverage": "Registra anche gli esiti degli agenti e gli eventi emessi dagli strumenti, inclusi rifiuti e approvazioni in attesa. Argomenti e risultati sono esclusi. Se lo storage di audit non è disponibile, l’esecuzione continua; gli eventi non salvati sono segnalati nei log del server.",
-    "subtitle": "Consulta le attività e le modifiche alle autorizzazioni.",
-    "coverageTitle": "Copertura del registro",
-    "title": "Registro di controllo",
-    "adminOnly": "Solo gli amministratori possono visualizzare il registro.",
-    "coverage": "Attualmente registra gli accessi riusciti, la gestione dei gruppi, le modifiche ai permessi delle raccolte, alcuni avvii di download e gli accessi al registro. Le altre attività non sono ancora incluse. Un’operazione senza esito positivo può avere un risultato sconosciuto.",
-    "loginWarning": "Gli accessi riusciti vengono registrati quando l’archivio di audit è disponibile. Durante un’interruzione è comunque possibile accedere, quindi alcune registrazioni potrebbero mancare.",
-    "action": "Azione",
-    "outcome": "Esito",
-    "actorId": "ID utente",
-    "groupId": "ID gruppo",
-    "members": "ID membri",
-    "operation": "ID operazione",
-    "resource": "ID risorsa",
-    "role": "Ruolo",
-    "invalidFilters": "Inserisci ID completi e un intervallo di date valido.",
-    "from": "Dal (UTC)",
-    "to": "Al (UTC)",
-    "all": "Tutti",
-    "loading": "Caricamento del registro…",
-    "error": "Impossibile caricare il registro. Controlla i filtri e riprova.",
-    "empty": "Nessun evento trovato.",
-    "time": "Data e ora",
-    "previous": "Precedente",
-    "next": "Successiva",
-    "exportPage": "Esporta questa pagina in JSON"
-  },
   "collections": {
     "stats": {
       "title": "Analitica",
@@ -417,7 +347,8 @@
     "searchChats": "Cerca nelle chat",
     "inbox": "Posta in arrivo",
     "notifications": "Notifiche",
-    "home": "Home"
+    "home": "Home",
+    "addons": "Componenti aggiuntivi"
   },
   "artifacts": {
     "title": "Tutti gli artefatti",
@@ -1249,42 +1180,34 @@
         ]
       }
     },
-    "demoBanner": "Stai guardando Acme Corp, una piccola azienda immaginaria caricata come dati demo. Prova uno di questi, o",
+    "demoBanner": "Stai guardando Mobart Ben, una piccola azienda immaginaria caricata come dati demo. Prova uno di questi, o",
     "demoConnectYourOwn": "collega le tue fonti",
     "demoSuggestions": {
       "1": {
-        "text": "Perché è stata modificata l'architettura del servizio di pagamento e come è stata presa la decisione?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "Quali clienti hanno segnalato timeout di esportazione e cosa li hanno risolti?",
-        "icons": [
-          "jira",
-          "github"
-        ]
-      },
-      "3": {
-        "text": "Qual è la nostra politica in merito ai servizi di guardia durante i giorni festivi?",
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
         "icons": [
           "sheets"
         ]
       },
+      "3": {
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
+      },
       "4": {
-        "text": "Chi ha rivisto e approvato il PR n. 482 nell'addetto alla fatturazione e cosa ha chiesto Dana prima della fusione?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "Qual è la strategia dei prezzi aziendali per il 2026?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -1706,7 +1629,21 @@
         "error": "Non riuscito"
       }
     },
-    "showMoreCitations_many": "Mostra altre {{count}} citazioni"
+    "showMoreCitations_many": "Mostra altre {{count}} citazioni",
+    "timeGreeting": {
+      "morning": "Buongiorno",
+      "morningNamed": "Buongiorno, {{name}}",
+      "afternoon": "Buon pomeriggio",
+      "afternoonNamed": "Buon pomeriggio, {{name}}",
+      "evening": "Buonasera",
+      "eveningNamed": "Buonasera, {{name}}",
+      "night": "Buonanotte",
+      "nightNamed": "Buonanotte, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Saluta",
+      "hello": "Ciao!"
+    }
   },
   "workspaceMenu": {
     "appearance": "Aspetto",
@@ -4413,11 +4350,11 @@
       "moreAgents": "Altri agenti",
       "moreChats": "Altre chat",
       "demoData": {
-        "description": "Acme Corp è una società fittizia caricata, quindi puoi provare EXODIA Brain. Questo cambia solo ciò che vedi; nulla viene cancellato.",
+        "description": "Mobart Ben è una società fittizia caricata, quindi puoi provare EXODIA Brain. Questo cambia solo ciò che vedi; nulla viene cancellato.",
         "everyoneDescription": "La disattivazione nasconde la demo dalle risposte, dalle ricerche e dai record di tutti e interrompe l'accesso degli account di esempio. Niente viene eliminato.",
         "everyoneLabel": "Offri la demo a tutti",
         "followingDefault": "Segue l'impostazione predefinita: mostrato finché l'organizzazione non dispone di dati propri, quindi nascosto.",
-        "label": "Mostra i dati dimostrativi di Acme Corp nelle mie risposte, ricerche e record",
+        "label": "Mostra i dati dimostrativi di Mobart Ben nelle mie risposte, ricerche e record",
         "offForEveryone": "Disattivato per tutti da un amministratore.",
         "title": "Dati dimostrativi",
         "useDefault": "Utilizza l'impostazione predefinita",
@@ -5861,17 +5798,17 @@
   "demoData": {
     "badge": {
       "label": "Dimostrazione",
-      "tooltip": "Dati di esempio dalla demo di Acme Corp, non uno dei record della tua azienda"
+      "tooltip": "Dati di esempio dalla demo di Mobart Ben, non uno dei record della tua azienda"
     },
     "removalNotice": {
-      "title": "I dati dimostrativi di Acme Corp sono ancora nel tuo spazio di lavoro",
+      "title": "I dati dimostrativi di Mobart Ben sono ancora nel tuo spazio di lavoro",
       "description": "I dati della tua azienda sono ora in EXODIA Brain. La demo è nascosta dalle risposte per impostazione predefinita, ma chiunque può riattivarla e i suoi account di esempio possono comunque accedere. Disattivala per tutti o rimuovila definitivamente.",
       "remove": "Rimuovi permanentemente",
       "keep": "Conserva per ora",
       "turnOff": "Disattiva per tutti"
     },
     "removeDialog": {
-      "title": "Rimuovere permanentemente i dati dimostrativi di Acme Corp?",
+      "title": "Rimuovere permanentemente i dati dimostrativi di Mobart Ben?",
       "description": "Ciò elimina il connettore Demo con tutti i suoi record, gruppi e autorizzazioni. Per nasconderlo senza eliminare nulla, disattivalo invece per tutti. Puoi aggiungerlo di nuovo in seguito dalla pagina Connettori.",
       "deleteAccounts": "Elimina anche gli account di esempio: {{names}}",
       "deleteAccountsHint": "Sono stati creati con una password iniziale, quindi chiunque la conosca può accedere come loro.",
@@ -5887,7 +5824,7 @@
     "switch": {
       "errorTitle": "Impossibile modificare l'impostazione dei dati dimostrativi",
       "errorDescription": "Non è cambiato nulla. Riprova tra un attimo.",
-      "hiddenTitle": "Dati dimostrativi di Acme Corp nascosti",
+      "hiddenTitle": "Dati dimostrativi di Mobart Ben nascosti",
       "hiddenDescription": "È fuori dalle tue risposte, ricerche e registrazioni. Riattivalo in qualsiasi momento in Profilo → Dati demo.",
       "undo": "Annulla"
     },
@@ -5945,6 +5882,7 @@
     "metric": "Metrica del grafico",
     "overTime": "Utilizzo nel tempo",
     "chartData": "Visualizza dati del grafico",
+    "filters": "Filtri",
     "topModels": "Modelli più utilizzati",
     "byWorkload": "Utilizzo per attività",
     "byMember": "Utilizzo per membro",
@@ -5985,6 +5923,189 @@
     "averageLatency": "Latenza media",
     "noConnector": "Nessun connettore",
     "useCatalog": "Usa catalogo"
+  },
+  "agentSchedule": {
+    "title": "Programmazione agente",
+    "description": "Solo ricerca pubblica. Ogni riepilogo è contrassegnato come bozza.",
+    "loading": "Caricamento…",
+    "enabled": "Esegui automaticamente",
+    "days": "Giorni",
+    "time": "Ora",
+    "timezone": "Fuso orario",
+    "prompt": "Istruzioni per il riepilogo",
+    "next": "Prossima esecuzione",
+    "slackEnabled": "Invio su Slack attivo.",
+    "brainOnly": "Le bozze vengono salvate in Brain.",
+    "runs": "Esecuzioni recenti",
+    "empty": "Nessuna esecuzione.",
+    "open": "Apri bozza",
+    "close": "Chiudi",
+    "working": "In corso…",
+    "run": "Esegui ora",
+    "save": "Salva",
+    "failed": "Impossibile aggiornare la programmazione.",
+    "invalid": "Scegli i giorni, un orario e le istruzioni.",
+    "status": {
+      "running": "In esecuzione",
+      "draft": "Bozza pronta",
+      "needs_review": "Da rivedere",
+      "needs_reconciliation": "Verifica esecuzione interrotta"
+    },
+    "slackTitle": "Invio su Slack",
+    "sendSlack": "Invia i riepiloghi su Slack",
+    "slackBot": "Bot Slack",
+    "chooseBot": "Scegli un bot",
+    "slackChannel": "Canale Slack",
+    "channelPlaceholder": "Incolla il link o l’ID di un canale Slack",
+    "channelHelp": "Invita il bot selezionato nel canale prima di attivare l’invio.",
+    "slackAdminOnly": "Un amministratore gestisce l’invio su Slack. Puoi disattivarlo.",
+    "manageBots": "Gestisci bot Slack",
+    "noBots": "Collega prima un bot a questo agente.",
+    "slackLoadFailed": "Impossibile caricare le impostazioni Slack. Chiudi e riapri per riprovare.",
+    "invalidSlack": "Scegli un bot e inserisci un link o ID valido di un canale Slack.",
+    "saveBeforeRun": "Salva le modifiche prima di eseguire.",
+    "projectDescription": "Bozza privata del progetto. Vengono usate solo le fonti approvate; l’invio a Slack non è disponibile."
+  },
+  "agentPicture": {
+    "title": "Cambia immagine agente",
+    "description": "Aggiorna l’immagine di questo agente in Brain.",
+    "choose": "Scegli immagine",
+    "remove": "Rimuovi immagine",
+    "formats": "PNG, JPEG o WebP · fino a 5 MB",
+    "preview": "Anteprima immagine",
+    "invalid": "Scegli un’immagine PNG, JPEG o WebP inferiore a 5 MB.",
+    "failed": "Impossibile salvare l’immagine dell’agente. Riprova.",
+    "saving": "Salvataggio…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "Ragionamento predefinito del modello",
+    "inheritPlatform": "Usa il valore della piattaforma (Basso)",
+    "inheritModel": "Eredita dal modello",
+    "priority": "Priorità: scelta del messaggio → agente → modello → Basso."
+  },
+  "graph": {
+    "title": "Grafo della conoscenza",
+    "overviewIntro": "Esplora la conoscenza in gruppi collegati. Ingrandisci per scoprire documenti e concetti.",
+    "arranging": "Individuazione dei gruppi e disposizione del grafo…",
+    "progress": "Caricamento documenti: {{loaded}} / {{total}}",
+    "counts": "{{nodes}} nodi · {{edges}} collegamenti · {{clusters}} gruppi",
+    "findNode": "Cerca un nodo…",
+    "empty": "Non ci sono ancora contenuti visibili al tuo account.",
+    "retry": "Riprova",
+    "error": "Impossibile caricare il grafo. Riprova.",
+    "rendererError": "Questo browser non riesce a visualizzare il grafo. Abilita WebGL o prova un altro browser. Puoi comunque cercare i nodi ed esplorare i gruppi qui sotto.",
+    "canvasLabel": "Grafo della conoscenza 3D. Ruota, ingrandisci e seleziona un gruppo per esplorarne i nodi.",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "fit": "Mostra tutto il grafo",
+    "openRecord": "Apri documento",
+    "searchResults": "Nodi corrispondenti",
+    "noResults": "Nessun nodo corrispondente.",
+    "clusters": "Gruppi",
+    "unconnected": "Nodi non collegati",
+    "clusterHint": "Seleziona un gruppo per ingrandirlo. Seleziona un nodo per esaminarlo.",
+    "coverage": "Tutti i documenti accessibili e i loro collegamenti salvati. I gruppi rispettano i tuoi permessi. Aggiorna dopo la sincronizzazione.",
+    "entity": "Entità",
+    "kinds": {
+      "record": "Documento",
+      "folder": "Cartella",
+      "kb": "Raccolta",
+      "app": "Fonte",
+      "recordGroup": "Gruppo di documenti",
+      "department": "Reparto",
+      "category": "Categoria",
+      "subcategory": "Sottocategoria",
+      "topic": "Argomento",
+      "language": "Lingua",
+      "named_entity": "Entità nominata"
+    },
+    "preparing": "Preparazione del grafo della conoscenza",
+    "rendering": "Visualizzazione della mappa…",
+    "metricLegend": "Dimensione dei gruppi: nodi · Dimensione dei punti: collegamenti",
+    "refresh": "Aggiorna grafo",
+    "connections": "Collegamenti: {{value}}",
+    "layout": {
+      "progress": "Disposizione dei nodi: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Ruota a sinistra",
+    "rotateRight": "Ruota a destra",
+    "controls3d": "Trascina per ruotare · Scorri per ingrandire · Trascina con il tasto destro per spostare. Su touch: un dito ruota, due dita ingrandiscono o spostano.",
+    "connectionHint": "Seleziona un nodo per vedere i suoi collegamenti.",
+    "visibleNodes": "Visualizzati {{shown}} nodi su {{total}} · Avvicinati per più dettagli.",
+    "cacheHint": "I layout recenti vengono riutilizzati durante la verifica degli aggiornamenti. Aggiorna per cercare nuovi dati.",
+    "updating": "Verifica degli aggiornamenti del grafo…",
+    "refreshError": "Aggiornamento non riuscito. È ancora visibile il grafo salvato."
+  },
+  "groupAccess": {
+    "currentAccess": "Lettori attuali",
+    "empty": "Nessuna risorsa accessibile qui.",
+    "expand": "Espandi",
+    "allow": "Consenti",
+    "allowed": "Consentito",
+    "blocked": "Bloccato",
+    "inherited": "Ereditato",
+    "reset": "Usa accesso ereditato",
+    "description": "Queste regole limitano ciò che i membri possono leggere in Brain. Restano valide le autorizzazioni di Slack e Drive. Ogni membro è soggetto alle restrizioni di tutti i suoi gruppi.",
+    "all": "Tutte le risorse consentite dalla fonte",
+    "selected": "Solo risorse selezionate",
+    "manage": "Gestisci accesso",
+    "allWithExceptions": "Tutte le risorse consentite dalla fonte, con eccezioni",
+    "partial": "Accesso parziale",
+    "noReaders": "Nessun lettore attuale",
+    "countsHint": "Il numero di lettori riflette le regole salvate, i permessi della fonte e le restrizioni degli altri gruppi. — indica dati non verificati."
+  },
+  "accessGroups": {
+    "title": "Gruppi di accesso",
+    "adminOnly": "Solo gli amministratori possono gestire i gruppi di accesso.",
+    "help": "Aggiungi membri e controlla il loro accesso a connettori, canali e cartelle in Permessi di accesso. Restano valide le condivisioni delle raccolte.",
+    "error": "Impossibile confermare l’operazione. Aggiorna e controlla lo stato prima di riprovare.",
+    "name": "Nome del gruppo",
+    "create": "Crea gruppo",
+    "previous": "Precedente",
+    "next": "Successiva",
+    "rename": "Rinomina",
+    "delete": "Elimina",
+    "confirmDelete": "Eliminare il gruppo e revocare il suo accesso?",
+    "members": "Membri",
+    "remove": "Rimuovi",
+    "search": "Cerca persone",
+    "add": "Aggiungi"
+  },
+  "audit": {
+    "agentId": "ID agente",
+    "runId": "ID esecuzione",
+    "traceId": "ID traccia",
+    "parentRunId": "ID esecuzione padre",
+    "tool": "Strumento",
+    "toolCallId": "ID chiamata strumento",
+    "model": "Modello",
+    "agentCoverage": "Registra anche gli esiti degli agenti e gli eventi emessi dagli strumenti, inclusi rifiuti e approvazioni in attesa. Argomenti e risultati sono esclusi. Se lo storage di audit non è disponibile, l’esecuzione continua; gli eventi non salvati sono segnalati nei log del server.",
+    "subtitle": "Consulta le attività e le modifiche alle autorizzazioni.",
+    "coverageTitle": "Copertura del registro",
+    "title": "Registro di controllo",
+    "adminOnly": "Solo gli amministratori possono visualizzare il registro.",
+    "coverage": "Attualmente registra gli accessi riusciti, la gestione dei gruppi, le modifiche ai permessi delle raccolte, alcuni avvii di download e gli accessi al registro. Le altre attività non sono ancora incluse. Un’operazione senza esito positivo può avere un risultato sconosciuto.",
+    "loginWarning": "Gli accessi riusciti vengono registrati quando l’archivio di audit è disponibile. Durante un’interruzione è comunque possibile accedere, quindi alcune registrazioni potrebbero mancare.",
+    "action": "Azione",
+    "outcome": "Esito",
+    "actorId": "ID utente",
+    "groupId": "ID gruppo",
+    "members": "ID membri",
+    "operation": "ID operazione",
+    "resource": "ID risorsa",
+    "role": "Ruolo",
+    "invalidFilters": "Inserisci ID completi e un intervallo di date valido.",
+    "from": "Dal (UTC)",
+    "to": "Al (UTC)",
+    "all": "Tutti",
+    "loading": "Caricamento del registro…",
+    "error": "Impossibile caricare il registro. Controlla i filtri e riprova.",
+    "empty": "Nessun evento trovato.",
+    "time": "Data e ora",
+    "previous": "Precedente",
+    "next": "Successiva",
+    "exportPage": "Esporta questa pagina in JSON"
   },
   "datePicker": {
     "on": "Il",

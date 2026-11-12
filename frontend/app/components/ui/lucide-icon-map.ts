@@ -405,6 +405,8 @@ export const LUCIDE_ICON_MAP: Record<string, LucideIcon> = {
   'refresh': RefreshCw,
   'remove': Minus,
   'replay': RotateCcw,
+  'rotate_left': RotateCcw,
+  'rotate_right': RotateCw,
   'reply': Reply,
   'report_problem': TriangleAlert,
   'restart_alt': RotateCcw,

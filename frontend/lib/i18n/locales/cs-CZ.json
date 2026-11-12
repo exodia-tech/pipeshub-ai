@@ -1,74 +1,4 @@
 {
-  "groupAccess": {
-    "currentAccess": "Aktuální čtenáři",
-    "empty": "Zde nejsou přístupné žádné prostředky.",
-    "expand": "Rozbalit",
-    "allow": "Povolit",
-    "allowed": "Povoleno",
-    "blocked": "Blokováno",
-    "inherited": "Zděděno",
-    "reset": "Použít zděděný přístup",
-    "description": "Pravidla omezují čtení členů v Brain. Oprávnění Slack a Drive nadále platí. Na člena se vztahují omezení všech jeho skupin.",
-    "all": "Všechny prostředky povolené zdrojem",
-    "selected": "Pouze vybrané prostředky",
-    "manage": "Spravovat přístup",
-    "allWithExceptions": "Všechny prostředky povolené zdrojem, s výjimkami",
-    "partial": "Částečný přístup",
-    "noReaders": "Momentálně žádní čtenáři",
-    "countsHint": "Počty čtenářů zohledňují uložená pravidla, oprávnění zdroje a omezení ostatních skupin. — znamená neověřeno."
-  },
-  "accessGroups": {
-    "title": "Přístupové skupiny",
-    "adminOnly": "Přístupové skupiny mohou spravovat pouze správci.",
-    "help": "Přidejte členy a spravujte jejich přístup ke konektorům, kanálům a složkám v Oprávnění přístupu. Sdílení kolekcí platí i nadále.",
-    "error": "Operaci se nepodařilo potvrdit. Před opakováním obnovte stránku a zkontrolujte stav.",
-    "name": "Název skupiny",
-    "create": "Vytvořit skupinu",
-    "previous": "Předchozí",
-    "next": "Další",
-    "rename": "Přejmenovat",
-    "delete": "Smazat",
-    "confirmDelete": "Smazat skupinu a odebrat její přístup?",
-    "members": "Členové",
-    "remove": "Odebrat",
-    "search": "Hledat osoby",
-    "add": "Přidat"
-  },
-  "audit": {
-    "agentId": "ID agenta",
-    "runId": "ID běhu",
-    "traceId": "ID trasování",
-    "parentRunId": "ID nadřazeného běhu",
-    "tool": "Nástroj",
-    "toolCallId": "ID volání nástroje",
-    "model": "Model",
-    "agentCoverage": "Zaznamenává také výsledky běhů agentů a události nástrojů, včetně zamítnutí a čekajících schválení. Argumenty ani výsledky se neukládají. Při selhání auditního úložiště běh pokračuje; chybějící události se hlásí v protokolech serveru.",
-    "subtitle": "Přehled aktivit a změn oprávnění v pracovním prostoru.",
-    "coverageTitle": "Rozsah auditu",
-    "title": "Protokol auditu",
-    "adminOnly": "Protokol auditu mohou zobrazit pouze správci.",
-    "coverage": "Zaznamenává se úspěšná přihlášení, správa skupin, změny oprávnění ke kolekcím, vybraná zahájení stahování a přístup k protokolu. Ostatní aktivity zatím zahrnuty nejsou. Operace bez potvrzeného úspěchu může mít neznámý výsledek.",
-    "loginWarning": "Úspěšná přihlášení se zaznamenávají, pokud je úložiště auditu dostupné. Při výpadku zůstává přihlášení možné a záznamy mohou chybět.",
-    "action": "Akce",
-    "outcome": "Výsledek",
-    "actorId": "ID uživatele",
-    "groupId": "ID skupiny",
-    "members": "ID členů",
-    "operation": "ID operace",
-    "resource": "ID zdroje",
-    "role": "Role",
-    "invalidFilters": "Zadejte úplná ID a platný rozsah dat.",
-    "from": "Od (UTC)",
-    "to": "Do (UTC)",
-    "all": "Vše",
-    "loading": "Načítání protokolu…",
-    "error": "Protokol se nepodařilo načíst. Zkontrolujte filtry a zkuste to znovu.",
-    "empty": "Nebyly nalezeny žádné události.",
-    "time": "Čas",
-    "previous": "Předchozí",
-    "next": "Další",
-    "exportPage": "Exportovat tuto stránku jako JSON"
-  },
   "collections": {
     "stats": {
       "title": "Analytika",
@@ -435,7 +365,8 @@
     "searchChats": "Hledat v chatech",
     "inbox": "Doručené",
     "notifications": "Oznámení",
-    "home": "Domů"
+    "home": "Domů",
+    "addons": "Doplňky"
   },
   "artifacts": {
     "title": "Všechny artefakty",
@@ -1273,42 +1204,34 @@
         ]
       }
     },
-    "demoBanner": "Díváte se na Acme Corp, malou fiktivní firmu načtenou jako ukázková data. Vyzkoušejte některý z těchto dotazů, nebo",
+    "demoBanner": "Díváte se na Mobart Ben, malou fiktivní firmu načtenou jako ukázková data. Vyzkoušejte některý z těchto dotazů, nebo",
     "demoConnectYourOwn": "připojte vlastní zdroje",
     "demoSuggestions": {
       "1": {
-        "text": "Proč se změnila architektura platební služby a jak se o tom rozhodlo?",
-        "icons": [
-          "github",
-          "jira",
-          "slack"
-        ]
+        "text": "Quali finiture e funzioni sono state richieste inizialmente per la cucina di Villa Aurora?",
+        "icons": []
       },
       "2": {
-        "text": "Kteří zákazníci nahlásili vypršení časového limitu exportu a co to vyřešilo?",
-        "icons": [
-          "jira",
-          "github"
-        ]
-      },
-      "3": {
-        "text": "Jaká jsou naše pravidla pro pohotovost během státního svátku?",
+        "text": "Qual era il totale del preventivo originale e quali voci comprendeva?",
         "icons": [
           "sheets"
         ]
       },
+      "3": {
+        "text": "Quale variante delle ante ha chiesto Giulia e quale finitura ha poi approvato?",
+        "icons": []
+      },
       "4": {
-        "text": "Kdo zkontroloval a schválil PR #482 v billing workeru a co Dana požadovala před jeho sloučením?",
-        "icons": [
-          "github"
-        ]
+        "text": "Il piano nero è approvato per Villa Aurora? Qual è lo stato del preventivo revisionato?",
+        "icons": []
       },
       "5": {
-        "text": "Jaká je strategie podnikových cen pro rok 2026?",
-        "icons": [
-          "sheets",
-          "slack"
-        ],
+        "text": "Che cosa approva il documento D07 e a quale progetto si riferisce?",
+        "icons": []
+      },
+      "6": {
+        "text": "Qual è il codice fittizio interno usato per etichettare la bozza di variante ancora in sospeso?",
+        "icons": [],
         "restricted": true
       }
     },
@@ -1739,6 +1662,20 @@
         "done": "Hotovo",
         "error": "Selhalo"
       }
+    },
+    "timeGreeting": {
+      "morning": "Dobré ráno",
+      "morningNamed": "Dobré ráno, {{name}}",
+      "afternoon": "Dobré odpoledne",
+      "afternoonNamed": "Dobré odpoledne, {{name}}",
+      "evening": "Dobrý večer",
+      "eveningNamed": "Dobrý večer, {{name}}",
+      "night": "Dobrou noc",
+      "nightNamed": "Dobrou noc, {{name}}"
+    },
+    "companion": {
+      "sayHello": "Pozdravit",
+      "hello": "Ahoj!"
     }
   },
   "workspaceMenu": {
@@ -4471,11 +4408,11 @@
       "moreAgents": "Další agenti",
       "moreChats": "Další chaty",
       "demoData": {
-        "description": "Acme Corp je fiktivní společnost načtená proto, abyste si mohli EXODIA Brain vyzkoušet. Nastavení mění pouze to, co vidíte; nic se nemaže.",
+        "description": "Mobart Ben je fiktivní společnost načtená proto, abyste si mohli EXODIA Brain vyzkoušet. Nastavení mění pouze to, co vidíte; nic se nemaže.",
         "everyoneDescription": "Vypnutím skryjete ukázku z odpovědí, vyhledávání a záznamů všech uživatelů a ukázkové účty se nebudou moci přihlásit. Nic se nemaže.",
         "everyoneLabel": "Nabízet ukázku všem",
         "followingDefault": "Podle výchozího nastavení: zobrazuje se, dokud vaše organizace nemá vlastní data, poté se skryje.",
-        "label": "Zobrazovat ukázková data Acme Corp v mých odpovědích, vyhledávání a záznamech",
+        "label": "Zobrazovat ukázková data Mobart Ben v mých odpovědích, vyhledávání a záznamech",
         "offForEveryone": "Správce ukázku vypnul pro všechny.",
         "title": "Ukázková data",
         "useDefault": "Použít výchozí nastavení",
@@ -5934,17 +5871,17 @@
   "demoData": {
     "badge": {
       "label": "Ukázka",
-      "tooltip": "Ukázková data z dema Acme Corp, nikoli záznam vaší společnosti"
+      "tooltip": "Ukázková data z dema Mobart Ben, nikoli záznam vaší společnosti"
     },
     "removalNotice": {
-      "title": "Ukázková data Acme Corp jsou stále ve vašem pracovním prostoru",
+      "title": "Ukázková data Mobart Ben jsou stále ve vašem pracovním prostoru",
       "description": "Vlastní data vaší společnosti jsou nyní v EXODIA Brain. Ukázka je ve výchozím nastavení z odpovědí skryta, ale kdokoli ji může znovu zapnout a její ukázkové účty se stále mohou přihlásit. Vypněte ji pro všechny, nebo ji trvale odstraňte.",
       "remove": "Odstranit trvale",
       "keep": "Zatím ponechat",
       "turnOff": "Vypnout pro všechny"
     },
     "removeDialog": {
-      "title": "Trvale odstranit ukázková data Acme Corp?",
+      "title": "Trvale odstranit ukázková data Mobart Ben?",
       "description": "Tím se smaže konektor Demo se všemi jeho záznamy, skupinami a oprávněními. Pokud jej chcete skrýt bez mazání, místo toho jej vypněte pro všechny. Později jej můžete znovu přidat na stránce Konektory.",
       "deleteAccounts": "Smazat také ukázkové účty: {{names}}",
       "deleteAccountsHint": "Byly vytvořeny s počátečním heslem, takže kdokoli, kdo ho zná, se za ně může přihlásit.",
@@ -5960,7 +5897,7 @@
     "switch": {
       "errorTitle": "Nastavení ukázkových dat se nepodařilo změnit",
       "errorDescription": "Nic se nezměnilo. Zkuste to za chvíli znovu.",
-      "hiddenTitle": "Ukázková data Acme Corp skryta",
+      "hiddenTitle": "Ukázková data Mobart Ben skryta",
       "hiddenDescription": "Nejsou ve vašich odpovědích, vyhledávání ani záznamech. Kdykoli je můžete znovu zapnout v části Profil → Ukázková data.",
       "undo": "Vrátit zpět"
     },
@@ -6018,6 +5955,7 @@
     "metric": "Metrika grafu",
     "overTime": "Využití v čase",
     "chartData": "Zobrazit data grafu",
+    "filters": "Filtry",
     "topModels": "Nejpoužívanější modely",
     "byWorkload": "Využití podle úlohy",
     "byMember": "Využití podle člena",
@@ -6058,6 +5996,189 @@
     "averageLatency": "Průměrná latence",
     "noConnector": "Bez konektoru",
     "useCatalog": "Použít ceník"
+  },
+  "agentSchedule": {
+    "title": "Plán agenta",
+    "description": "Pouze veřejný průzkum. Každý přehled je označen jako koncept.",
+    "loading": "Načítání…",
+    "enabled": "Spouštět automaticky",
+    "days": "Dny",
+    "time": "Čas",
+    "timezone": "Časové pásmo",
+    "prompt": "Pokyny pro přehled",
+    "next": "Další spuštění",
+    "slackEnabled": "Doručování do Slacku je zapnuté.",
+    "brainOnly": "Koncepty se ukládají do Brain.",
+    "runs": "Nedávná spuštění",
+    "empty": "Zatím žádná spuštění.",
+    "open": "Otevřít koncept",
+    "close": "Zavřít",
+    "working": "Probíhá…",
+    "run": "Spustit nyní",
+    "save": "Uložit",
+    "failed": "Plán se nepodařilo aktualizovat.",
+    "invalid": "Vyberte dny, čas a pokyny.",
+    "status": {
+      "running": "Probíhá",
+      "draft": "Koncept připraven",
+      "needs_review": "Ke kontrole",
+      "needs_reconciliation": "Zkontrolovat přerušené spuštění"
+    },
+    "slackTitle": "Doručování do Slacku",
+    "sendSlack": "Posílat přehledy do Slacku",
+    "slackBot": "Bot Slacku",
+    "chooseBot": "Vybrat bota",
+    "slackChannel": "Kanál Slacku",
+    "channelPlaceholder": "Vložte odkaz nebo ID kanálu Slacku",
+    "channelHelp": "Před zapnutím doručování pozvěte vybraného bota do tohoto kanálu.",
+    "slackAdminOnly": "Doručování do Slacku spravuje administrátor organizace. Můžete ho vypnout.",
+    "manageBots": "Spravovat boty Slacku",
+    "noBots": "Nejprve připojte bota k tomuto agentovi.",
+    "slackLoadFailed": "Nastavení Slacku se nepodařilo načíst. Zavřete a znovu otevřete okno.",
+    "invalidSlack": "Vyberte bota a zadejte platný odkaz nebo ID kanálu Slacku.",
+    "saveBeforeRun": "Před spuštěním uložte změny.",
+    "projectDescription": "Soukromý koncept projektu. Používají se pouze schválené zdroje; odesílání do Slacku není dostupné."
+  },
+  "agentPicture": {
+    "title": "Změnit obrázek agenta",
+    "description": "Aktualizujte obrázek tohoto agenta v Brain.",
+    "choose": "Vybrat obrázek",
+    "remove": "Odebrat obrázek",
+    "formats": "PNG, JPEG nebo WebP · do 5 MB",
+    "preview": "Náhled obrázku",
+    "invalid": "Vyberte obrázek PNG, JPEG nebo WebP menší než 5 MB.",
+    "failed": "Obrázek agenta se nepodařilo uložit. Zkuste to znovu.",
+    "saving": "Ukládání…"
+  },
+  "reasoningDefaults": {
+    "modelLabel": "Výchozí úroveň uvažování modelu",
+    "inheritPlatform": "Použít výchozí hodnotu platformy (Nízká)",
+    "inheritModel": "Převzít výchozí hodnotu modelu",
+    "priority": "Priorita: volba zprávy → agent → model → Nízká."
+  },
+  "graph": {
+    "title": "Znalostní graf",
+    "overviewIntro": "Prozkoumejte znalosti v propojených skupinách. Přibližte si dokumenty a témata.",
+    "arranging": "Hledání a rozmísťování skupin…",
+    "progress": "Načítání dokumentů: {{loaded}} / {{total}}",
+    "counts": "{{nodes}} uzlů · {{edges}} spojení · {{clusters}} skupin",
+    "findNode": "Najít uzel…",
+    "empty": "Pro váš účet zatím nejsou viditelné žádné znalosti.",
+    "retry": "Zkusit znovu",
+    "error": "Graf se nepodařilo načíst. Zkuste to znovu.",
+    "rendererError": "Prohlížeč nedokázal vykreslit graf. Zapněte WebGL nebo zkuste jiný prohlížeč. Skupiny a vyhledávání uzlů jsou stále dostupné níže.",
+    "canvasLabel": "3D znalostní graf. Otáčejte, přibližujte a vyberte skupinu pro prozkoumání uzlů.",
+    "zoomIn": "Přiblížit",
+    "zoomOut": "Oddálit",
+    "fit": "Zobrazit celý graf",
+    "openRecord": "Otevřít dokument",
+    "searchResults": "Odpovídající uzly",
+    "noResults": "Žádné odpovídající uzly.",
+    "clusters": "Skupiny",
+    "unconnected": "Nepropojené uzly",
+    "clusterHint": "Vyberte skupinu pro přiblížení nebo uzel pro podrobnosti.",
+    "coverage": "Všechny dostupné dokumenty a uložená spojení. Skupiny respektují vaše oprávnění. Po synchronizaci obnovte stránku.",
+    "entity": "Entita",
+    "kinds": {
+      "record": "Dokument",
+      "folder": "Složka",
+      "kb": "Kolekce",
+      "app": "Zdroj",
+      "recordGroup": "Skupina dokumentů",
+      "department": "Oddělení",
+      "category": "Kategorie",
+      "subcategory": "Podkategorie",
+      "topic": "Téma",
+      "language": "Jazyk",
+      "named_entity": "Pojmenovaná entita"
+    },
+    "preparing": "Příprava znalostního grafu",
+    "rendering": "Vykreslování mapy…",
+    "metricLegend": "Velikost skupiny: uzly · Velikost bodu: spojení",
+    "refresh": "Obnovit graf",
+    "connections": "Spojení: {{value}}",
+    "layout": {
+      "progress": "Rozmísťování uzlů: {{done}} / {{total}}"
+    },
+    "view3d": "3D",
+    "rotateLeft": "Otočit doleva",
+    "rotateRight": "Otočit doprava",
+    "controls3d": "Tažením otáčíte · Kolečkem přibližujete · Pravým tlačítkem posouváte. Dotyk: jeden prst otáčí, dva přibližují nebo posouvají.",
+    "connectionHint": "Vyberte uzel a zobrazte jeho spojení.",
+    "visibleNodes": "Zobrazeno {{shown}} z {{total}} uzlů · Přibližte pro více podrobností.",
+    "cacheHint": "Při kontrole aktualizací se použije nedávné rozložení. Obnovením vyhledáte nová data.",
+    "updating": "Kontrola aktualizací grafu…",
+    "refreshError": "Aktualizace se nezdařila. Uložený graf zůstává zobrazen."
+  },
+  "groupAccess": {
+    "currentAccess": "Aktuální čtenáři",
+    "empty": "Zde nejsou přístupné žádné prostředky.",
+    "expand": "Rozbalit",
+    "allow": "Povolit",
+    "allowed": "Povoleno",
+    "blocked": "Blokováno",
+    "inherited": "Zděděno",
+    "reset": "Použít zděděný přístup",
+    "description": "Pravidla omezují čtení členů v Brain. Oprávnění Slack a Drive nadále platí. Na člena se vztahují omezení všech jeho skupin.",
+    "all": "Všechny prostředky povolené zdrojem",
+    "selected": "Pouze vybrané prostředky",
+    "manage": "Spravovat přístup",
+    "allWithExceptions": "Všechny prostředky povolené zdrojem, s výjimkami",
+    "partial": "Částečný přístup",
+    "noReaders": "Momentálně žádní čtenáři",
+    "countsHint": "Počty čtenářů zohledňují uložená pravidla, oprávnění zdroje a omezení ostatních skupin. — znamená neověřeno."
+  },
+  "accessGroups": {
+    "title": "Přístupové skupiny",
+    "adminOnly": "Přístupové skupiny mohou spravovat pouze správci.",
+    "help": "Přidejte členy a spravujte jejich přístup ke konektorům, kanálům a složkám v Oprávnění přístupu. Sdílení kolekcí platí i nadále.",
+    "error": "Operaci se nepodařilo potvrdit. Před opakováním obnovte stránku a zkontrolujte stav.",
+    "name": "Název skupiny",
+    "create": "Vytvořit skupinu",
+    "previous": "Předchozí",
+    "next": "Další",
+    "rename": "Přejmenovat",
+    "delete": "Smazat",
+    "confirmDelete": "Smazat skupinu a odebrat její přístup?",
+    "members": "Členové",
+    "remove": "Odebrat",
+    "search": "Hledat osoby",
+    "add": "Přidat"
+  },
+  "audit": {
+    "agentId": "ID agenta",
+    "runId": "ID běhu",
+    "traceId": "ID trasování",
+    "parentRunId": "ID nadřazeného běhu",
+    "tool": "Nástroj",
+    "toolCallId": "ID volání nástroje",
+    "model": "Model",
+    "agentCoverage": "Zaznamenává také výsledky běhů agentů a události nástrojů, včetně zamítnutí a čekajících schválení. Argumenty ani výsledky se neukládají. Při selhání auditního úložiště běh pokračuje; chybějící události se hlásí v protokolech serveru.",
+    "subtitle": "Přehled aktivit a změn oprávnění v pracovním prostoru.",
+    "coverageTitle": "Rozsah auditu",
+    "title": "Protokol auditu",
+    "adminOnly": "Protokol auditu mohou zobrazit pouze správci.",
+    "coverage": "Zaznamenává se úspěšná přihlášení, správa skupin, změny oprávnění ke kolekcím, vybraná zahájení stahování a přístup k protokolu. Ostatní aktivity zatím zahrnuty nejsou. Operace bez potvrzeného úspěchu může mít neznámý výsledek.",
+    "loginWarning": "Úspěšná přihlášení se zaznamenávají, pokud je úložiště auditu dostupné. Při výpadku zůstává přihlášení možné a záznamy mohou chybět.",
+    "action": "Akce",
+    "outcome": "Výsledek",
+    "actorId": "ID uživatele",
+    "groupId": "ID skupiny",
+    "members": "ID členů",
+    "operation": "ID operace",
+    "resource": "ID zdroje",
+    "role": "Role",
+    "invalidFilters": "Zadejte úplná ID a platný rozsah dat.",
+    "from": "Od (UTC)",
+    "to": "Do (UTC)",
+    "all": "Vše",
+    "loading": "Načítání protokolu…",
+    "error": "Protokol se nepodařilo načíst. Zkontrolujte filtry a zkuste to znovu.",
+    "empty": "Nebyly nalezeny žádné události.",
+    "time": "Čas",
+    "previous": "Předchozí",
+    "next": "Další",
+    "exportPage": "Exportovat tuto stránku jako JSON"
   },
   "datePicker": {
     "on": "Dne",

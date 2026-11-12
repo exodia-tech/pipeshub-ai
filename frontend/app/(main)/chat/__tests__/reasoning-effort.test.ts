@@ -467,12 +467,12 @@ describe('label for the effort a chat runs with', () => {
     expect(getAppliedReasoningEffortLabel(t, { picked: null, modelDefault })).toBe('Default (Low)');
   });
 
-  it('keeps showing High when the model stores no default', () => {
+  it('shows Low when neither the agent nor model stores a default', () => {
     setOrgModels();
     const modelDefault = getModelDefaultReasoningEffort(ASSISTANT_CTX, qwen);
 
     expect(modelDefault).toBeNull();
-    expect(getAppliedReasoningEffortLabel(t, { picked: null, modelDefault })).toBe('High');
+    expect(getAppliedReasoningEffortLabel(t, { picked: null, modelDefault })).toBe('Low');
   });
 
   it("shows a pick or the agent's default over the model's default", () => {

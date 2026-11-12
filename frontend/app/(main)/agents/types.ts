@@ -34,6 +34,7 @@ export interface AgentsListApiResponse {
  * Several fields are optional because the backend omits them on some records.
  */
 export interface AgentListRecord {
+  avatarUrl?: string | null;
   /** Business id (UUID) — use for routes and API paths */
   id: string;
   /** Arango-style document key (matches `id` in practice) */
@@ -166,6 +167,7 @@ export interface AgentMcpServer {
  * Optional fields are omitted by some API versions or edge records.
  */
 export interface AgentDetail {
+  avatarUrl?: string | null;
   models: AgentConfiguredModel[];
   /**
    * True when `models` is empty and the agent falls back to the

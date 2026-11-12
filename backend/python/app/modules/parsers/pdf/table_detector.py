@@ -73,7 +73,11 @@ def _session(name: str) -> Optional["InferenceSession"]:
                 if name == "heron":
                     from huggingface_hub import hf_hub_download
 
-                    path = hf_hub_download(_HERON_REPO, "model.onnx", revision=_HERON_REVISION)
+                    # Docker bakes this revision; an online cache check can exhaust an upload's deadline.
+                    path = hf_hub_download(
+                        _HERON_REPO, "model.onnx", revision=_HERON_REVISION,
+                        local_files_only=True,
+                    )
                 else:
                     path = os.environ.get(_GATE_MODEL_ENV) or str(_GATE_MODEL_BUNDLED)
                     if path == "off":

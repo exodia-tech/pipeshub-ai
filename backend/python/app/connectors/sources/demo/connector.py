@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
@@ -66,6 +67,34 @@ from app.models.permission import EntityType, Permission, PermissionType
 DEMO_CONNECTOR_NAME = "Demo"
 DEMO_ICON_PATH = "/icons/connectors/default.svg"
 FIXTURE_PATH = Path(__file__).parent / "fixture" / "acme-corp.yaml"
+ASSET_MANIFEST_PATH = FIXTURE_PATH.parent / "mobart-assets.yaml"
+_ASSET_MIME = {
+    ".pdf": "application/pdf",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+
+def _asset_path(name: str) -> Path:
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        raise ValueError("Invalid demo asset name")
+    root = (FIXTURE_PATH.parent / "files").resolve()
+    path = (root / name).resolve()
+    if (
+        path.parent != root
+        or path.suffix.lower() not in _ASSET_MIME
+        or not path.is_file()
+    ):
+        raise ValueError(f"Invalid or missing demo asset: {name}")
+    return path
+
+
+def _asset_revision(path: Path) -> str:
+    digest = hashlib.sha256(f"{_REVISION_SALT}\n".encode())
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()[:16]
+
 
 _SYSTEM_TO_CONNECTOR = {
     "GITHUB": Connectors.GITHUB,
@@ -89,11 +118,11 @@ _KIND_TO_GROUP_TYPE = {
     "desk": RecordGroupType.PROJECT,
 }
 _TYPE_LABEL = {
-    "PULL_REQUEST": "Pull request",
+    "PULL_REQUEST": "Revisione",
     "TICKET": "Ticket",
-    "MESSAGE": "Chat message",
-    "FILE": "Document",
-    "COMMENT": "Review comment",
+    "MESSAGE": "Messaggio",
+    "FILE": "Documento",
+    "COMMENT": "Commento",
 }
 _MARKDOWN = "text/markdown"
 # How long a sync waits for the sign-in personas to appear in the graph. The
@@ -143,7 +172,9 @@ async def _wait_for_members(
         waited = loop.time() - started
         if waited >= timeout or (not arrived and waited >= grace):
             return sorted(missing)
-        logger.info("Demo connector waiting for %d account(s) to be created", len(missing))
+        logger.info(
+            "Demo connector waiting for %d account(s) to be created", len(missing)
+        )
         await asyncio.sleep(poll)
     return []
 
@@ -180,7 +211,9 @@ def _epoch_ms(value: Any) -> int | None:
     if isinstance(value, datetime):
         dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
         return int(dt.timestamp() * 1000)
-    return int(datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp() * 1000)
+    return int(
+        datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp() * 1000
+    )
 
 
 class DemoApp(App):
@@ -193,23 +226,28 @@ class DemoApp(App):
     .in_group(AppGroups.DEMO.value)
     .with_supported_auth_types("NONE")
     .with_description(
-        "Acme Corp, a small fictional company: pull requests, tickets, chat threads, "
-        "documents and support cases across five systems, with two people who can "
-        "see different things. Nothing external is contacted."
+        "Dati dimostrativi sintetici Mobart Ben: progetti, documenti, conversazioni "
+        "e preventivi in italiano, con autorizzazioni separate per gruppo."
     )
     .with_categories(["Demo"])
     .with_scopes([ConnectorScope.TEAM.value])
     .with_permission_model(PermissionModel.RECORD_LEVEL)
     .configure(
-        lambda builder: builder.with_icon(DEMO_ICON_PATH)
-        .with_realtime_support(False)
-        .add_documentation_link(
-            DocumentationLink("Try PipesHub with demo data", "https://docs.pipeshub.com/demo-data", "setup")
+        lambda builder: (
+            builder.with_icon(DEMO_ICON_PATH)
+            .with_realtime_support(False)
+            .add_documentation_link(
+                DocumentationLink(
+                    "Try PipesHub with demo data",
+                    "https://docs.pipeshub.com/demo-data",
+                    "setup",
+                )
+            )
+            .with_sync_strategies([SyncStrategy.MANUAL], selected=SyncStrategy.MANUAL)
+            .with_sync_support(True)
+            .with_agent_support(False)
+            .with_hide_connector(False)
         )
-        .with_sync_strategies([SyncStrategy.MANUAL], selected=SyncStrategy.MANUAL)
-        .with_sync_support(True)
-        .with_agent_support(False)
-        .with_hide_connector(False)
     )
     .build_decorator()
 )
@@ -239,14 +277,29 @@ class DemoConnector(BaseConnector):
         self.connector_id = connector_id
         self._fixture: dict[str, Any] | None = None
         self._bodies: dict[str, str] = {}  # external id -> markdown
+        self._files: dict[str, Path] = {}
 
     # ------------------------------------------------------------------ fixture
 
-    def _load_fixture(self) -> dict[str, Any]:
-        if self._fixture is None:
+    def _load_fixture(self, *, refresh: bool = False) -> dict[str, Any]:
+        if self._fixture is None or refresh:
             with FIXTURE_PATH.open(encoding="utf-8") as fh:
-                self._fixture = yaml.safe_load(fh)
-            self._bodies = self._render_bodies(self._fixture)
+                fixture = yaml.safe_load(fh)
+            with ASSET_MANIFEST_PATH.open(encoding="utf-8") as fh:
+                manifest = yaml.safe_load(fh)
+            fixture["records"].extend(manifest.get("records", []))
+            records = {record["id"]: record for record in fixture["records"]}
+            if len(records) != len(fixture["records"]):
+                raise ValueError("Duplicate demo record ID")
+            files = {}
+            for record_id, name in manifest["files"].items():
+                record = records.get(record_id)
+                if record is None or record["type"] != "FILE":
+                    raise ValueError(f"Invalid demo file record: {record_id}")
+                files[record_id] = _asset_path(name)
+                record["asset"] = name
+            bodies = self._render_bodies(fixture)
+            self._fixture, self._bodies, self._files = fixture, bodies, files
         return self._fixture
 
     @staticmethod
@@ -266,8 +319,8 @@ class DemoConnector(BaseConnector):
             head = [
                 f"# {rec['title']}",
                 "",
-                f"**System:** {_SYSTEM_LABEL[c['system']]} · **Type:** {_TYPE_LABEL[rec['type']]} · **In:** {c['name']}",
-                f"**Author:** {people[rec['author']]['name']} · **Date:** {str(rec['created'])[:10]}",
+                f"**Sistema:** {_SYSTEM_LABEL[c['system']]} · **Tipo:** {_TYPE_LABEL[rec['type']]} · **In:** {c['name']}",
+                f"**Autore:** {people[rec['author']]['name']} · **Data:** {str(rec['created'])[:10]}",
                 "",
             ]
             out[rec["id"]] = "\n".join(head) + rec["body"].rstrip() + "\n"
@@ -276,9 +329,16 @@ class DemoConnector(BaseConnector):
             t = threads[tid]
             c = containers[t["container"]]
             msgs.sort(key=lambda m: str(m["created"]))
-            lines = [f"# {t['title']}", "", f"**System:** Slack · **Type:** Thread · **In:** {c['name']}", ""]
+            lines = [
+                f"# {t['title']}",
+                "",
+                f"**Sistema:** Slack · **Tipo:** Thread · **In:** {c['name']}",
+                "",
+            ]
             for m in msgs:
-                lines.append(f"**{people[m['author']]['name']}** · {str(m['created'])[:16].replace('T', ' ')}")
+                lines.append(
+                    f"**{people[m['author']]['name']}** · {str(m['created'])[:16].replace('T', ' ')}"
+                )
                 lines.append(m["body"].rstrip())
                 lines.append("")
             out[tid] = "\n".join(lines)
@@ -304,9 +364,13 @@ class DemoConnector(BaseConnector):
         if not self.created_by:
             return None
         try:
-            user = await self.data_entities_processor.get_user_by_user_id(self.created_by)
+            user = await self.data_entities_processor.get_user_by_user_id(
+                self.created_by
+            )
         except Exception as exc:  # noqa: BLE001 - a missing installer only costs them visibility
-            self.logger.warning("Could not resolve the connector creator %s: %s", self.created_by, exc)
+            self.logger.warning(
+                "Could not resolve the connector creator %s: %s", self.created_by, exc
+            )
             return None
         if user is None or not user.email:
             return None
@@ -326,7 +390,9 @@ class DemoConnector(BaseConnector):
             fx = self._load_fixture()
             self.logger.info(
                 "Demo connector ready: %d records, %d containers, %d people",
-                len(fx["records"]), len(fx["containers"]), len(fx["people"]),
+                len(fx["records"]),
+                len(fx["containers"]),
+                len(fx["people"]),
             )
             return True
         except Exception as exc:  # noqa: BLE001 - surfaced to the caller as a failed init
@@ -346,12 +412,26 @@ class DemoConnector(BaseConnector):
         convertTo: Optional[str] = None,
     ) -> StreamingResponse:
         self._load_fixture()
+        asset = self._files.get(record.external_record_id)
+        if asset is not None:
+
+            async def _file_chunks() -> AsyncGenerator[bytes, None]:
+                with asset.open("rb") as source:
+                    while chunk := await asyncio.to_thread(source.read, 65536):
+                        yield chunk
+
+            return StreamingResponse(
+                _file_chunks(),
+                media_type=_ASSET_MIME[asset.suffix.lower()],
+                headers={"Content-Disposition": f'inline; filename="{asset.name}"'},
+            )
         body = self._bodies.get(record.external_record_id)
         if body is None:
             raise HTTPException(
                 status_code=HttpStatusCode.NOT_FOUND.value,
                 detail=f"Demo record {record.external_record_id!r} is not in the fixture",
             )
+
         async def _gen() -> AsyncGenerator[bytes, None]:
             yield body.encode("utf-8")
 
@@ -360,13 +440,15 @@ class DemoConnector(BaseConnector):
         return StreamingResponse(
             _gen(),
             media_type=_MARKDOWN,
-            headers={"Content-Disposition": f'inline; filename="{record.external_record_id}.md"'},
+            headers={
+                "Content-Disposition": f'inline; filename="{record.external_record_id}.md"'
+            },
         )
 
     # ------------------------------------------------------------------ sync
 
     async def run_sync(self) -> None:
-        fx = self._load_fixture()
+        fx = self._load_fixture(refresh=True)
         now = _epoch_ms(datetime.now(timezone.utc))
         people = {p["id"]: p for p in fx["people"]}
         containers = {c["id"]: c for c in fx["containers"]}
@@ -482,7 +564,7 @@ class DemoConnector(BaseConnector):
                 external_revision_id=_revision_of(self._bodies[tid]),
                 external_record_group_id=c["id"],
                 record_group_id=record_groups[c["id"]].id,
-                version=1,
+                version=0,
                 origin=OriginTypes.CONNECTOR,
                 connector_name=Connectors.SLACK,
                 connector_id=self.connector_id,
@@ -505,7 +587,9 @@ class DemoConnector(BaseConnector):
         # 5. Relations, using the ids the store settled on.
         stored: dict[str, Record] = {}
         for fixture_id in records:
-            found = await self.data_entities_processor.get_record_by_external_id(self.connector_id, fixture_id)
+            found = await self.data_entities_processor.get_record_by_external_id(
+                self.connector_id, fixture_id
+            )
             if found is not None:
                 stored[fixture_id] = found
         relation_count = 0
@@ -528,24 +612,34 @@ class DemoConnector(BaseConnector):
 
         self.logger.info(
             "Demo sync complete: %d records, %d containers, %d groups, %d relations",
-            len(batch), len(rg_batch), len(memberships), relation_count,
+            len(batch),
+            len(rg_batch),
+            len(memberships),
+            relation_count,
         )
 
     def _build_record(
         self, rec: dict, container: dict, people: dict, rg: RecordGroup, now: int
     ) -> Record:
+        asset = _asset_path(rec["asset"]) if rec.get("asset") else None
         common: dict[str, Any] = dict(
             org_id=self.data_entities_processor.org_id,
-            record_name=rec["title"],
+            record_name=(
+                f"{rec['title']}{asset.suffix}"
+                if asset and not rec["title"].lower().endswith(asset.suffix.lower())
+                else rec["title"]
+            ),
             external_record_id=rec["id"],
-            external_revision_id=_revision_of(self._bodies[rec["id"]]),
+            external_revision_id=_asset_revision(asset)
+            if asset
+            else _revision_of(self._bodies[rec["id"]]),
             external_record_group_id=container["id"],
             record_group_id=rg.id,
-            version=1,
+            version=0,
             origin=OriginTypes.CONNECTOR,
             connector_name=_SYSTEM_TO_CONNECTOR[container["system"]],
             connector_id=self.connector_id,
-            mime_type=_MARKDOWN,
+            mime_type=_ASSET_MIME[asset.suffix.lower()] if asset else _MARKDOWN,
             # The fixture's addresses are made up, so "Open in Jira/GitHub/..." would
             # lead nowhere: hide_weburl hides it and citations open the record in
             # PipesHub. The address itself stays, because search drops a non-file
@@ -579,7 +673,7 @@ class DemoConnector(BaseConnector):
         return FileRecord(
             record_type=RecordType.FILE,
             is_file=True,
-            extension="md",
+            extension=asset.suffix.lower().lstrip(".") if asset else "md",
             **common,
         )
 
@@ -603,7 +697,9 @@ class DemoConnector(BaseConnector):
         search: Optional[str] = None,
         cursor: Optional[str] = None,
     ) -> FilterOptionsResponse:
-        return FilterOptionsResponse(success=True, options=[], page=page, limit=limit, has_more=False)
+        return FilterOptionsResponse(
+            success=True, options=[], page=page, limit=limit, has_more=False
+        )
 
     @classmethod
     async def create_connector(

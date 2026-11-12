@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Handle, Position, useReactFlow, useStore, useNodeConnections } from '@xyflow/react';
-import { Box, Flex, Text, IconButton, Dialog, Button, TextArea, Badge, Switch } from '@radix-ui/themes';
+import { Box, Flex, Text, IconButton, Dialog, Button, TextArea, Badge, Switch, Select } from '@radix-ui/themes';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { ConnectorIcon } from '@/app/components/ui';
 import { ThemeableAssetIcon, themeableAssetIconPresets } from '@/app/components/ui/themeable-asset-icon';
@@ -552,6 +552,18 @@ export function AgentCoreNode({
                 {t('agentBuilder.usingOrgDefault')}
               </Text>
             )}
+            {(hasReasoningModel || connected.llms.length === 0) && (
+              <DefaultReasoningEffortSelector
+                value={(data.config?.defaultReasoningEffort as ReasoningEffort | null) ?? null}
+                disabled={readOnly}
+                onSelect={value => {
+                  setDefaultReasoningEffort(value);
+                  setNodes(nodes => nodes.map(node => node.id === data.id
+                    ? { ...node, data: { ...node.data, config: { ...((node.data.config as Record<string, unknown>) || {}), defaultReasoningEffort: value } } }
+                    : node));
+                }}
+              />
+            )}
           </Section>
 
           <Section title={t('agentBuilder.knowledge')} icon="library_books">
@@ -704,12 +716,6 @@ export function AgentCoreNode({
               showAllLabel={(n) => t('agentBuilder.showAll', { count: n })}
               showLessLabel={t('agentBuilder.showLess')}
             />
-            {hasReasoningModel ? (
-              <DefaultReasoningEffortSelector
-                value={defaultReasoningEffort}
-                onSelect={setDefaultReasoningEffort}
-              />
-            ) : null}
             <Flex align="start" justify="between" gap="3">
               <Box style={{ minWidth: 0 }}>
                 <Text size="2" weight="bold">
@@ -893,63 +899,23 @@ function PromptSection({
   );
 }
 
-/** Agent-level fallback shown only when a connected LLM is reasoning-capable — mirrors the
- * per-request selector in chat/model-selector-panel.tsx so users see a familiar control. */
-function DefaultReasoningEffortSelector({
-  value,
-  onSelect,
-}: {
+/** Stored on the agent, including agents that inherit the organization's model. */
+export function DefaultReasoningEffortSelector({ value, onSelect, disabled = false }: {
   value: ReasoningEffort | null;
   onSelect: (value: ReasoningEffort | null) => void;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  return (
-    <Box style={{ flexShrink: 0 }}>
-      <Flex align="center" gap="2" mb="1">
-        <Text size="2" weight="bold">
-          {t('agentBuilder.defaultReasoningEffortLabel')}
-        </Text>
-      </Flex>
-      <Flex align="center" gap="2" wrap="wrap" role="radiogroup" aria-label={t('agentBuilder.defaultReasoningEffortLabel')}>
-        {REASONING_EFFORT_OPTIONS.map((option) => {
-          const isActive = value === option.value;
-          return (
-            <Flex
-              key={option.value}
-              align="center"
-              justify="center"
-              role="radio"
-              aria-checked={isActive}
-              tabIndex={0}
-              onClick={() => onSelect(isActive ? null : option.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onSelect(isActive ? null : option.value);
-                }
-              }}
-              style={{
-                padding: '4px 12px',
-                borderRadius: 'var(--radius-6)',
-                border: isActive ? '1px solid var(--accent-9)' : '1px solid var(--gray-6)',
-                backgroundColor: isActive ? 'var(--accent-3)' : 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              <Text
-                size="1"
-                weight={isActive ? 'medium' : 'regular'}
-                style={{ color: isActive ? 'var(--accent-11)' : 'var(--agent-flow-text-muted)' }}
-              >
-                {t(option.labelKey, option.defaultLabel)}
-              </Text>
-            </Flex>
-          );
-        })}
-      </Flex>
-      <Text size="1" style={{ color: 'var(--agent-flow-text-muted)', display: 'block', marginTop: 4 }}>
-        {t('agentBuilder.defaultReasoningEffortHint')}
-      </Text>
-    </Box>
-  );
+  return <Flex direction="column" gap="2" mt="2" className="nodrag nowheel">
+    <Text size="1" weight="medium">{t('agentBuilder.defaultReasoningEffortLabel')}</Text>
+    <Select.Root value={value === 'none' ? 'low' : value ?? '__inherit__'} disabled={disabled}
+      onValueChange={choice => onSelect(choice === '__inherit__' ? null : choice as ReasoningEffort)}>
+      <Select.Trigger aria-label={t('agentBuilder.defaultReasoningEffortLabel')} style={{ width: '100%', minHeight: 44, color: 'var(--agent-flow-text)', background: 'var(--agent-flow-well-bg)', boxShadow: 'inset 0 0 0 1px var(--agent-flow-well-border)' }} />
+      <Select.Content>
+        <Select.Item value="__inherit__">{t('reasoningDefaults.inheritModel')}</Select.Item>
+        {REASONING_EFFORT_OPTIONS.map(option => <Select.Item key={option.value} value={option.value}>{t(option.labelKey, option.defaultLabel)}</Select.Item>)}
+      </Select.Content>
+    </Select.Root>
+    <Text size="1" style={{ color: 'var(--agent-flow-text-muted)' }}>{t('reasoningDefaults.priority')}</Text>
+  </Flex>;
 }

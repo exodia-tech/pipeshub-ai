@@ -1,4 +1,6 @@
 import { requireChatCompareEnabled } from '../utils/chat-compare-feature';
+import { createAgentPictureRouter } from './agent-pictures.routes';
+import { createAgentScheduleRouter } from './agent-schedules.routes';
 import {
   chooseCompare,
   createCompareBranchHandler,
@@ -14,6 +16,7 @@ import {
   entityNeighbors,
 } from '../controller/exact_search.controller';
 import multer from 'multer';
+import { searchAddons } from '../../../addons/registry';
 import { createMulter } from '../../../libs/utils/multer.utils';
 import { AuthMiddleware } from '../../../libs/middlewares/auth.middleware';
 import {
@@ -713,6 +716,7 @@ export function createSemanticSearchRouter(container: Container): Router {
     );
   };
   entityRoute('/grep', enterpriseSearchGrepSchema, grepRecords(appConfig));
+  for (const addon of searchAddons) entityRoute(addon.path, addon.schema, addon.createHandler(appConfig));
   entityRoute(
     '/entities',
     enterpriseSearchEntitiesSchema,
@@ -817,6 +821,8 @@ export function createSemanticSearchRouter(container: Container): Router {
 
 export function createAgentConversationalRouter(container: Container): Router {
   const router = Router();
+  router.use('/:agentKey/schedule', createAgentScheduleRouter(container));
+  router.use('/:agentKey/avatar', createAgentPictureRouter(container));
   guardPathParams(router, 'agentKey', 'recordId', 'provider', 'model_key');
   const authMiddleware = container.get<AuthMiddleware>('AuthMiddleware');
   const appConfig = container.get<AppConfig>('AppConfig');

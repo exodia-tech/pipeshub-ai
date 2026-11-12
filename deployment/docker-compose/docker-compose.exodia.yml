@@ -29,26 +29,8 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - "python3 -c 'import json, os, pathlib, time, urllib.request, urllib.error\norigin = '\"'\"'http://127.0.0.1:3000'\"\
-      '\"'\nemail = os.environ['\"'\"'EXODIA_ADMIN_EMAIL'\"'\"']\npassword = os.environ['\"'\"'EXODIA_ADMIN_PASSWORD'\"'\"\
-      ']\ndef request(path, data=None, session=None):\n    headers = {'\"'\"'Content-Type'\"'\"': '\"'\"'application/json'\"\
-      '\"'}\n    if session: headers['\"'\"'x-session-token'\"'\"'] = session\n    req = urllib.request.Request(origin + path,\
-      \ headers=headers, data=json.dumps(data).encode() if data is not None else None)\n    with urllib.request.urlopen(req,\
-      \ timeout=20) as response:\n        body = json.load(response)\n        return body, response.headers\nfor attempt in\
-      \ range(120):\n    try:\n        status, _ = request('\"'\"'/api/v1/org/exists'\"'\"')\n        if status.get('\"'\"\
-      'exists'\"'\"') is False:\n            request('\"'\"'/api/v1/org'\"'\"', {'\"'\"'accountType'\"'\"':'\"'\"'business'\"\
-      '\"','\"'\"'contactEmail'\"'\"':email,'\"'\"'adminFullName'\"'\"':'\"'\"'EXODIA Administrator'\"'\"','\"'\"'password'\"\
-      '\"':password,'\"'\"'registeredName'\"'\"':'\"'\"'EXODIA'\"'\"'})\n        _, headers = request('\"'\"'/api/v1/userAccount/initAuth'\"\
-      '\"', {'\"'\"'email'\"'\"':email})\n        session = headers.get('\"'\"'x-session-token'\"'\"')\n        if not session:\
-      \ raise RuntimeError('\"'\"'missing session'\"'\"')\n        auth, _ = request('\"'\"'/api/v1/userAccount/authenticate'\"\
-      '\"', {'\"'\"'method'\"'\"':'\"'\"'password'\"'\"','\"'\"'email'\"'\"':email,'\"'\"'credentials'\"'\"':{'\"'\"'password'\"\
-      '\"':password}}, session)\n        if not auth.get('\"'\"'accessToken'\"'\"'): raise RuntimeError('\"'\"'login failed'\"\
-      '\"')\n        pathlib.Path('\"'\"'/tmp/exodia-admin-ready'\"'\"').touch()\n        print('\"'\"'EXODIA admin initialized\
-      \ and password login verified'\"'\"', flush=True)\n        break\n    except Exception:\n        time.sleep(10)\nelse:\n\
-      \    print('\"'\"'EXODIA admin initialization failed; public readiness remains blocked'\"'\"', flush=True)\n' & for\
-      \ k in MAX_CONCURRENT_PARSING MAX_CONCURRENT_INDEXING MAX_PENDING_INDEXING_TASKS EMBEDDING_SERVER_MAX_CONCURRENCY EMBEDDING_BATCH_CONCURRENCY;\
-      \ do v=$$(printenv \"$$k\" || true); [ -z \"$$v\" ] && unset \"$$k\"; done; if [ -x /usr/local/bin/docker-entrypoint.sh\
-      \ ]; then exec /usr/local/bin/docker-entrypoint.sh /app/process_monitor.sh; else exec /app/process_monitor.sh; fi"
+    - >-
+      python3 /app/exodia-admin-bootstrap.py & for k in MAX_CONCURRENT_PARSING MAX_CONCURRENT_INDEXING MAX_PENDING_INDEXING_TASKS EMBEDDING_SERVER_MAX_CONCURRENCY EMBEDDING_BATCH_CONCURRENCY; do v=$$(printenv "$$k" || true); [ -z "$$v" ] && unset "$$k"; done; if [ -x /usr/local/bin/docker-entrypoint.sh ]; then exec /usr/local/bin/docker-entrypoint.sh /app/process_monitor.sh; else exec /app/process_monitor.sh; fi
     logging:
       driver: local
       options:
@@ -57,6 +39,10 @@ services:
         compress: 'true'
     environment:
     - PIPESHUB_USAGE_DB=/data/pipeshub/usage.sqlite3
+    - EXODIA_OTLP_ENABLED=${EXODIA_OTLP_ENABLED:-false}
+    - EXODIA_OTLP_ENDPOINT=${EXODIA_OTLP_ENDPOINT:-}
+    - EXODIA_OTLP_HEADERS=${EXODIA_OTLP_HEADERS:-}
+    - EXODIA_OTLP_ORG_ID=${EXODIA_OTLP_ORG_ID:-}
     - NODE_ENV=${NODE_ENV:-production}
     - GIT_COMMIT=${SOURCE_COMMIT:-}
     - APP_VERSION=${APP_VERSION:-exodia-main}
@@ -103,6 +89,8 @@ services:
     - REDIS_USERNAME=${REDIS_USERNAME:-}
     - REDIS_URL=redis://:${REDIS_PASSWORD:-}@${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
     - REDIS_KV_PREFIX=${REDIS_KV_PREFIX:-pipeshub:kv:}
+    - CRAWL4AI_INTERNAL_URL=http://crawl4ai:11235
+    - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
     - REDIS_TIMEOUT=${REDIS_TIMEOUT:-10000}
     - REDIS_DB=${REDIS_DB:-0}
     - REDIS_KEY_NAMESPACE=${REDIS_KEY_NAMESPACE:-}
@@ -215,6 +203,7 @@ services:
     - pipeshub_hf_cache:/root/.cache/huggingface
     networks:
     - pipeshub
+    - web-gateway
     healthcheck:
       test:
       - CMD-SHELL
@@ -370,6 +359,33 @@ services:
     - /bin/bash
     - -c
     - unset NEO4J_URI NEO4J_USERNAME NEO4J_PASSWORD NEO4J_DATABASE; exec /startup/docker-entrypoint.sh neo4j
+  web-readers-gateway:
+    image: nginx:1.27.5-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    pull_policy: if_not_present
+    restart: always
+    entrypoint:
+    - /bin/sh
+    - -c
+    - |
+      printf '%s\n' 'worker_processes 1;' 'events {}' 'stream { resolver 127.0.0.11 valid=10s ipv6=off; server { listen 11235; set $$reader crawl4ai-reader:11235; proxy_pass $$reader; proxy_connect_timeout 5s; } }' > /etc/nginx/nginx.conf
+      exec nginx -g 'daemon off;'
+    networks:
+      web-gateway:
+        aliases: [crawl4ai]
+      web-readers: {}
+  crawl4ai:
+    image: unclecode/crawl4ai:0.9.5@sha256:0b05666882bfb67f45d559a5b827839c54127b74aedd723f8ab338a3571b5fc9
+    pull_policy: if_not_present
+    restart: always
+    environment:
+    - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+    command: ["bash", "-c", "test -n \"$$CRAWL4AI_API_TOKEN\" || { echo 'CRAWL4AI_API_TOKEN is required' >&2; exit 1; }; exec bash entrypoint.sh"]
+    shm_size: 1gb
+    mem_limit: 3g
+    cpus: 2
+    networks:
+      web-readers:
+        aliases: [crawl4ai-reader]
 volumes:
   mongodb_data:
     driver: local
@@ -389,4 +405,8 @@ volumes:
     driver: local
 networks:
   pipeshub:
+    driver: bridge
+  web-gateway:
+    driver: bridge
+  web-readers:
     driver: bridge
