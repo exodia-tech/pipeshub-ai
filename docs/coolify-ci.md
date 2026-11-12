@@ -34,7 +34,7 @@ connector/bot acceptance also need their own evidence.
 The deployment validation job installs the checksum-pinned Compose CLI inside
 its disposable runner to render configuration. The config checks start no
 containers; the separate entrypoint checks use the private daemon. Npm caching
-is disabled because post-job cache uploads stalled the disposable workers.
+is disabled to avoid an additional post-job upload on disposable workers.
 
 Runner settings and executions:
 https://coolify.exodia.ws/server/fnbahuvghsbyyoewxacg1dho/github-runners
@@ -42,7 +42,7 @@ https://coolify.exodia.ws/server/fnbahuvghsbyyoewxacg1dho/github-runners
 Native runner documentation:
 https://coolify.io/docs/core/infrastructure/servers/github-actions-runners
 
-The large Node/frontend test streams are saved as compressed seven-day log
-artifacts. The console prints summaries and a bounded failure tail; the original
+The large Node test stream is saved as a compressed seven-day log
+artifact. The console prints summaries and a bounded failure tail; the original
 test exit status still gates the job. This avoids repeated 30-second results-log
 upload timeouts while retaining the full diagnostics.

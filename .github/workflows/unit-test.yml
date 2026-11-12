@@ -136,7 +136,7 @@ jobs:
         working-directory: backend/nodejs/apps
         run: |
           if [ -d "coverage" ]; then
-            zip -r coverage-report.zip coverage/
+            python3 -m zipfile -c coverage-report.zip coverage/
           fi
 
       - name: Zip coverage folder (Windows)
@@ -349,7 +349,7 @@ jobs:
         working-directory: backend/python
         run: |
           if [ -d "coverage" ]; then
-            zip -r python-coverage-report.zip coverage/
+            python3 -m zipfile -c python-coverage-report.zip coverage/
           fi
 
       - name: Upload Python coverage artifact
@@ -525,7 +525,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
+          package-manager-cache: false
 
       - name: Install Node dependencies
         working-directory: backend/nodejs/apps
