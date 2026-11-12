@@ -188,7 +188,7 @@ def _flagged_delete_functions() -> dict[str, bool]:
     collection that is not a `CollectionNames.X` literal (a variable could be either). Value: whether it bumps."""
     flagged: dict[str, bool] = {}
     for path in APP.rglob("*.py"):
-        rel = str(path.relative_to(APP))
+        rel = path.relative_to(APP).as_posix()
         if rel.startswith("services/graph_db/"):
             continue
         source = path.read_text(encoding="utf-8-sig")
@@ -228,7 +228,7 @@ def _flagged_create_functions() -> dict[str, bool]:
     collection that is not a `CollectionNames.X` literal. Value: whether it bumps."""
     flagged: dict[str, bool] = {}
     for path in APP.rglob("*.py"):
-        rel = str(path.relative_to(APP))
+        rel = path.relative_to(APP).as_posix()
         if rel.startswith("services/graph_db/") or not any(name in (source := path.read_text(encoding="utf-8-sig")) for name in CREATE_CALLS):
             continue
         for fn in _enclosing_functions(ast.parse(source)):
