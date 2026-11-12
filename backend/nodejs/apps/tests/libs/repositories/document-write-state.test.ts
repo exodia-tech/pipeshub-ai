@@ -34,7 +34,7 @@ describe('document write state is hidden', () => {
   });
 
   it('PostgreSQL: the row mapper names neither column', () => {
-    const src = readFileSync(join(repoDir, 'pg.ts'), 'utf8');
+    const src = readFileSync(join(repoDir, 'pg.ts'), 'utf8').replace(/\r\n/g, '\n');
     const cols = /const COLS = `([^`]*)`/.exec(src)?.[1] ?? '';
     expect(cols).to.contain('updated_at');
     expect(cols).to.not.match(/write_seq|writers/);

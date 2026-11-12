@@ -34,7 +34,7 @@ const privateConnectorRouter = (): RoutesModule['createConnectorRouter'] => {
   const before = new Set(Object.keys(require.cache))
   const originals = new Map<string, NodeJS.Module | undefined>()
   for (const key of before) {
-    if (RELOADED.some((suffix) => key.endsWith(suffix))) {
+    if (RELOADED.some((suffix) => key.replace(/\\/g, '/').endsWith(suffix))) {
       originals.set(key, require.cache[key])
       delete require.cache[key]
     }
@@ -53,7 +53,7 @@ const privateConnectorRouter = (): RoutesModule['createConnectorRouter'] => {
       if (originals.has(key)) require.cache[key] = originals.get(key)
       else if (!before.has(key)) {
         delete require.cache[key]
-        if (!RELOADED.some((suffix) => key.endsWith(suffix))) strays.push(key)
+        if (!RELOADED.some((suffix) => key.replace(/\\/g, '/').endsWith(suffix))) strays.push(key)
       }
     }
   }

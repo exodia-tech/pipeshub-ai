@@ -52,6 +52,9 @@ const ROUTES_WITHOUT_VALIDATION = new Set<string>([
 
   // Passed through to a Python service, which validates the body with its own
   // models; Node reads nothing from it but path params.
+  'createUsageRouter PUT /observability',
+  'createUsageRouter PUT /rates',
+  'createUsageRouter PUT /budgets',
   'createAgentConversationalRouter POST /:agentKey/conversations/internal/:conversationId/messages/stream',
   'createAgentConversationalRouter POST /:agentKey/conversations/internal/stream',
   'createChatSpeechRouter POST /speak',
@@ -135,6 +138,7 @@ const fakeContainer = (): Container =>
 
 const routeFiles = (): string[] =>
   (fs.readdirSync(path.join(SRC, 'modules'), { recursive: true }) as string[])
+    .map((file) => file.replace(/\\/g, '/'))
     .filter((file) => /(^|\/)routes\/[^/]+\.ts$/.test(file) || /(^|\/)[^/]+\.routes\.ts$/.test(file))
     .map((file) => path.join(SRC, 'modules', file))
     .sort()

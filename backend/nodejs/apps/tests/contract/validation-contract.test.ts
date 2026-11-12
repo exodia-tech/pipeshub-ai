@@ -189,6 +189,10 @@ describe('validation contract snapshot', function () {
   })
   after(() => sinon.restore())
 
+  it('keeps parameterized child routers distinct from parent routes', () => {
+    expect(mounts.map((m) => m.key)).to.include('createAgentConversationalRouter GET /:agentKey/schedule/project-grant/preview #0')
+  })
+
   it('has a recorded case for every route that validates', () => {
     const recorded = new Set(fixture.routes.map((r) => r.key))
     const missing = mounts.map((m) => m.key).filter((k) => !recorded.has(k))

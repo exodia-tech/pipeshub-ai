@@ -18,7 +18,7 @@ jobs:
   # Which of the jobs below this pull request's changes can affect
   # (scripts/pr_changes.py). Every other event runs them all.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -39,7 +39,7 @@ jobs:
   validate-backend:
     needs: changes
     if: needs.changes.outputs.node_build == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,7 +85,7 @@ jobs:
   validate-frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -138,7 +138,7 @@ jobs:
           npm run build
 
   ruff-lint-pr:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Checkout code
@@ -186,7 +186,7 @@ jobs:
           echo "$CHANGED_TESTS" | xargs ruff check --select F811 --output-format=concise
 
   pyright-type-check-pr:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Checkout code
@@ -229,7 +229,7 @@ jobs:
           fi
 
   validate-docker-compose:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Checkout code
@@ -282,7 +282,7 @@ jobs:
 
   workflow-lint:
     name: Lint GitHub Actions workflows
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -320,7 +320,7 @@ jobs:
 
   connector-coverage:
     name: Connector integration coverage
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

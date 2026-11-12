@@ -78,7 +78,7 @@ export class AgentSchedules {
     return raw ? JSON.parse(raw) as AgentSchedule : null;
   }
 
-  async save(orgId: string, userId: string, agentId: string, input: AgentScheduleInput): Promise<AgentSchedule> {
+  async saveSchedule(orgId: string, userId: string, agentId: string, input: AgentScheduleInput): Promise<AgentSchedule> {
     const key = scheduleKey(orgId, userId, agentId);
     const raw = await this.store.get<string>(key);
     const previous = raw ? JSON.parse(raw) as AgentSchedule : null;

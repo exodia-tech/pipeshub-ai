@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import sinon from 'sinon';
 import { AgentSchedules, AgentScheduleInput, nextAgentRun } from '../../../../src/modules/enterprise_search/services/agent-schedules';
 import { requirePublicResearchAgent, withoutSlackMentions } from '../../../../src/modules/enterprise_search/services/scheduled-agent-runtime';
 
@@ -15,6 +16,25 @@ const input: AgentScheduleInput = { enabled: true, days: [1, 3, 5], hour: 9, min
 const result = { conversationId: 'a'.repeat(24), links: ['https://example.org/news'], needsReview: true };
 
 describe('Native agent schedules', () => {
+  it('runs a due schedule from its timer and stops future automatic executions', async () => {
+    const timers = sinon.useFakeTimers({ now: Date.parse('2026-11-09T07:59:00Z'), toFake: ['Date', 'setInterval', 'clearInterval'] });
+    let calls = 0;
+    const service = new AgentSchedules(new MemoryStore(), async () => { calls++; return result; }, () => {});
+    try {
+      await service.saveSchedule('org', 'owner', 'agent', input);
+      service.start();
+      await timers.tickAsync(0);
+      assert.equal(calls, 0);
+      await timers.tickAsync(60_000);
+      assert.equal(calls, 1);
+      await service.stop();
+      await timers.tickAsync(120_000);
+      assert.equal(calls, 1);
+    } finally {
+      await service.stop();
+      timers.restore();
+    }
+  });
   it('keeps 09:00 local time through daylight saving', () => {
     assert.equal(nextAgentRun(input, Date.parse('2026-11-09T07:59:00Z')), Date.parse('2026-11-09T08:00:00Z'));
     assert.equal(nextAgentRun(input, Date.parse('2026-07-06T06:59:00Z')), Date.parse('2026-07-06T07:00:00Z'));
@@ -25,7 +45,7 @@ describe('Native agent schedules', () => {
     const execute = async () => { executions++; return result; };
     const first = new AgentSchedules(store, execute, () => {}, () => now);
     const second = new AgentSchedules(store, execute, () => {}, () => now);
-    await first.save('org', 'owner', 'agent', input);
+    await first.saveSchedule('org', 'owner', 'agent', input);
     now += 60_000;
     await Promise.all([first.tick(), second.tick()]);
     assert.equal(executions, 1);
@@ -38,17 +58,17 @@ describe('Native agent schedules', () => {
   });
   it('separates organization and owner schedules and refuses stale edits', async () => {
     const service = new AgentSchedules(new MemoryStore(), async () => result, () => {});
-    await service.save('org-a', 'owner', 'agent', input);
+    await service.saveSchedule('org-a', 'owner', 'agent', input);
     assert.equal(await service.read('org-b', 'owner', 'agent'), null);
     assert.equal(await service.read('org-a', 'other-owner', 'agent'), null);
-    await assert.rejects(service.save('org-a', 'owner', 'agent', input));
+    await assert.rejects(service.saveSchedule('org-a', 'owner', 'agent', input));
   });
   it('persists a conversation before model work and pauses after an uncertain outcome', async () => {
     const store = new MemoryStore(); let now = Date.parse('2026-11-09T07:59:00Z'); let attempts = 0;
     const service = new AgentSchedules(store, async (_schedule, _run, record) => {
       attempts++; await record(result.conversationId); throw new Error('timeout');
     }, () => {}, () => now);
-    await service.save('org', 'owner', 'agent', input); now += 60_000;
+    await service.saveSchedule('org', 'owner', 'agent', input); now += 60_000;
     await service.tick(); await service.tick();
     const saved = await service.read('org', 'owner', 'agent');
     assert.equal(attempts, 1); assert.equal(saved?.enabled, false);
@@ -60,10 +80,10 @@ describe('Native agent schedules', () => {
     const started = new Promise<void>(resolve => { signal = resolve; });
     const wait = new Promise<void>(resolve => { release = resolve; });
     const service = new AgentSchedules(new MemoryStore(), async () => { signal(); await wait; return result; }, () => {});
-    await service.save('org', 'owner', 'agent', { ...input, enabled: false });
+    await service.saveSchedule('org', 'owner', 'agent', { ...input, enabled: false });
     const running = service.runNow('org', 'owner', 'agent'); await started;
     const active = await service.read('org', 'owner', 'agent');
-    await service.save('org', 'owner', 'agent', { ...input, enabled: false, revision: active!.revision });
+    await service.saveSchedule('org', 'owner', 'agent', { ...input, enabled: false, revision: active!.revision });
     let drained = false;
     const stopping = service.stop().then(() => { drained = true; });
     await Promise.resolve(); assert.equal(drained, false);
@@ -75,7 +95,7 @@ describe('Native agent schedules', () => {
   it('marks a crashed run for reconciliation without executing it again', async () => {
     const store = new MemoryStore(); let now = Date.parse('2026-11-09T07:59:00Z');
     const original = new AgentSchedules(store, async () => result, () => {}, () => now);
-    await original.save('org', 'owner', 'agent', input);
+    await original.saveSchedule('org', 'owner', 'agent', input);
     const key = [...store.values.keys()][0]; const saved = JSON.parse(store.values.get(key)!);
     saved.runs = [{ id: 'crashed', startedAt: now - 16 * 60_000, status: 'running', periodStart: now - 86400_000, periodEnd: now }];
     store.values.set(key, JSON.stringify(saved)); let calls = 0;
@@ -97,7 +117,7 @@ describe('Native agent schedules', () => {
   it('waits for query readiness without claiming or pausing an overdue run', async () => {
     const store = new MemoryStore(); let now = Date.parse('2026-11-09T07:59:00Z'); let ready = false; let calls = 0;
     const service = new AgentSchedules(store, async () => { calls++; return result; }, () => {}, () => now, async () => ready);
-    await service.save('org', 'owner', 'agent', input); now += 60_000;
+    await service.saveSchedule('org', 'owner', 'agent', input); now += 60_000;
     await service.tick();
     assert.equal(calls, 0); assert.equal((await service.read('org', 'owner', 'agent'))?.enabled, true);
     ready = true; await service.tick(); assert.equal(calls, 1);

@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { currentOrgContext } from '../../../libs/context/orgContext';
 import { Container } from 'inversify';
 import multer from 'multer';
 import { z } from 'zod';
@@ -29,20 +30,20 @@ export function createAgentPictureRouter(container: Container): Router {
     const id = String(req.params.agentKey);
     const agent = await container.get(ScheduledAgentRuntime).checkOwner(id, req.user!.userId, headers(req), false);
     if (!req.file) throw new BadRequestError('Choose a picture to upload.');
-    const avatarUrl = await container.get(AgentPictures).upload(req.user!.orgId, id, req.file.buffer, agent.avatarUrl, headers(req));
+    const avatarUrl = await container.get(AgentPictures).upload(currentOrgContext().orgId!, id, req.file.buffer, agent.avatarUrl, headers(req));
     res.status(201).json({ avatarUrl });
   }));
   router.get('/:version', ValidationMiddleware.validate(z.object({ params: z.object({ agentKey: z.string().uuid(), version: z.string().uuid() }) })), handle(async (req, res) => {
     const id = String(req.params.agentKey);
     const agent = await container.get(ScheduledAgentRuntime).getAgent(id, headers(req));
-    const dataUrl = await container.get(AgentPictures).read(req.user!.orgId, id, String(req.params.version), agent.avatarUrl);
+    const dataUrl = await container.get(AgentPictures).read(currentOrgContext().orgId!, id, String(req.params.version), agent.avatarUrl);
     res.setHeader('Cache-Control', 'private, no-store');
     res.json({ dataUrl });
   }));
   router.delete('/', requireScopes(OAuthScopeNames.AGENT_WRITE), handle(async (req, res) => {
     const id = String(req.params.agentKey);
     const agent = await container.get(ScheduledAgentRuntime).checkOwner(id, req.user!.userId, headers(req), false);
-    await container.get(AgentPictures).remove(req.user!.orgId, id, agent.avatarUrl, headers(req));
+    await container.get(AgentPictures).remove(currentOrgContext().orgId!, id, agent.avatarUrl, headers(req));
     res.json({ avatarUrl: null });
   }));
   return router;

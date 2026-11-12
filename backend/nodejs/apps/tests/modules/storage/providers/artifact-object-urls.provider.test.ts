@@ -119,7 +119,7 @@ describe('Signed object URLs for artifact sets', () => {
     const adapter = () =>
       new LocalStorageAdapter({ mountName: 'PipesHub', baseUrl: 'http://localhost:3000' } as any)
 
-    const keyPath = () => path.join(fs.realpathSync(home), '.local', 'PipesHub', KEY)
+    const keyPath = () => path.join(fs.realpathSync(home), process.platform === 'win32' ? 'AppData' : process.platform === 'darwin' ? 'Library' : '.local', 'PipesHub', KEY)
 
     const read = async (a: LocalStorageAdapter, key = KEY): Promise<string | null> => {
       const opened = await a.openObject(key)
@@ -170,7 +170,7 @@ describe('Signed object URLs for artifact sets', () => {
         fs.writeFileSync(path.join(outside, 'part-0000.jsonl'), 'secret')
         const blocks = path.dirname(keyPath())
         fs.rmSync(blocks, { recursive: true })
-        fs.symlinkSync(outside, blocks)
+        fs.symlinkSync(outside, blocks, process.platform === 'win32' ? 'junction' : 'dir')
 
         await refused(() => a.writeObject(KEY, Buffer.from('escaped')), 'write')
         await refused(() => a.openObject(KEY), 'read')

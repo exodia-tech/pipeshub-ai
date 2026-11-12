@@ -2,6 +2,7 @@ import 'reflect-metadata'
 import { expect } from 'chai'
 import fs from 'fs'
 import path from 'path'
+import { pathToFileURL } from 'node:url'
 import { registerCodeGraphTools } from '../../src/modules/mcp/code-graph.tools'
 
 /**
@@ -19,7 +20,7 @@ import { registerCodeGraphTools } from '../../src/modules/mcp/code-graph.tools'
  * and explain the `git diff` of the fixture in the PR.
  */
 const FIXTURE = path.join(__dirname, 'mcp-tools-list.fixture.json')
-const nm = (p: string): string => path.join(__dirname, '../../node_modules', p)
+const nm = (p: string): string => pathToFileURL(path.join(__dirname, '../../node_modules', p)).href
 // The mocha setup replaces the CJS view of these ESM packages with mocks, so
 // load the real files with a native dynamic import.
 const nativeImport = new Function('p', 'return import(p)') as (p: string) => Promise<any>

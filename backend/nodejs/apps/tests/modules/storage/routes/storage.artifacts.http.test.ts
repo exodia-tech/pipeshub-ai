@@ -106,7 +106,7 @@ describe('Artifact sets over HTTP: the local disk path', () => {
     call('POST', '/internal/artifacts/presign', { virtualRecordId: VRID, rev: REV, files, ...extra }, org)
 
   const filesOnDisk = (): string[] => {
-    const root = path.join(home, '.local', MOUNT)
+    const root = path.join(home, process.platform === 'win32' ? 'AppData' : process.platform === 'darwin' ? 'Library' : '.local', MOUNT)
     if (!fs.existsSync(root)) return []
     return (fs.readdirSync(root, { recursive: true }) as string[])
       .filter((p) => fs.statSync(path.join(root, p)).isFile())
@@ -366,7 +366,7 @@ describe('Artifact sets over HTTP: the local disk path', () => {
 
   it('does not serve a file that is itself a symlink out of the mount', async () => {
     const f = await uploadAndReadUrl('record.json', Buffer.from('{}'))
-    const onDisk = path.join(home, '.local', MOUNT, ORG_ID, 'PipesHub', 'record-revisions', VRID, REV, 'record.json')
+    const onDisk = path.join(home, process.platform === 'win32' ? 'AppData' : process.platform === 'darwin' ? 'Library' : '.local', MOUNT, ORG_ID, 'PipesHub', 'record-revisions', VRID, REV, 'record.json')
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'artifact-http-outside-'))
     try {
       const secret = path.join(outside, 'secret.txt')

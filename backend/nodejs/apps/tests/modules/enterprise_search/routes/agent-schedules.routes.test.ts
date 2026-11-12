@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { asAccount } from '../../../../src/libs/context/orgContext';
 import { strict as assert } from 'node:assert';
 import express from 'express';
 import { createServer } from 'node:http';
@@ -24,10 +25,10 @@ describe('Agent schedule access boundaries', () => {
     let scopes: string[] = ['agent:read', 'agent:write'];
     container.bind('AuthMiddleware').toConstantValue({ authenticate: (req: AuthenticatedUserRequest, _res: express.Response, next: express.NextFunction) => {
       req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: scopes };
-      next();
+      asAccount('org', 'owner', 'test:verified-auth', next);
     } });
     const owner = sinon.stub(ScheduledAgentRuntime.prototype, 'checkOwner').rejects(new Error('creator only'));
-    const save = sinon.stub(AgentSchedules.prototype, 'save');
+    const save = sinon.stub(AgentSchedules.prototype, 'saveSchedule');
     container.bind(ScheduledAgentRuntime).toConstantValue(Object.create(ScheduledAgentRuntime.prototype));
     const app = express(); app.use(express.json());
     app.use('/agents/:agentKey/schedule', createAgentScheduleRouter(container));
@@ -56,7 +57,7 @@ describe('Agent schedule access boundaries', () => {
   it('validates paused destination edits but lets a former admin pause an unchanged destination', async () => {
     const container = new Container();
     container.bind('AuthMiddleware').toConstantValue({ authenticate: (req: AuthenticatedUserRequest, _res: express.Response, next: express.NextFunction) => {
-      req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: ['agent:read', 'agent:write', 'agent:execute'] }; next();
+      req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: ['agent:read', 'agent:write', 'agent:execute'] }; asAccount('org', 'owner', 'test:verified-auth', next);
     } });
     const bot = '120d1a70-989a-499b-8e41-170b2a07a820';
     const runtime = Object.create(ScheduledAgentRuntime.prototype) as ScheduledAgentRuntime;
@@ -64,7 +65,7 @@ describe('Agent schedule access boundaries', () => {
     const delivery = sinon.stub(runtime, 'checkDelivery').rejects(new Error('not admin'));
     const schedules = Object.create(AgentSchedules.prototype) as AgentSchedules;
     sinon.stub(schedules, 'read').resolves({ slackBotId: bot, slackChannelId: 'C0C6WPPH5V0' });
-    const save = sinon.stub(schedules, 'save').resolves({});
+    const save = sinon.stub(schedules, 'saveSchedule').resolves({});
     container.bind(ScheduledAgentRuntime).toConstantValue(runtime); container.bind(AgentSchedules).toConstantValue(schedules);
     const app = express(); app.use(express.json()); app.use('/agents/:agentKey/schedule', createAgentScheduleRouter(container));
     app.use((_err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.sendStatus(403); });
@@ -80,7 +81,7 @@ describe('Agent schedule access boundaries', () => {
     let scopes = ['agent:read'];
     const container = new Container();
     container.bind('AuthMiddleware').toConstantValue({ authenticate: (req: AuthenticatedUserRequest, _res: express.Response, next: express.NextFunction) => {
-      req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: scopes }; next();
+      req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: scopes }; asAccount('org', 'owner', 'test:verified-auth', next);
     } });
     const runtime = Object.create(ScheduledAgentRuntime.prototype) as ScheduledAgentRuntime;
     sinon.stub(runtime, 'checkOwner').resolves({ createdBy: 'owner' });
@@ -91,7 +92,7 @@ describe('Agent schedule access boundaries', () => {
     const validate = sinon.stub(grants, 'validate').resolves({ grant: { id: 'grant-1' } });
     const schedules = Object.create(AgentSchedules.prototype) as AgentSchedules;
     sinon.stub(schedules, 'read').resolves(null);
-    const save = sinon.stub(schedules, 'save').resolves({});
+    const save = sinon.stub(schedules, 'saveSchedule').resolves({});
     container.bind(ScheduledAgentRuntime).toConstantValue(runtime); container.bind(AgentProjectGrants).toConstantValue(grants); container.bind(AgentSchedules).toConstantValue(schedules);
     const app = express(); app.use(express.json()); app.use('/agents/:agentKey/schedule', createAgentScheduleRouter(container));
     app.use((_err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.sendStatus(403); });

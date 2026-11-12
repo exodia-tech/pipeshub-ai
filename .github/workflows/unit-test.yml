@@ -2,6 +2,11 @@ name: unit-test
 
 on:
   workflow_dispatch:
+    inputs:
+      node-only:
+        description: 'Run the full Node gate only (no Docker required); other suites are explicitly skipped'
+        type: boolean
+        default: false
   pull_request:
     branches:
       - 'main'
@@ -54,7 +59,7 @@ jobs:
   # Which of the jobs below this pull request's changes can affect
   # (scripts/pr_changes.py). Every other event runs them all.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -76,12 +81,11 @@ jobs:
   nodejs-unit-tests:
     needs: changes
     if: needs.changes.outputs.node_unit == 'true'
-    runs-on: ${{ matrix.os }}
+    runs-on: [self-hosted, linux, exodia-brain]
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
         node-version: [22]
 
     steps:
@@ -134,7 +138,7 @@ jobs:
         if: ${{ always() && inputs.generate-coverage-reports == true }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nodejs-coverage-report-${{ matrix.os }}
+          name: nodejs-coverage-report-linux
           path: backend/nodejs/apps/coverage-report.zip
           retention-days: 7
           if-no-files-found: ignore
@@ -147,8 +151,8 @@ jobs:
   python-unit:
     name: python-unit (${{ matrix.shard }})
     needs: changes
-    if: needs.changes.outputs.python_unit == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.python_unit == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 30
     env:
       # One fixed place for the fastembed model files, so the cache step, the
@@ -288,8 +292,8 @@ jobs:
     needs: [changes, python-unit]
     # Still runs when a shard failed: the coverage result is a separate question,
     # and python-unit-tests fails on the shard either way.
-    if: ${{ !cancelled() && needs.changes.outputs.python_unit == 'true' }}
-    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && needs.changes.outputs.python_unit == 'true' && !inputs.node-only }}
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 15
 
     steps:
@@ -353,8 +357,8 @@ jobs:
   # change. Structural only — no model call, no network, no API key.
   python-agent-evals:
     needs: changes
-    if: needs.changes.outputs.python_unit == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.python_unit == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 20
 
     steps:
@@ -404,8 +408,8 @@ jobs:
   # pinned packages staying published.
   python-integration-offline:
     needs: changes
-    if: needs.changes.outputs.python_unit == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.python_unit == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     timeout-minutes: 30
 
     steps:
@@ -448,8 +452,8 @@ jobs:
   # required status check keeps one name however the shards change.
   python-unit-tests:
     needs: [changes, python-unit, python-coverage, python-agent-evals, python-integration-offline]
-    if: ${{ always() && needs.changes.outputs.python_unit == 'true' }}
-    runs-on: ubuntu-latest
+    if: ${{ always() && needs.changes.outputs.python_unit == 'true' && !inputs.node-only }}
+    runs-on: [self-hosted, linux, exodia-brain]
 
     steps:
       - name: Check the Python jobs passed
@@ -466,8 +470,8 @@ jobs:
     # proves the MemoryDB-readiness refactor (R1/R17) against a live cluster on
     # every PR that touches Redis code, not just nightly/manual integration runs.
     needs: changes
-    if: needs.changes.outputs.redis_cluster == 'true'
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.redis_cluster == 'true' && !inputs.node-only
+    runs-on: [self-hosted, linux, exodia-brain]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -7,6 +7,7 @@ import sinon from 'sinon';
 import { Container } from 'inversify';
 import { AuthenticatedUserRequest } from '../../../../src/libs/middlewares/types';
 import { createAgentPictureRouter } from '../../../../src/modules/enterprise_search/routes/agent-pictures.routes';
+import { asAccount } from '../../../../src/libs/context/orgContext';
 import { ScheduledAgentRuntime } from '../../../../src/modules/enterprise_search/services/scheduled-agent-runtime';
 import { AgentPictures } from '../../../../src/modules/enterprise_search/services/agent-pictures';
 import { BadRequestError } from '../../../../src/libs/errors/http.errors';
@@ -18,7 +19,8 @@ describe('Agent picture access boundaries', () => {
     const container = new Container();
     container.bind('AuthMiddleware').toConstantValue({ authenticate: (req: AuthenticatedUserRequest, res: express.Response, next: express.NextFunction) => {
       if (!authenticated) { res.sendStatus(401); return; }
-      req.user = { userId: 'owner', orgId: 'org', isOAuth: true, oauthScopes: scopes }; next();
+      req.user = { userId: 'owner', orgId: 'untrusted-request-org', isOAuth: true, oauthScopes: scopes };
+      asAccount('org', 'owner', 'test:verified-auth', next);
     } });
     const runtime = Object.create(ScheduledAgentRuntime.prototype) as ScheduledAgentRuntime;
     const owner = sinon.stub(runtime, 'checkOwner').rejects(new Error('creator only'));

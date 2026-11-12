@@ -79,7 +79,7 @@ describe('oauth_provider/config/scopes.config - coverage', () => {
       'utf8',
     )
     const listed = doc.split('PAT scopes the script mints')[1]?.split('```')[1] ?? ''
-    expect(listed.trim().split('\n').sort()).to.deep.equal([...AgentMcpScopes].sort())
+    expect(listed.trim().split(/\r?\n/).sort()).to.deep.equal([...AgentMcpScopes].sort())
   })
 
   // MCP clients request every scope discovery lists, so it lists only what
@@ -95,7 +95,7 @@ describe('oauth_provider/config/scopes.config - coverage', () => {
   it('discovery on the stock MCP_SCOPES drops only the scopes no tool uses', () => {
     const template = readFileSync(resolve(process.cwd(), '../../env.template'), 'utf8')
     const line = template.split('\n').find((l) => l.startsWith('MCP_SCOPES=')) ?? ''
-    const stock = line.slice('MCP_SCOPES='.length).split(',')
+    const stock = line.slice('MCP_SCOPES='.length).trim().split(',')
     for (const list of [stock, DefaultMcpScopes]) {
       expect(mcpDiscoveryScopes(list)).to.have.members([...McpToolScopes])
     }

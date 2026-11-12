@@ -4,6 +4,7 @@ import sinon from 'sinon'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import mongoose from 'mongoose'
 import { StorageController } from '../../../../src/modules/storage/controllers/storage.controller'
 import { StorageServiceAdapter } from '../../../../src/modules/storage/adapter/base-storage.adapter'
@@ -73,8 +74,8 @@ describe('StorageController.moveTreeLocal on disk', () => {
     const sets = writtenPaths(bulk)
     expect(sets[a._id].documentPath).to.equal(`${base}/Renamed`)
     expect(sets[b._id].documentPath).to.equal(`${base}/Renamed/sub`)
-    expect(sets[b._id]['local.localPath']).to.equal(
-      `file://${mount}/${base}/Renamed/sub/${b._id}/record_v.json`,
+    expect(fileURLToPath(sets[b._id]['local.localPath'])).to.equal(
+      path.join(mount, base, `Renamed/sub/${b._id}/record_v.json`),
     )
     await fs.access(path.join(mount, `${base}/Renamed/sub/${b._id}/record_v.json`))
   })
@@ -125,7 +126,7 @@ describe('StorageController.moveTreeLocal on disk', () => {
 
     const set = writtenPaths(bulk)[a._id]
     expect(set.documentPath).to.equal(`${base}/Renamed/y`)
-    expect(set['local.localPath']).to.equal(`file://${mount}/${base}/Renamed/y/${a._id}/record_v.json`)
+    expect(fileURLToPath(set['local.localPath'])).to.equal(path.join(mount, base, `Renamed/y/${a._id}/record_v.json`))
   })
 
   it('leaves a row whose folder is nowhere under the new path untouched', async () => {
@@ -152,8 +153,8 @@ describe('StorageController.moveTreeLocal on disk', () => {
 
     const set = writtenPaths(bulk)[a._id]
     expect(set.documentPath).to.equal(`${base}/Renamed/Q1_ Plan 文档`)
-    expect(decodeURIComponent(set['local.localPath'])).to.equal(
-      `file://${mount}/${base}/Renamed/Q1_ Plan 文档/${a._id}/record_v.json`,
+    expect(fileURLToPath(set['local.localPath'])).to.equal(
+      path.join(mount, base, `Renamed/Q1_ Plan 文档/${a._id}/record_v.json`),
     )
   })
 })
@@ -182,7 +183,7 @@ describe('LocalStorageAdapter.locateDocuments', () => {
   it('does not follow a symlink out of the tree', async () => {
     await fs.mkdir(path.join(mount, 'outside/id9'), { recursive: true })
     await fs.mkdir(path.join(mount, 'o/PipesHub/r'), { recursive: true })
-    await fs.symlink(path.join(mount, 'outside'), path.join(mount, 'o/PipesHub/r/link'))
+    await fs.symlink(path.join(mount, 'outside'), path.join(mount, 'o/PipesHub/r/link'), process.platform === 'win32' ? 'junction' : 'dir')
 
     const found = await local.locateDocuments('o/PipesHub/r', ['id9'])
 

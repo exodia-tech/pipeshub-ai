@@ -5,6 +5,10 @@ import * as users from '../../../../src/libs/repositories/user';
 import { AgentProjectGrants } from '../../../../src/modules/enterprise_search/services/agent-project-grants';
 import { ScheduledAgentRuntime } from '../../../../src/modules/enterprise_search/services/scheduled-agent-runtime';
 import * as chat from '../../../../src/modules/enterprise_search/utils/non-streaming-chat';
+import { AIServiceCommand } from '../../../../src/libs/commands/ai_service/ai.service.command';
+import * as admins from '../../../../src/modules/user_management/services/user-admin.service';
+import * as bots from '../../../../src/modules/configuration_manager/controller/cm_controller';
+import * as scoped from '../../../../src/modules/enterprise_search/utils/scoped-request';
 
 describe('Project schedule runtime', () => {
   afterEach(() => sinon.restore());
@@ -56,5 +60,68 @@ describe('Project schedule runtime', () => {
     getLive.resolves({ _id: 'owner', orgId: 'org', email: 'owner@example.invalid', kind: 'human' });
     await assert.rejects(runtime.execute({ ...schedule, slackChannelId: 'C0C6WPPH5V0' }, run, async () => {}));
     assert.equal(validate.callCount, 0); assert.equal(complete.callCount, 0);
+  });
+
+  it('does not expose credential-bearing or duplicate links in a public research result', async () => {
+    const { runtime, complete, validate } = setup();
+    complete.resolves({ conversation: { messages: [
+      { messageType: 'user_query', content: 'https://private.example.invalid' },
+      { messageType: 'bot_response', content: 'Sources: https://example.invalid/a#one https://example.invalid/a#two https://user:secret@example.invalid/private https://[broken' },
+    ] }, recordsUsed: 0 });
+    const result = await runtime.execute({ ...schedule, projectId: null, projectGrantId: null }, run, async () => {});
+    assert.deepEqual(result.links, ['https://example.invalid/a']);
+    assert.equal(result.slackTs, undefined);
+    assert.equal(validate.callCount, 0);
+  });
+
+  it('checks agent ownership and public-research eligibility before settings access', async () => {
+    const runtime = new ScheduledAgentRuntime(() => ({}), {}, {} as AgentProjectGrants);
+    const getAgent = sinon.stub(runtime, 'getAgent').resolves({ ...agent, createdBy: 'someone-else' });
+    await assert.rejects(runtime.checkOwner('agent', 'owner', {}, true), /Only the agent creator/);
+    getAgent.resolves({ ...agent, knowledge: ['private-folder'], toolsets: [], mcpServers: [], apiToolsetTools: [], skills: [], sendUserContext: false });
+    await assert.rejects(runtime.checkOwner('agent', 'owner', {}, true), /no company knowledge/);
+    getAgent.resolves({ ...agent, knowledge: [], toolsets: [], mcpServers: [], apiToolsetTools: [], skills: [], sendUserContext: false });
+    assert.equal((await runtime.checkOwner('agent', 'owner', {}, true)).createdBy, 'owner');
+  });
+
+  it('refuses unavailable agents and failed avatar updates instead of accepting upstream errors', async () => {
+    const runtime = new ScheduledAgentRuntime(() => ({ aiBackend: 'http://test.invalid' }), {}, {} as AgentProjectGrants);
+    const execute = sinon.stub(AIServiceCommand.prototype, 'execute').resolves({ statusCode: 403 });
+    await assert.rejects(runtime.getAgent('agent', {}), /not available/);
+    await assert.rejects(runtime.updateAvatar('agent', null, {}), /could not be saved/);
+    execute.resolves({ statusCode: 200, data: { agent } });
+    assert.deepEqual(await runtime.getAgent('agent', {}), agent);
+    await runtime.updateAvatar('agent', null, {});
+  });
+
+  it('keeps delivery options private to administrators and reports health outages', async () => {
+    const runtime = new ScheduledAgentRuntime(() => ({ aiBackend: 'http://test.invalid' }), {}, {} as AgentProjectGrants);
+    sinon.stub(admins, 'isUserOrgAdmin').resolves(false);
+    assert.deepEqual(await runtime.deliveryOptions('org', 'member', 'agent'), { canManage: false, bots: [] });
+    assert.equal(await runtime.checkDelivery({ orgId: 'org', userId: 'member', agentId: 'agent' }), null);
+    await assert.rejects(runtime.checkDelivery({ orgId: 'org', userId: 'member', agentId: 'agent', slackBotId: 'bot', slackChannelId: 'channel' }), /administrator/);
+    const fetch = sinon.stub(globalThis, 'fetch').resolves(new Response(null, { status: 200 }));
+    assert.equal(await runtime.isReady(), true);
+    fetch.resolves(new Response(null, { status: 503 }));
+    assert.equal(await runtime.isReady(), false);
+    fetch.rejects(new Error('offline'));
+    assert.equal(await runtime.isReady(), false);
+  });
+
+  it('lists only the selected agent bots without exposing tokens or accepting another agent bot', async () => {
+    const runtime = new ScheduledAgentRuntime(() => ({}), {}, {} as AgentProjectGrants);
+    sinon.stub(admins, 'isUserOrgAdmin').resolves(true);
+    const soleOrg = sinon.stub(scoped, 'resolveSoleOrgId').resolves('org');
+    const store = sinon.stub(bots, 'getSlackBotStore').resolves({ configs: [
+      { id: 'allowed', agentId: 'agent', name: 'Briefing bot', botToken: 'synthetic-token' },
+      { id: 'other', agentId: 'another-agent', name: 'Other bot', botToken: 'other-token' },
+    ] });
+    assert.deepEqual(await runtime.deliveryOptions('org', 'owner', 'agent'), { canManage: true, bots: [{ id: 'allowed', name: 'Briefing bot' }] });
+    assert.equal(await runtime.checkDelivery({ orgId: 'org', userId: 'owner', agentId: 'agent', slackBotId: 'allowed', slackChannelId: 'channel' }), 'synthetic-token');
+    await assert.rejects(runtime.checkDelivery({ orgId: 'org', userId: 'owner', agentId: 'agent', slackBotId: 'other', slackChannelId: 'channel' }), /Connect a Slack bot/);
+    soleOrg.resolves('another-org');
+    store.resetHistory();
+    assert.deepEqual(await runtime.deliveryOptions('org', 'owner', 'agent'), { canManage: false, bots: [] });
+    assert.equal(store.callCount, 0);
   });
 });

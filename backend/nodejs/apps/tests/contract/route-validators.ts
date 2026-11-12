@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import sinon from 'sinon'
+import { Router } from 'express'
 import { ValidationMiddleware } from '../../src/libs/middlewares/validation.middleware'
 
 /**
@@ -50,6 +51,17 @@ export interface ValidatorMount {
 
 export async function collectValidatorMounts(): Promise<ValidatorMount[]> {
   const captured = new Map<unknown, true>()
+  const mountPaths = new WeakMap<Layer, string>()
+  const routerPrototype = Router as unknown as { use: (...args: any[]) => unknown }
+  const originalUse = routerPrototype.use
+  const use = sinon.stub(routerPrototype, 'use').callsFake(function (this: { stack: Layer[] }, ...args: any[]) {
+    const start = this.stack.length
+    const result = originalUse.apply(this, args)
+    if (typeof args[0] === 'string') {
+      for (const layer of this.stack.slice(start)) mountPaths.set(layer, args[0])
+    }
+    return result
+  })
   const original = ValidationMiddleware.validate.bind(ValidationMiddleware)
   process.env.SECRET_KEY = process.env.SECRET_KEY ?? 'route-validator-contract-key'
   const stub = sinon.stub(ValidationMiddleware, 'validate').callsFake((schema, options) => {
@@ -75,7 +87,7 @@ export async function collectValidatorMounts(): Promise<ValidatorMount[]> {
           add(`${factory} ${methods.join(',')} ${prefix}${layer.route.path} #${idx++}`, h)
         }
       } else if (Array.isArray(layer.handle?.stack)) {
-        walk(layer.handle.stack, prefix + mountPrefix(layer), factory, routerWide)
+        walk(layer.handle.stack, prefix + (mountPaths.get(layer) ?? mountPrefix(layer)), factory, routerWide)
       } else if (captured.has(layer.handle)) {
         routerWide.push(layer.handle)
       }
@@ -83,6 +95,7 @@ export async function collectValidatorMounts(): Promise<ValidatorMount[]> {
   }
   try {
     const files = (fs.readdirSync(path.join(SRC, 'modules'), { recursive: true }) as string[])
+      .map((f) => f.replace(/\\/g, '/'))
       .filter((f) => /(^|\/)routes\/[^/]+\.ts$/.test(f) || /(^|\/)[^/]+\.routes\.ts$/.test(f))
       .map((f) => path.join(SRC, 'modules', f))
       .sort()
@@ -101,6 +114,7 @@ export async function collectValidatorMounts(): Promise<ValidatorMount[]> {
     }
   } finally {
     stub.restore()
+    use.restore()
   }
   return mounts
 }
