@@ -1,3 +1,4 @@
+import { currentOrgContext } from '../../../libs/context/orgContext';
 import { randomUUID } from 'node:crypto';
 import { Container } from 'inversify';
 import { Router } from 'express';
@@ -49,7 +50,7 @@ export function createAccessGroupsRouter(container: Container): Router {
           const token = jwt.sign(
             {
               userId: String(req.user!.userId),
-              orgId: String(req.user!.orgId),
+              orgId: String(currentOrgContext().orgId),
               scopes: [TokenScopes.ACCESS_GROUP_MANAGE],
             },
             config.scopedJwtSecret,
@@ -106,7 +107,7 @@ export function createAccessGroupsRouter(container: Container): Router {
         )
           throw new BadRequestError('Invalid resource policy');
         const audit = {
-          org_id: String(req.user!.orgId),
+          org_id: String(currentOrgContext().orgId),
           actor_id: String(req.user!.userId),
           operation_id: randomUUID(),
           request_id: req.context?.requestId,
@@ -190,7 +191,7 @@ export function createAccessGroupsRouter(container: Container): Router {
         const token = jwt.sign(
           {
             userId: String(req.user!.userId),
-            orgId: String(req.user!.orgId),
+            orgId: String(currentOrgContext().orgId),
             scopes: [TokenScopes.ACCESS_GROUP_MANAGE],
           },
           config.scopedJwtSecret,
@@ -236,7 +237,7 @@ export function createAccessGroupsRouter(container: Container): Router {
         const token = jwt.sign(
           {
             userId: String(req.user!.userId),
-            orgId: String(req.user!.orgId),
+            orgId: String(currentOrgContext().orgId),
             scopes: [TokenScopes.ACCESS_GROUP_MANAGE],
           },
           config.scopedJwtSecret,
@@ -272,7 +273,7 @@ export function createAccessGroupsRouter(container: Container): Router {
           name.trim().length > 120
         )
           throw new BadRequestError('Invalid group name');
-        const org_id = String(req.user!.orgId);
+        const org_id = String(currentOrgContext().orgId);
         const actor_id = String(req.user!.userId);
         const audit = {
           org_id,
@@ -374,7 +375,7 @@ export function createAccessGroupsRouter(container: Container): Router {
             )
           )
             throw new BadRequestError('Invalid group or member IDs');
-          const org_id = String(req.user!.orgId),
+          const org_id = String(currentOrgContext().orgId),
             actor_id = String(req.user!.userId);
           const audit = {
             org_id,
@@ -450,7 +451,7 @@ export function createAccessGroupsRouter(container: Container): Router {
               name.trim().length > 120))
         )
           throw new BadRequestError('Invalid group or name');
-        const org_id = String(req.user!.orgId),
+        const org_id = String(currentOrgContext().orgId),
           actor_id = String(req.user!.userId);
         const audit = {
           org_id,

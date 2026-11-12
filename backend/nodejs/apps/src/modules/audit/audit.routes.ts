@@ -1,3 +1,4 @@
+import { currentOrgContext } from '../../libs/context/orgContext';
 import { Container } from 'inversify';
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
@@ -213,7 +214,7 @@ export function createAuditRouter(container: Container): Router {
           res.status(400).json({ error: 'Invalid UTC audit time range' });
           return;
         }
-        const events = await listAuditEvents(String(req.user!.orgId), {
+        const events = await listAuditEvents(String(currentOrgContext().orgId), {
           action: action as AuditAction | undefined,
           limit: Number(rawLimit),
           before,
@@ -225,7 +226,7 @@ export function createAuditRouter(container: Container): Router {
           to: end,
         });
         await recordAuditEvent({
-          org_id: String(req.user!.orgId),
+          org_id: String(currentOrgContext().orgId),
           actor_id: String(req.user!.userId),
           operation_id: randomUUID(),
           request_id: req.context?.requestId,

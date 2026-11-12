@@ -1,3 +1,4 @@
+import { currentOrgContext } from '../../../libs/context/orgContext';
 import { randomUUID } from 'crypto';
 import { recordAuditEvent } from '../../audit/audit.store';
 import * as crypto from 'crypto';
@@ -1961,7 +1962,7 @@ export const createKBPermission =
       }
 
       const audit = {
-        org_id: String(req.user!.orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
+        org_id: String(currentOrgContext().orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
         request_id: req.context?.requestId, action: 'collection.permission.grant' as const,
         resource_id: kbId, permission_role: role as 'OWNER' | 'WRITER' | 'READER' | undefined,
         group_ids: teamIds, member_ids: userIds,
@@ -2049,7 +2050,7 @@ export const updateKBPermission =
       );
 
       const audit = {
-        org_id: String(req.user!.orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
+        org_id: String(currentOrgContext().orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
         request_id: req.context?.requestId, action: 'collection.permission.change' as const,
         resource_id: kbId, permission_role: role as 'OWNER' | 'WRITER' | 'READER',
         group_ids: teamIds, member_ids: userIds,
@@ -2120,7 +2121,7 @@ export const removeKBPermission =
       );
 
       const audit = {
-        org_id: String(req.user!.orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
+        org_id: String(currentOrgContext().orgId), actor_id: String(req.user!.userId), operation_id: randomUUID(),
         request_id: req.context?.requestId, action: 'collection.permission.revoke' as const,
         resource_id: kbId, group_ids: teamIds, member_ids: userIds,
       };
@@ -2297,9 +2298,9 @@ export const getRecordBuffer =
         error: error?.message,
         recordId: req.params.recordId,
       });
-      if ([403, 404].includes(error.response?.status) && req.user?.orgId && req.user?.userId) {
+      if ([403, 404].includes(error.response?.status) && req.user?.userId) {
         try {
-          await recordAuditEvent({org_id:String(req.user.orgId),actor_id:String(req.user.userId),operation_id:auditOperationId,request_id:req.context?.requestId,action:'record.download.start',resource_id:String(req.params.recordId),group_ids:[],member_ids:[],outcome:'denied'});
+          await recordAuditEvent({org_id:String(currentOrgContext().orgId),actor_id:String(req.user.userId),operation_id:auditOperationId,request_id:req.context?.requestId,action:'record.download.start',resource_id:String(req.params.recordId),group_ids:[],member_ids:[],outcome:'denied'});
         } catch (auditError) {next(auditError);return;}
       }
       if (!res.headersSent) {

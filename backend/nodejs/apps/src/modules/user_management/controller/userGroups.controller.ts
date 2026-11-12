@@ -111,12 +111,13 @@ export class UserGroupController {
     }
 
     const groups = getGroupRepository();
-    if (await groups.nameTaken(req.user?.orgId as string, name)) {
+    const orgId = req.user?.orgId as string;
+    if (await groups.nameTaken(orgId, name)) {
       throw new BadRequestError(GROUP_EXISTS_MESSAGE);
     }
 
     const audit = {
-      org_id: String(req.user?.orgId),
+      org_id: String(orgId),
       operation_id: randomUUID(),
       request_id: req.context?.requestId,
       actor_id: String(req.user?.userId),

@@ -39,8 +39,11 @@ import { StoreType } from '../src/libs/keyValueStore/constants/KeyValueStoreType
 
 // Route factory modules — stubbed so configureRoutes() doesn't resolve real DI services
 import * as healthRoutes from '../src/modules/tokens_manager/routes/health.routes';
+import * as usageRoutes from '../src/modules/tokens_manager/routes/usage.routes';
 import * as userRoutes from '../src/modules/user_management/routes/users.routes';
 import * as userGroupRoutes from '../src/modules/user_management/routes/userGroups.routes';
+import * as accessGroupRoutes from '../src/modules/user_management/routes/accessGroups.routes';
+import * as auditRoutes from '../src/modules/audit/audit.routes';
 import * as orgRoutes from '../src/modules/user_management/routes/org.routes';
 import * as userAccountRoutes from '../src/modules/auth/routes/userAccount.routes';
 import * as orgAuthConfigRoutes from '../src/modules/auth/routes/orgAuthConfig.routes';
@@ -167,8 +170,11 @@ function stubAllRouteFactories(sandbox: sinon.SinonSandbox) {
   const dummyRouter = express.Router();
 
   sandbox.stub(healthRoutes, 'createHealthRouter').returns(dummyRouter);
+  sandbox.stub(usageRoutes, 'createUsageRouter').returns(dummyRouter);
   sandbox.stub(userRoutes, 'createUserRouter').returns(dummyRouter);
   sandbox.stub(userGroupRoutes, 'createUserGroupRouter').returns(dummyRouter);
+  sandbox.stub(accessGroupRoutes, 'createAccessGroupsRouter').returns(dummyRouter);
+  sandbox.stub(auditRoutes, 'createAuditRouter').returns(dummyRouter);
   sandbox.stub(orgRoutes, 'createOrgRouter').returns(dummyRouter);
   sandbox.stub(userAccountRoutes, 'createUserAccountRouter').returns(dummyRouter);
   sandbox.stub(orgAuthConfigRoutes, 'createOrgAuthConfigRouter').returns(dummyRouter);
@@ -215,6 +221,7 @@ function stubAllContainers(sandbox: sinon.SinonSandbox) {
   // Telemetry — never start the real push loop / Mongo-backed gauge refresh
   sandbox.stub(telemetryModule, 'startTelemetry');
   sandbox.stub(metricsRefreshModule, 'startOrgMetricsRefresh');
+  sandbox.stub(EnterpriseSearchAgentContainer, 'startSchedules');
   sandbox.stub(KeyValueStoreService, 'getInstance').returns({} as any);
 
   const containers: Record<string, Container> = {};
@@ -1037,6 +1044,9 @@ describe('Application', () => {
   // start()
   // =========================================================================
   describe('start()', () => {
+    beforeEach(() => {
+      sandbox.stub(EnterpriseSearchAgentContainer, 'startSchedules');
+    });
     it('should start the server on the configured port', async () => {
       const app = new Application();
       // Stub the logger on the instance

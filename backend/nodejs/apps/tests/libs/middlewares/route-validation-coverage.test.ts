@@ -16,6 +16,14 @@ const WRITE_METHODS = ['post', 'put', 'patch'] as const
 // handler that reads req.body unchecked is how a `{"$ne": null}` reaches a
 // Mongo filter.
 const ROUTES_WITHOUT_VALIDATION = new Set<string>([
+  // Strict metadata-only parser returns generic errors instead of logging rejected payload values.
+  'createAuditRouter POST /internal/events',
+  // Gateway handlers validate bounded policies/names/IDs and forward only allowlisted fields.
+  'createAccessGroupsRouter PUT /:id/access',
+  'createAccessGroupsRouter POST /',
+  'createAccessGroupsRouter POST /:id/members/add',
+  'createAccessGroupsRouter POST /:id/members/remove',
+  'createAccessGroupsRouter PUT /:id',
   // Config-change notices from other EXODIA Brain services: scoped token, no body read.
   'createSemanticSearchRouter POST /updateAppConfig',
   'createMailServiceRouter POST /updateSmtpConfig',

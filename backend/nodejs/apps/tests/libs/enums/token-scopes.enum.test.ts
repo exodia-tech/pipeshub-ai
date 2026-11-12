@@ -69,8 +69,8 @@ describe('TokenScopes', () => {
     expect(TokenScopes.SLACK_BOT_VERIFY).to.equal('slack-bot:verify');
   });
 
-  it('should have exactly 16 scopes', () => {
-    expect(Object.keys(TokenScopes)).to.have.lengthOf(16);
+  it('should have exactly 18 scopes', () => {
+    expect(Object.keys(TokenScopes)).to.have.lengthOf(18);
   });
 
   it('should contain only the expected keys', () => {
@@ -85,6 +85,8 @@ describe('TokenScopes', () => {
       'CONVERSATION_PERMISSIONS',
       'VALIDATE_EMAIL',
       'ENTITY_USER_WRITE',
+      'ACCESS_GROUP_MANAGE',
+      'AUDIT_WRITE',
       'ORG_EMAIL_VERIFY',
       'EMAIL_VERIFIED',
       'DESKTOP_COMMAND',
@@ -136,6 +138,8 @@ describe('isUserActionScope', () => {
       TokenScopes.MCP_RELAY,
       TokenScopes.SLACK_BOT_VERIFY,
       TokenScopes.ENTITY_USER_WRITE,
+      TokenScopes.ACCESS_GROUP_MANAGE,
+      TokenScopes.AUDIT_WRITE,
       'not:a:scope',
     ].forEach((scope) => expect(isUserActionScope(scope)).to.be.false);
   });

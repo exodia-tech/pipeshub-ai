@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { currentOrgContext } from '../../../libs/context/orgContext';
 import { AuditAction, recordAuditEvent } from '../../audit/audit.store';
 import { Logger } from '../../../libs/services/logger.service';
 import { Router, Request, Response, NextFunction } from 'express';
@@ -119,10 +120,10 @@ export const groupAdminCheck =
         next();
         return;
       }
-      if (req.user?.orgId && req.user?.userId) {
+      if (req.user?.userId) {
         try {
           await recordAuditEvent({
-            org_id: String(req.user.orgId),
+            org_id: String(currentOrgContext().orgId),
             actor_id: String(req.user.userId),
             operation_id: randomUUID(),
             request_id: req.context?.requestId,

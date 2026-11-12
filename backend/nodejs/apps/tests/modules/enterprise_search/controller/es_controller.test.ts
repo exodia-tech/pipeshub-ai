@@ -68,6 +68,7 @@ import Citation from '../../../../src/modules/enterprise_search/schema/citation.
 import { AIServiceCommand } from '../../../../src/libs/commands/ai_service/ai.service.command'
 import { Logger } from '../../../../src/libs/services/logger.service'
 import * as conversationArtifacts from '../../../../src/modules/artifacts/services/conversation-artifacts.service'
+import * as viewerRedaction from '../../../../src/modules/enterprise_search/utils/viewer-redaction'
 import { BadRequestError, ConflictError, NotFoundError, ServiceUnavailableError, UnauthorizedError } from '../../../../src/libs/errors/http.errors'
 import { IAMServiceCommand } from '../../../../src/libs/commands/iam/iam.service.command'
 import { Users } from '../../../../src/modules/user_management/schema/users.schema'
@@ -378,6 +379,10 @@ let restoreSessionDocs: () => void = () => undefined
 
 describe('Enterprise Search Controller', () => {
   beforeEach(() => {
+    // These controller tests use unrestricted viewers; policy failures have dedicated redaction/API tests.
+    sinon.stub(viewerRedaction, 'readableRecordIds').callsFake(async (_config, _viewer, ids, urls = []) => ({
+      ids: new Set(ids), urls: new Set(urls), groupRestricted: false,
+    }))
     if (!(conversationArtifacts.deleteConversationArtifacts as any).restore) {
       sinon.stub(conversationArtifacts, 'deleteConversationArtifacts').resolves()
     }
