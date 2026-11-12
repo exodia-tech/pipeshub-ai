@@ -108,7 +108,22 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           cd backend/nodejs/apps
-          npx cross-env TS_NODE_PROJECT=tsconfig.test.json c8 --check-coverage --lines 89 --functions 90 --branches 80 --statements 89 --reporter=text --reporter=lcov mocha --parallel --jobs 4
+          # Large streamed logs time out in the runner results service; retain the full log as an artifact.
+          status=0
+          npx cross-env TS_NODE_PROJECT=tsconfig.test.json c8 --check-coverage --lines 89 --functions 90 --branches 80 --statements 89 --reporter=text --reporter=lcov mocha --parallel --jobs 4 > "$RUNNER_TEMP/node-tests.log" 2>&1 || status=$?
+          grep -E '[0-9]+ (passing|pending|failing)|All files[[:space:]]+\|' "$RUNNER_TEMP/node-tests.log" | tail -n 20 || true
+          if ((status)); then tail -n 200 "$RUNNER_TEMP/node-tests.log"; fi
+          exit "$status"
+
+      - name: Retain full Node test log
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: node-test-log
+          path: ${{ runner.temp }}/node-tests.log
+          compression-level: 9
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Generate Node.js coverage reports
         if: ${{ always() && inputs.generate-coverage-reports == true }}

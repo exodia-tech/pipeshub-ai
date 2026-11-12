@@ -120,7 +120,21 @@ jobs:
       - name: Run frontend unit tests with coverage
         run: |
           cd frontend
-          npm run test:unit:coverage
+          status=0
+          npm run test:unit:coverage > "$RUNNER_TEMP/frontend-tests.log" 2>&1 || status=$?
+          grep -E 'Test Files|Tests[[:space:]]+[0-9]|Duration|All files' "$RUNNER_TEMP/frontend-tests.log" | tail -n 20 || true
+          if ((status)); then tail -n 200 "$RUNNER_TEMP/frontend-tests.log"; fi
+          exit "$status"
+
+      - name: Retain full frontend test log
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-test-log
+          path: ${{ runner.temp }}/frontend-tests.log
+          compression-level: 9
+          retention-days: 7
+          if-no-files-found: error
 
       # The Electron local-sync tests drive a real file watcher against a real
       # temporary directory, so they are slower than the vitest suite (~45s) and

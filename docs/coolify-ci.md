@@ -41,3 +41,8 @@ https://coolify.exodia.ws/server/fnbahuvghsbyyoewxacg1dho/github-runners
 
 Native runner documentation:
 https://coolify.io/docs/core/infrastructure/servers/github-actions-runners
+
+The large Node/frontend test streams are saved as compressed seven-day log
+artifacts. The console prints summaries and a bounded failure tail; the original
+test exit status still gates the job. This avoids repeated 30-second results-log
+upload timeouts while retaining the full diagnostics.
