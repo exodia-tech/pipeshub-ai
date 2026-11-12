@@ -11,12 +11,13 @@ const api = vi.hoisted(() => ({ loadGraph: vi.fn(), cluster: vi.fn(), node: vi.f
 vi.mock('../api', () => ({ loadGraph: api.loadGraph }));
 vi.mock('../graph-canvas', () => ({ GraphCanvas: React.forwardRef(function Canvas({ label, onReady }: { label: string; onReady(): void }, ref) {
   React.useImperativeHandle(ref, () => ({ cluster: api.cluster, node: api.node, reset: api.reset, zoom: vi.fn() }));
-  React.useEffect(() => { onReady(); }, []);
+  React.useEffect(() => { queueMicrotask(onReady); }, []);
   return <div role="img" aria-label={label} />;
 }) }));
 import KnowledgeGraphPage from '../index';
 
 beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal('Worker', class {
     onmessage?: (e: { data: unknown }) => void;
     postMessage(data: GraphData) { queueMicrotask(() => this.onmessage?.({ data: { result: clusterLayout(data) } })); }
@@ -30,6 +31,7 @@ describe('Cluster overview', () => {
     api.loadGraph.mockResolvedValue({ nodes: [{ id: 'record:a', name: 'Pricing guide', kind: 'record', recordId: 'a' }, { id: 'topic', name: 'Sales', kind: 'topic' }], edges: [{ source: 'record:a', target: 'topic' }] });
     render(<Theme><KnowledgeGraphPage /></Theme>);
     const cluster = await screen.findByRole('button', { name: /Sales/ });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show whole graph' }).getAttribute('disabled')).toBeNull());
     fireEvent.click(cluster);
     expect(api.cluster).toHaveBeenCalledWith(0);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Pricing' } });
@@ -46,6 +48,22 @@ describe('Cluster overview', () => {
     expect(screen.queryByText('No knowledge is visible to your account yet.')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('No knowledge is visible to your account yet.')).toBeTruthy();
+  });
+
+  it('keeps the saved graph usable after a failed refresh and clears the warning after retry', async () => {
+    const graph = { nodes: [{ id: 'record:a', name: 'Pricing guide', kind: 'record', recordId: 'a' }], edges: [] };
+    api.loadGraph.mockResolvedValueOnce(graph).mockRejectedValueOnce(new Error('unavailable')).mockResolvedValueOnce(graph);
+    render(<Theme><KnowledgeGraphPage /></Theme>);
+    await screen.findByRole('button', { name: 'Refresh graph' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show whole graph' }).getAttribute('disabled')).toBeNull());
+    const canvas = screen.getByRole('img');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh graph' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not refresh. The saved graph is still shown.');
+    expect(screen.getByRole('img')).toBe(canvas);
+    expect(screen.getByRole('button', { name: 'Show whole graph' }).getAttribute('disabled')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(screen.getByRole('img')).toBe(canvas);
   });
 });
 
