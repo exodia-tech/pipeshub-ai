@@ -83,7 +83,8 @@ export default function KnowledgeGraphPage() {
             </Flex>
             <Separator size="4" />
             <ScrollArea ref={inspector} type="auto" scrollbars="vertical" style={{ flex: 1, minHeight: 0 }}>
-              <Flex direction="column" gap="1" p="2">
+              {/* Long names must not size the ScrollArea's intrinsic-width content table. */}
+              <Flex direction="column" gap="1" p="2" style={{ contain: 'inline-size' }}>
                 {selected && <Box p="3" mb="2" style={{ background: 'var(--gray-3)', borderRadius: 'var(--radius-3)', overflowWrap: 'anywhere' }}>
                   <Text as="p" size="2" weight="medium">{selected.name}</Text>
                   <Text as="p" size="1" color="gray" mt="1">{t(`graph.kinds.${selected.kind}`, { defaultValue: t('graph.entity') })}</Text>

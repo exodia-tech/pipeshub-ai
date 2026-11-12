@@ -28,7 +28,7 @@ afterEach(() => { cleanup(); clearSessionCache(); vi.resetAllMocks(); vi.unstubA
 
 describe('Cluster overview', () => {
   it('loads without search, zooms into a cluster and finds/opens a record', async () => {
-    api.loadGraph.mockResolvedValue({ nodes: [{ id: 'record:a', name: 'Pricing guide', kind: 'record', recordId: 'a' }, { id: 'topic', name: 'Sales', kind: 'topic' }], edges: [{ source: 'record:a', target: 'topic' }] });
+    api.loadGraph.mockResolvedValue({ nodes: [{ id: 'record:a', name: 'Pricing guide', kind: 'record', recordId: 'a' }, { id: 'topic', name: 'Sales, business development, partnerships and client relationship management', kind: 'topic' }], edges: [{ source: 'record:a', target: 'topic' }] });
     render(<Theme><KnowledgeGraphPage /></Theme>);
     const cluster = await screen.findByRole('button', { name: /Sales/ });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Show whole graph' }).getAttribute('disabled')).toBeNull());
