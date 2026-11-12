@@ -111,24 +111,19 @@ describe('Connector routes: failed service calls keep credentials out of the log
     const record =
       (level: string) =>
       (message: string, meta?: unknown): void => {
-        logged.push({
-          label: `${level}: ${message}`,
-          text: `${message} ${serialise(meta)}`,
-        });
-      };
-    const recorder = {
-      error: record('error'),
-      warn: record('warn'),
-      info: record('info'),
-      debug: record('debug'),
-    };
-    const getInstance = sinon
+        logged.push({ label: `${level}: ${message}`, text: `${message} ${serialise(meta)}` })
+      }
+    const recorder = { error: record('error'), warn: record('warn'), info: record('info'), debug: record('debug') }
+    const getInstance = sinon.stub(Logger, 'getInstance').returns(recorder as unknown as Logger)
+    const createRouter = privateConnectorRouter()
+    getInstance.restore()
+    // The upstream call line takes its logger when it is written, not at load.
+    const realGetInstance = Logger.getInstance.bind(Logger)
+    sinon
       .stub(Logger, 'getInstance')
-      .returns(recorder as unknown as Logger);
-    const createRouter = privateConnectorRouter();
-    getInstance.restore();
-    h = await startHarness({ createRouter });
-  });
+      .callsFake((config) => (config?.service === 'UpstreamCall' ? (recorder as unknown as Logger) : realGetInstance(config)))
+    h = await startHarness({ createRouter })
+  })
 
   it('loads its private copy without adding retry interceptors to the shared axios client', () => {
     const before = interceptorCounts();
@@ -159,11 +154,9 @@ describe('Connector routes: failed service calls keep credentials out of the log
       },
     });
 
-    expect(r.status).to.equal(503);
-    expect(r.body.error).to.include({ message: SERVICE_UNAVAILABLE_MESSAGE });
-    expect(logged.map((e) => e.label)).to.include(
-      'error: Connector service command failed',
-    );
+    expect(r.status).to.equal(503)
+    expect(r.body.error).to.include({ message: SERVICE_UNAVAILABLE_MESSAGE })
+    expect(logged.map((e) => e.label)).to.include('warn: upstream.call.end')
     expect(
       leaking(
         (text) =>
@@ -184,18 +177,10 @@ describe('Connector routes: failed service calls keep credentials out of the log
       sessionToken(h, admin),
     );
 
-    expect(r.status).to.equal(503);
-    expect(logged.map((e) => e.label)).to.include(
-      'error: Connector service command failed',
-    );
-    expect(
-      leaking(
-        (text) =>
-          text.includes('oauth-code-do-not-log') ||
-          text.includes('oauth-state-do-not-log'),
-      ),
-    ).to.deep.equal([]);
-  });
+    expect(r.status).to.equal(503)
+    expect(logged.map((e) => e.label)).to.include('warn: upstream.call.end')
+    expect(leaking((text) => text.includes('oauth-code-do-not-log') || text.includes('oauth-state-do-not-log'))).to.deep.equal([])
+  })
 
   it('does not log the internal config token when the configuration manager is unreachable', async () => {
     h.backend.on(
@@ -212,10 +197,8 @@ describe('Connector routes: failed service calls keep credentials out of the log
       { tempCode: 'code-1' },
     );
 
-    expect(r.status).to.be.within(500, 599);
-    expect(logged.map((e) => e.label)).to.include(
-      'error: Configuration Manager service command failed',
-    );
-    expect(leaking((text) => JWT_SHAPE.test(text))).to.deep.equal([]);
-  });
-});
+    expect(r.status).to.be.within(500, 599)
+    expect(logged.map((e) => e.label)).to.include('warn: upstream.call.end')
+    expect(leaking((text) => JWT_SHAPE.test(text))).to.deep.equal([])
+  })
+})

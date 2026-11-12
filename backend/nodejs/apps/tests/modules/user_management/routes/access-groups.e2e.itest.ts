@@ -421,7 +421,12 @@ describe('access groups across authenticated services', function () {
       assert.equal(history.status, 200);
       const historical = await history.text();
       assert.ok(!historical.includes('synthetic quarterly budget review'));
-      assert.ok(historical.includes('no longer accessible'));
+      const hiddenHistory = JSON.parse(historical) as {
+        messages: Array<{ answerHidden?: { reason?: string } }>;
+      };
+      assert.ok(hiddenHistory.messages.some((message) =>
+        message.answerHidden?.reason === 'no_longer_accessible',
+      ));
       saved = await fetch(path, {
         method: 'PUT',
         headers,

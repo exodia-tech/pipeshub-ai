@@ -19,6 +19,7 @@ import { ChatSession } from '../../../../src/modules/enterprise_search/schema/ch
 import { ChatSessionMessage } from '../../../../src/modules/enterprise_search/schema/chat.session.message.schema'
 import { copyArtifactsForFork, copySessionUpToMessage } from '../../../../src/modules/enterprise_search/utils/fork-conversation'
 import type { ArtifactCopier, ArtifactRef } from '../../../../src/modules/enterprise_search/utils/fork-artifacts'
+import type { AppConfig } from '../../../../src/modules/tokens_manager/config/config'
 import { continueConversation } from '../../../../src/modules/enterprise_search/utils/non-streaming-chat'
 import { getConversationRepository } from '../../../../src/libs/repositories/conversation'
 import { saveCompleteConversation } from '../../../../src/modules/enterprise_search/utils/utils'

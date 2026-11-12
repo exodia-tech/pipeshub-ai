@@ -116,6 +116,7 @@ class OAuthScopes(str, Enum):
 
     # Code graph
     CODE_READ = "code:read"
+    CODE_WRITE = "code:write"
 
     # Teams
     TEAM_READ = "team:read"
