@@ -3,7 +3,6 @@ import axios from 'axios';
 import {
   buildChatStreamUrl,
   resolveMentionsInText,
-  NO_UNFURL_OPTIONS,
   type TypedSlackClient,
 } from './helpers';
 import type { SlackMessagePayload } from './helpers';
@@ -35,6 +34,7 @@ export class SlackActiveRun {
   constructor(
     readonly sourceTs: string,
     conversationId: string | null,
+    readonly onSteered?: () => Promise<void>,
   ) {
     this.ready = new Promise((resolve) => {
       this.resolveReady = resolve;
@@ -100,12 +100,6 @@ export async function trySteerSlackRun(
     );
   }
   if (!delivery.queued) return false;
-  if (!delivery.duplicate && message.channel)
-    await client.chat.postMessage({
-      channel: message.channel,
-      thread_ts: message.thread_ts || message.ts,
-      text: "Got it - I'll use your update at the next step.",
-      ...NO_UNFURL_OPTIONS,
-    });
+  if (!delivery.duplicate) await run.onSteered?.().catch(() => undefined);
   return true;
 }

@@ -504,7 +504,9 @@ async function processSlackMessage(
   try {
     if (runKey) {
       if (activeSlackRuns.has(runKey)) throw new Error('Another reply is starting in this thread. Please try again.');
-      activeRun = new SlackActiveRun(typedMessage.ts, conversation);
+      activeRun = new SlackActiveRun(typedMessage.ts, conversation, async () => {
+        useNativeStatus = await nativeStatus.start();
+      });
       activeSlackRuns.set(runKey, activeRun);
     }
     const streamRecipientPayload: Record<string, unknown> = {};
