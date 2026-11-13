@@ -5855,6 +5855,9 @@
   },
   "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "usage": {
+    "consumption": "사용량",
+    "organizationTotal": "조직 전체 (사용자 + 서비스)",
+    "allUsers": "모든 사용자",
     "title": "사용량 및 비용",
     "subtitle": "모델 호출, 토큰 및 예상 지출을 확인하세요.",
     "refresh": "새로 고침",

@@ -5965,6 +5965,9 @@
   },
   "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "usage": {
+    "consumption": "Consumo",
+    "organizationTotal": "Total de la organización (usuarios + servicios)",
+    "allUsers": "Todos los usuarios",
     "title": "Uso y costes",
     "subtitle": "Supervisa llamadas a modelos, tokens y gasto estimado.",
     "refresh": "Actualizar",

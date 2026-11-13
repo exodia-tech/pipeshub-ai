@@ -67,6 +67,7 @@ export default function UsagePage() {
   );
   const [end, setEnd] = useState(today);
   const [view, setView] = useState("personal");
+  const [audience, setAudience] = useState("all");
   const [tab, setTab] = useState("overview");
   const [interval, setInterval] = useState("day");
   const [metric, setMetric] = useState<UsageMetric>("tokens");
@@ -89,6 +90,7 @@ export default function UsagePage() {
     () =>
       onSessionEnd(() => {
         setView("personal");
+        setAudience("all");
         setFilters({});
         setFiltersOpen(false);
         setOffset(0);
@@ -116,6 +118,7 @@ export default function UsagePage() {
     view,
     interval,
     ...filters,
+    audience: view === "organization" ? audience : "all",
     from: `${start}T00:00:00Z`,
     to: validDates ? exclusiveEnd(end) : "",
     offset,
@@ -151,6 +154,20 @@ export default function UsagePage() {
         suppressErrorToast: true,
       }),
   );
+  const { data: members } = useSWR(
+    isAdmin && view === "organization" && validDates
+      ? ["usage-members", start, end, interval]
+      : null,
+    () =>
+      usageApi.report({
+        view: "organization",
+        interval,
+        from: `${start}T00:00:00Z`,
+        to: exclusiveEnd(end),
+        limit: 1,
+      }),
+    { refreshInterval: 30_000, keepPreviousData: false },
+  );
   const connectorLabel = (id: string) =>
     connectorNames?.connectors.find((connector) => connector._key === id)
       ?.name ?? id;
@@ -171,7 +188,10 @@ export default function UsagePage() {
   };
   const label = (value: string) => t(`usage.${value}`);
   const rows = (field: string): Breakdown[] =>
-    (data?.[field as (typeof FIELDS)[number]] ?? []).map((row) =>
+    (field === "user_id"
+      ? (members?.user_id ?? data?.user_id ?? [])
+      : (data?.[field as (typeof FIELDS)[number]] ?? [])
+    ).map((row) =>
       field === "connector_id" && row.id
         ? { ...row, label: connectorLabel(row.id) }
         : row,
@@ -189,7 +209,7 @@ export default function UsagePage() {
         />
         <Select.Content>
           <Select.Item value="__all__">{label("all")}</Select.Item>
-          {(field === "user_id" || field === "connector_id") &&
+          {(field === "connector_id" || (field === "user_id" && audience === "all")) &&
             rows(field).some((r) => r.id === null) && (
               <Select.Item value="__none__">
                 {label(field === "user_id" ? "background" : "noConnector")}
@@ -369,6 +389,7 @@ export default function UsagePage() {
                 value={view}
                 onValueChange={(v) => {
                   setView(v);
+                  setAudience("all");
                   setFilters({});
                   setOffset(0);
                 }}
@@ -406,7 +427,39 @@ export default function UsagePage() {
               </Select.Content>
             </Select.Root>
           </Flex>
-          {filterControl("model")}
+          {isAdmin && view === "organization" && (
+              <>
+                <Flex direction="column" gap="1">
+                  <Text size="2">{label("consumption")}</Text>
+                  <Select.Root
+                    value={audience}
+                    onValueChange={(value) => {
+                      setAudience(value);
+                      setFilters((previous) => ({ ...previous, user_id: "" }));
+                      setOffset(0);
+                    }}
+                  >
+                    <Select.Trigger
+                      aria-label={label("consumption")}
+                      style={{ minHeight: 44 }}
+                    />
+                    <Select.Content>
+                      <Select.Item value="all">
+                        {label("organizationTotal")}
+                      </Select.Item>
+                      <Select.Item value="users">
+                        {label("allUsers")}
+                      </Select.Item>
+                      <Select.Item value="services">
+                        {label("background")}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Flex>
+                {audience !== "services" && filterControl("user_id")}
+              </>
+            )}
+            {filterControl("model")}
           <Flex direction="column" justify="end">
             <Button
               className="touch-hit"
@@ -451,8 +504,7 @@ export default function UsagePage() {
           >
             {FIELDS.filter(
               (field) =>
-                field !== "model" &&
-                (view === "organization" || field !== "user_id"),
+                field !== "model" && field !== "user_id",
             ).map((field) => (
               <Box key={field} style={{ minWidth: 0 }}>
                 {filterControl(field)}
@@ -694,8 +746,48 @@ export default function UsagePage() {
             <Grid columns={{ initial: "1", md: "2" }} gap="4">
               {bars(data.model, label("topModels"))}
               {bars(data?.workload ?? [], label("byWorkload"))}
-              {view === "organization" &&
-                bars(data?.user_id ?? [], label("byMember"))}
+              {view === "organization" && (
+                <SettingsSection>
+                  <Heading size="3" mb="4">
+                    {label("byMember")}
+                  </Heading>
+                  <Box style={{ overflowX: "auto" }}>
+                    <Table.Root>
+                      <VisuallyHidden asChild>
+                        <caption>{label("byMember")}</caption>
+                      </VisuallyHidden>
+                      <Table.Header>
+                        <Table.Row>
+                          {["user_id", "requests", "tokens", "cost"].map(
+                            (field) => (
+                              <Table.ColumnHeaderCell key={field}>
+                                {label(field)}
+                              </Table.ColumnHeaderCell>
+                            ),
+                          )}
+                        </Table.Row>
+                      </Table.Header>
+                      <Table.Body>
+                        {data.user_id.map((row) => (
+                          <Table.Row key={row.id ?? "__none__"}>
+                            <Table.RowHeaderCell>
+                              {row.id ? row.label : label("background")}
+                            </Table.RowHeaderCell>
+                            <Table.Cell>{number(row.requests)}</Table.Cell>
+                            <Table.Cell>
+                              {number(metricValue(row, "tokens"))}
+                            </Table.Cell>
+                            <Table.Cell>
+                              {money(metricValue(row, "cost"), i18n.language)}
+                              {row.unpriced_requests > 0 ? " *" : ""}
+                            </Table.Cell>
+                          </Table.Row>
+                        ))}
+                      </Table.Body>
+                    </Table.Root>
+                  </Box>
+                </SettingsSection>
+              )}
               {bars(rows("connector_id"), label("byConnector"))}
             </Grid>
           )}

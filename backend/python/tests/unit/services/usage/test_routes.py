@@ -71,6 +71,46 @@ class TestUsageRoutes(unittest.TestCase):
         self.assertEqual(response.json()["summary"]["requests"], 1)
         self.assertEqual(response.json()["events"][0]["user_id"], "user-a")
 
+    def test_admin_can_separate_all_people_services_and_one_person(self) -> None:
+        self.db.record(
+            event(id="service", user_id=None, user_label=None, workload="indexing")
+        )
+        self.user["role"] = "admin"
+        people = self.get(view="organization", audience="users").json()
+        self.assertEqual(people["summary"]["requests"], 2)
+        self.assertEqual({e["user_id"] for e in people["events"]}, {"user-a", "user-b"})
+        services = self.get(view="organization", audience="services").json()
+        self.assertEqual(services["summary"]["requests"], 1)
+        self.assertIsNone(services["events"][0]["user_id"])
+        self.assertEqual(self.get(view="organization").json()["summary"]["requests"], 3)
+        individual = self.get(
+            view="organization", audience="users", user_id="user-b"
+        ).json()
+        self.assertEqual(individual["summary"]["requests"], 1)
+        self.assertEqual(individual["events"][0]["user_id"], "user-b")
+
+    def test_personal_view_cannot_be_used_for_service_or_other_people_totals(
+        self,
+    ) -> None:
+        self.assertEqual(self.get(audience="services").status_code, 403)
+        self.assertEqual(self.get(audience="users").status_code, 403)
+        self.assertEqual(
+            self.get(view="organization", audience="users").status_code, 403
+        )
+        self.assertEqual(
+            self.get(view="organization", audience="services").status_code, 403
+        )
+
+    def test_admin_member_breakdown_includes_people_beyond_top_100(self) -> None:
+        self.user["role"] = "admin"
+        for i in range(101):
+            self.db.record(
+                event(id=f"member-{i}", user_id=f"member-{i}", user_label=f"Member {i}")
+            )
+        report = self.get(view="organization", audience="users").json()
+        self.assertEqual(len(report["user_id"]), 103)
+        self.assertEqual(report["summary"]["requests"], 103)
+
     def test_observability_requires_admin_and_is_org_scoped(self) -> None:
         self.assertEqual(
             self.client.put(

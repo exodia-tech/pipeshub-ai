@@ -76,6 +76,7 @@ async def set_observability(request: Request, body: ObservabilitySetting) -> dic
 async def get_usage(
     request: Request,
     view: Literal["personal", "organization"] = "personal",
+    audience: Literal["all", "users", "services"] = "all",
     start: datetime | None = Query(None, alias="from"),
     end: datetime | None = Query(None, alias="to"),
     interval: Literal["hour", "day", "week", "month"] = "day",
@@ -90,6 +91,8 @@ async def get_usage(
     limit: int = Query(50, ge=1, le=200),
 ) -> dict:
     org, own_user = await visibility(request, view)
+    if audience != "all" and view != "organization":
+        raise HTTPException(403, "Organization usage requires the administrator view")
     now = datetime.now(timezone.utc)
     start, end = start or now - timedelta(days=30), end or now
     if (
@@ -103,6 +106,7 @@ async def get_usage(
     if interval == "hour" and end - start > timedelta(days=31):
         raise HTTPException(422, "Hourly reports are limited to 31 days")
     filters = {
+        "audience": audience,
         "provider": provider,
         "model": model,
         "user_id": own_user or user_id,
