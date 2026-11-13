@@ -142,16 +142,42 @@ describe('access groups across authenticated services', function () {
     const created = await fetch(`${base}/access-groups`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: `Synthetic ${kb}` }),
+      body: JSON.stringify({ name: `Synthetic ${kb}`, description: 'Finance reference material' }),
     });
     assert.equal(created.status, 201);
     groupId = ((await created.json()) as { id: string }).id;
     const listed = await fetch(`${base}/access-groups`, { headers });
-    assert.ok(
-      (
-        (await listed.json()) as { groups: Array<{ _key: string }> }
-      ).groups.some((item) => item._key === groupId),
-    );
+    const group = ((await listed.json()) as { groups: Array<{
+      _key: string; description: string; createdAtTimestamp: number;
+      createdByUser: { userId: string } | null;
+    }> }).groups.find((item) => item._key === groupId);
+    assert.equal(group?.description, 'Finance reference material');
+    assert.equal(group?.createdByUser?.userId, admin);
+    assert.ok(group && group.createdAtTimestamp > 0);
+    const nameOnly = await fetch(`${base}/access-groups/${groupId}`, {
+      method: 'PUT', headers, body: JSON.stringify({ name: `Synthetic ${kb}` }),
+    });
+    assert.equal(nameOnly.status, 200);
+    const preserved = await fetch(`${base}/access-groups`, { headers });
+    assert.equal(((await preserved.json()) as { groups: typeof group[] }).groups.find((item) => item?._key === groupId)?.description, 'Finance reference material');
+    const invalidDescription = await fetch(`${base}/access-groups/${groupId}`, {
+      method: 'PUT', headers, body: JSON.stringify({ name: `Synthetic ${kb}`, description: 'x'.repeat(2001) }),
+    });
+    assert.equal(invalidDescription.status, 400);
+    const foreignList = await fetch(`${base}/access-groups`, { headers: {
+      ...headers, authorization: `Bearer ${jwt.sign({ userId: foreign, orgId: foreignOrg, role: 'admin' }, secret)}`,
+    } });
+    assert.equal(foreignList.status, 401);
+    const updated = await fetch(`${base}/access-groups/${groupId}`, {
+      method: 'PUT', headers,
+      body: JSON.stringify({ name: `Synthetic ${kb}`, description: '' }),
+    });
+    assert.equal(updated.status, 200);
+    const reread = await fetch(`${base}/access-groups`, { headers });
+    const saved = ((await reread.json()) as { groups: typeof group[] }).groups.find((item) => item?._key === groupId);
+    assert.equal(saved?.description, '');
+    assert.equal(saved?.createdAtTimestamp, group.createdAtTimestamp);
+    assert.equal(saved?.createdByUser?.userId, admin);
     await graph('share', { kb, admin, group: groupId });
     assert.deepEqual((await graph('access', { org, member })).ids, []);
     const denied = await fetch(`${base}/access-groups/${groupId}/members/add`, {

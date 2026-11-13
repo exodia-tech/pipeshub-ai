@@ -34,7 +34,7 @@ const accessPolicy = z.object({
     )
     .max(1000),
 });
-const namedGroup = z.object({ name: z.string() });
+const namedGroup = z.object({ name: z.string(), description: z.string().max(2000).optional() });
 const groupMembers = z.object({
   userIds: z
     .array(z.string().regex(/^[a-f0-9]{24}$/i))
@@ -315,7 +315,7 @@ export function createAccessGroupsRouter(container: Container): Router {
                 authorization: `Bearer ${token}`,
                 'content-type': 'application/json',
               },
-              body: JSON.stringify({ name: name.trim() }),
+              body: JSON.stringify({ name: name.trim(), description: parsedName.success ? parsedName.data.description?.trim() : undefined }),
               signal: AbortSignal.timeout(15_000),
             },
           );
@@ -490,7 +490,7 @@ export function createAccessGroupsRouter(container: Container): Router {
                 'content-type': 'application/json',
               },
               ...(operation === 'rename'
-                ? { body: JSON.stringify({ name: name?.trim() }) }
+                ? { body: JSON.stringify({ name: name?.trim(), description: parsedName.success ? parsedName.data.description?.trim() : undefined }) }
                 : {}),
               signal: AbortSignal.timeout(15_000),
             },

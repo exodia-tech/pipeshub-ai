@@ -25403,6 +25403,7 @@ paths:
               required: [name]
               properties:
                 name: { type: string, minLength: 1, maxLength: 120 }
+                description: { type: string, maxLength: 2000, description: Omit to preserve the current description; send an empty string to clear it }
       responses:
         '201': { description: Access group created }
         '400': { description: Invalid name }
@@ -25412,7 +25413,7 @@ paths:
   /access-groups/{id}:
     put:
       tags: [Administration]
-      summary: Rename an access group
+      summary: Update an access group name and description
       security:
         - bearerAuth: []
         - oauth2: [usergroup:write]
@@ -25427,6 +25428,7 @@ paths:
               required: [name]
               properties:
                 name: { type: string, minLength: 1, maxLength: 120 }
+                description: { type: string, maxLength: 2000, description: Omit to preserve the current description; send an empty string to clear it }
       responses:
         '200': { description: Group renamed }
         '403': { description: Administrator access required }

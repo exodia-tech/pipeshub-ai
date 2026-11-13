@@ -8,7 +8,6 @@ import {
   Button,
   Callout,
   Flex,
-  Heading,
   Badge,
   Text,
   IconButton,
@@ -26,6 +25,8 @@ import {
   EntityPagination,
   EntityRowActionMenu,
   FormField,
+  EntityDescriptionInput,
+  EntityMemberRow,
   PaginatedMembersList,
   WorkspaceRightPanel,
   SearchableCheckboxDropdown,
@@ -35,6 +36,7 @@ import { usePaginatedUserOptions } from "../hooks/use-paginated-user-options";
 import { GroupAccessPanel } from "./group-access-panel";
 import { AccessGroupsApi, type AccessGroup } from "./access-api";
 import { GroupNameInput } from "./components/group-name-input";
+import { formatDate } from "@/lib/utils/formatters";
 import { ConfirmationDialog } from "../components/confirmation-dialog";
 import { useWorkspaceDrawerNestedModalHost } from "../components/workspace-right-panel";
 
@@ -44,6 +46,7 @@ const MEMBER_BATCH_LIMIT = 500;
 export default function AccessGroupsPage() {
   const { t } = useTranslation();
   const isAdmin = useUserStore(selectIsAdmin);
+  const profile = useUserStore((state) => state.profile);
   const [skip, setSkip] = useState(0);
   const [limit, setLimit] = useState(100);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -52,7 +55,9 @@ export default function AccessGroupsPage() {
   const [selected, setSelected] = useState("");
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [renameName, setRenameName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [pendingMembers, setPendingMembers] = useState<string[]>([]);
   const [groupSearch, setGroupSearch] = useState("");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -104,7 +109,9 @@ export default function AccessGroupsPage() {
         setSelected("");
         setCreating(false);
         setName("");
+        setDescription("");
         setRenameName("");
+        setEditDescription("");
         setPendingMembers([]);
         setGroupSearch("");
         setSelectedRows(new Set());
@@ -137,6 +144,7 @@ export default function AccessGroupsPage() {
   const openGroup = (group: AccessGroup, nextTab = "members") => {
     setSelected(group._key);
     setRenameName(group.name);
+    setEditDescription(group.description ?? "");
     setPendingMembers([]);
     setFailed(false);
     setTab(nextTab);
@@ -146,11 +154,13 @@ export default function AccessGroupsPage() {
   };
   const selectedGroup = groups?.find((group) => group._key === selected);
   const nameDirty = editing && renameName.trim() !== selectedGroup?.name;
+  const descriptionDirty = editing && editDescription.trim() !== (selectedGroup?.description ?? "");
   const memberDirty = pendingMembers.length > 0 || pendingRemovals.length > 0;
-  const dirty = accessDirty || nameDirty || memberDirty;
+  const dirty = accessDirty || nameDirty || descriptionDirty || memberDirty;
   const resetEdits = () => {
     setEditing(false);
     setRenameName(selectedGroup?.name ?? "");
+    setEditDescription(selectedGroup?.description ?? "");
     setPendingMembers([]);
     setPendingRemovals([]);
   };
@@ -162,8 +172,8 @@ export default function AccessGroupsPage() {
   const saveEdits = () =>
     void run(
       async (isCurrent) => {
-        if (nameDirty) {
-          await AccessGroupsApi.rename(selected, renameName.trim());
+        if (nameDirty || descriptionDirty) {
+          await AccessGroupsApi.rename(selected, renameName.trim(), descriptionDirty ? editDescription.trim() : undefined);
           if (!isCurrent()) return;
           await mutate();
         }
@@ -204,6 +214,11 @@ export default function AccessGroupsPage() {
   const shown = (groups ?? []).filter((group) =>
     group.name.toLowerCase().includes(groupSearch.toLowerCase().trim()),
   );
+  const creatorCell = (group?: AccessGroup) => group?.createdByUser ? (
+    <AvatarCell name={group.createdByUser.name || group.createdByUser.email || group.createdByUser.userId}
+      email={group.createdByUser.email}
+      isSelf={!!profile?.userId && profile.userId === group.createdByUser.userId} />
+  ) : <Text size="2" color="gray">—</Text>;
   return (
     <Flex
       direction="column"
@@ -266,7 +281,21 @@ export default function AccessGroupsPage() {
             {
               key: "name",
               label: t("accessGroups.name"),
+              width: "20%",
+              minWidth: "160px",
               render: (group) => <AvatarCell name={group.name} />,
+            },
+            {
+              key: "description", label: t("workspace.groups.columns.description"), minWidth: "180px",
+              render: (group) => <Text size="2" style={{ color: "var(--slate-11)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={group.description}>{group.description || "—"}</Text>,
+            },
+            {
+              key: "createdBy", label: t("workspace.groups.columns.createdBy"), hideOnMobile: true, width: "20%", minWidth: "180px",
+              render: creatorCell,
+            },
+            {
+              key: "createdOn", label: t("workspace.groups.columns.createdOn"), hideOnMobile: true, width: "140px",
+              render: (group) => <Text size="2" color="gray">{group.createdAtTimestamp ? formatDate(group.createdAtTimestamp) : "—"}</Text>,
             },
           ]}
           data={shown}
@@ -321,9 +350,10 @@ export default function AccessGroupsPage() {
         primaryLoading={busy}
         onPrimaryClick={() =>
           void run(
-            () => AccessGroupsApi.create(name.trim()),
+            () => AccessGroupsApi.create(name.trim(), description.trim() || undefined),
             async () => {
               setName("");
+              setDescription("");
               setCreating(false);
               await mutate();
             },
@@ -347,7 +377,6 @@ export default function AccessGroupsPage() {
           )}
           <FormField
             label={t("accessGroups.name")}
-            description={t("accessGroups.help")}
             required
           >
             <GroupNameInput
@@ -356,6 +385,10 @@ export default function AccessGroupsPage() {
               ariaLabel={t("accessGroups.name")}
               onChange={setName}
             />
+          </FormField>
+          <FormField label={t("workspace.groups.create.descriptionLabel")} optional>
+            <EntityDescriptionInput value={description} onChange={setDescription} canEdit={!busy}
+              maxLength={2000} placeholder={t("workspace.groups.create.descriptionPlaceholder")} />
           </FormField>
         </Flex>
       </WorkspaceRightPanel>
@@ -428,6 +461,16 @@ export default function AccessGroupsPage() {
                     onChange={setRenameName}
                   />
                 </FormField>
+                <FormField label={t("workspace.groups.detail.descriptionLabel")}>
+                  <EntityDescriptionInput value={editDescription} onChange={setEditDescription}
+                    canEdit={editing && !busy} maxLength={2000} placeholder={t("workspace.groups.detail.descriptionPlaceholder")} />
+                </FormField>
+                <Flex direction="column" gap="4" p="4" style={{ backgroundColor: "var(--olive-2)", border: "1px solid var(--olive-3)", borderRadius: "var(--radius-2)" }}>
+                  <Text size="2" weight="medium">{t("workspace.groups.detail.createdBy")}</Text>
+                  {creatorCell(selectedGroup)}
+                  <Text size="2" weight="medium">{t("workspace.groups.columns.createdOn")}</Text>
+                  <Text size="2" color="gray">{selectedGroup?.createdAtTimestamp ? formatDate(selectedGroup.createdAtTimestamp) : "—"}</Text>
+                </Flex>
                 <Box
                   p="4"
                   style={{
@@ -437,7 +480,7 @@ export default function AccessGroupsPage() {
                 >
                   <Flex direction="column" gap="3">
                     <Flex align="center" justify="between">
-                      <Heading size="3">{t("accessGroups.members")}</Heading>
+                      <Text size="2" weight="medium">{t("accessGroups.members")}</Text>
                       <Badge variant="soft" color="gray">
                         {members?.length ?? "—"}
                       </Badge>
@@ -465,34 +508,20 @@ export default function AccessGroupsPage() {
                           "workspace.groups.detail.searchUsers",
                         )}
                         emptyText={t("workspace.groups.detail.noUsers")}
+                        maxHeight={320}
+                        listClassName="team-member-scroll-area"
                         renderItem={(member) => (
-                          <Flex
-                            align="center"
-                            justify="between"
-                            gap="3"
-                            style={{ minHeight: 44 }}
+                          <EntityMemberRow
+                            pendingRemoval={pendingRemovals.includes(member.userId)}
+                            name={member.userName || member.userEmail || member.userId}
+                            email={member.userEmail} profilePicture={member.profilePicture}
+                            isSelf={!!profile?.userId && profile.userId === member.userId}
                           >
-                            <Box
-                              style={{
-                                minWidth: 0,
-                                opacity: pendingRemovals.includes(member.userId)
-                                  ? 0.5
-                                  : 1,
-                              }}
-                            >
-                              <AvatarCell
-                                name={
-                                  member.userName ||
-                                  member.userEmail ||
-                                  member.userId
-                                }
-                                email={member.userEmail}
-                              />
-                            </Box>
                             {editing && (
                               <Button
                                 variant="ghost"
                                 color="gray"
+                                style={{ color: pendingRemovals.includes(member.userId) ? "var(--accent-11)" : "var(--red-11)" }}
                                 className="touch-hit"
                                 disabled={busy}
                                 onClick={() =>
@@ -512,7 +541,7 @@ export default function AccessGroupsPage() {
                                 )}
                               </Button>
                             )}
-                          </Flex>
+                          </EntityMemberRow>
                         )}
                       />
                     )}
@@ -521,10 +550,15 @@ export default function AccessGroupsPage() {
                         {t("common.loading")}
                       </Text>
                     )}
+
+                  </Flex>
+                </Box>
                     {editing && (
-                      <FormField
-                        label={t("workspace.groups.edit.addUsersLabel")}
-                      >
+                      <Box p="4" style={{ backgroundColor: "var(--olive-2)", border: "1px solid var(--olive-3)", borderRadius: "var(--radius-2)" }}>
+                        <Flex align="center" justify="between" mb="2">
+                          <Text size="2" weight="medium">{t("workspace.groups.edit.addUsersLabel")}</Text>
+                          <Badge variant="soft" color="gray" size="1">{t("workspace.common.selected", { count: pendingMembers.length })}</Badge>
+                        </Flex>
                         <SearchableCheckboxDropdown
                           options={people.options.filter(
                             (person) =>
@@ -544,10 +578,8 @@ export default function AccessGroupsPage() {
                           isLoadingMore={people.isLoading}
                           hasMore={people.hasMore}
                         />
-                      </FormField>
+                      </Box>
                     )}
-                  </Flex>
-                </Box>
               </Flex>
               {editing && (
                 <Flex

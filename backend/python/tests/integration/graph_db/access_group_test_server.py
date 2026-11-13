@@ -138,7 +138,9 @@ async def demo(request: Request) -> dict:
         """
         MERGE (a:User {id:$admin}) SET a.userId=$admin, a.orgId=$org, a.fullName='Alex Example', a.email='alex@example.invalid', a.isActive=true
         MERGE (u:User {id:$member}) SET u.userId=$member, u.orgId=$org, u.fullName='Sam Example', u.email='sam@example.invalid', u.isActive=true
-        MERGE (g:Teams {id:$group}) SET g.orgId=$org, g.name='Finance', g.exodiaAccessGroup=true, g.createdBy=$admin
+        MERGE (g:Teams {id:$group}) SET g.orgId=$org, g.name='Finance', g.exodiaAccessGroup=true, g.createdBy=$admin,
+          g.description=coalesce(g.description,'Finance reference material and shared reports'),
+          g.createdAtTimestamp=coalesce(g.createdAtTimestamp,1794528000000)
         MERGE (u)-[:PERMISSION {type:'USER', role:'READER'}]->(g)
         WITH a,u,g
         UNWIND [{id:'demo-slack',name:'Slack workspace',type:'SLACK WORKSPACE'}, {id:'demo-drive',name:'Google Drive',type:'GOOGLE DRIVE'}] AS source

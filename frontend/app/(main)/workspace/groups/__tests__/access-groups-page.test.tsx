@@ -90,6 +90,28 @@ describe("access groups", () => {
     show();
     expect(AccessGroupsApi.list).not.toHaveBeenCalled();
   });
+  it("shows group metadata in the table and cancels description changes", async () => {
+    vi.mocked(AccessGroupsApi.list).mockResolvedValue([{
+      _key: "g1", name: "Finance", description: "Finance reference material",
+      createdAtTimestamp: 1794528000000,
+      createdByUser: { userId: "creator", name: "Alex Example", email: "alex@example.invalid" },
+    }]);
+    show();
+    expect(await screen.findByText("Finance reference material")).toBeTruthy();
+    expect(screen.getByText("workspace.groups.columns.description")).toBeTruthy();
+    expect(screen.getByText("workspace.groups.columns.createdBy")).toBeTruthy();
+    expect(screen.getByText("workspace.groups.columns.createdOn")).toBeTruthy();
+    expect(screen.getByText("Alex Example")).toBeTruthy();
+    fireEvent.click(screen.getByText("Finance"));
+    const description = screen.getByLabelText("workspace.groups.detail.descriptionLabel");
+    expect(description).toHaveProperty("readOnly", true);
+    await waitFor(() => expect(screen.getByRole("button", { name: "workspace.groups.edit.edit" })).toHaveProperty("disabled", false));
+    fireEvent.click(screen.getByRole("button", { name: "workspace.groups.edit.edit" }));
+    fireEvent.change(description, { target: { value: "Draft purpose" } });
+    fireEvent.click(screen.getByRole("button", { name: "common.cancel" }));
+    expect(description).toHaveProperty("value", "Finance reference material");
+    expect(AccessGroupsApi.rename).not.toHaveBeenCalled();
+  });
   it("opens a read-only access group and cancels name edits without saving", async () => {
     show();
     fireEvent.click(await screen.findByText("Finance"));
@@ -114,6 +136,18 @@ describe("access groups", () => {
       "Finance",
     );
     expect(AccessGroupsApi.rename).not.toHaveBeenCalled();
+  });
+  it("saves a group description without changing its membership", async () => {
+    show();
+    fireEvent.click(await screen.findByText("Finance"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "workspace.groups.edit.edit" })).toHaveProperty("disabled", false));
+    fireEvent.click(screen.getByRole("button", { name: "workspace.groups.edit.edit" }));
+    const description = screen.getByLabelText("workspace.groups.detail.descriptionLabel");
+    expect(description).toHaveProperty("maxLength", 2000);
+    fireEvent.change(description, { target: { value: "Budget reference material" } });
+    fireEvent.click(screen.getByRole("button", { name: "workspace.groups.edit.save" }));
+    await waitFor(() => expect(AccessGroupsApi.rename).toHaveBeenCalledWith("g1", "Finance", "Budget reference material"));
+    expect(AccessGroupsApi.changeMembers).not.toHaveBeenCalled();
   });
   it("shows the members of the selected group and removes one", async () => {
     show();
@@ -155,7 +189,7 @@ describe("access groups", () => {
       screen.getAllByRole("button", { name: "accessGroups.create" }).at(-1)!,
     );
     await waitFor(() =>
-      expect(AccessGroupsApi.create).toHaveBeenCalledWith("Research"),
+      expect(AccessGroupsApi.create).toHaveBeenCalledWith("Research", undefined),
     );
   });
   it("finds an active person and adds them to the group", async () => {
@@ -221,7 +255,7 @@ describe("access groups", () => {
       screen.getByRole("button", { name: "workspace.groups.edit.save" }),
     );
     await waitFor(() =>
-      expect(AccessGroupsApi.rename).toHaveBeenCalledWith("g1", "New name"),
+      expect(AccessGroupsApi.rename).toHaveBeenCalledWith("g1", "New name", undefined),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "workspace.groups.edit.edit" }),

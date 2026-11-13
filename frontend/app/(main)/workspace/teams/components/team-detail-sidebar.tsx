@@ -11,6 +11,8 @@ import { getUserFacingErrorMessage } from '@/lib/api/api-error';
 import {
   WorkspaceRightPanel,
   FormField,
+  EntityDescriptionInput,
+  EntityMemberRow,
   SearchableCheckboxDropdown,
   AvatarCell,
   PaginatedMembersList,
@@ -580,51 +582,11 @@ export function TeamDetailSidebar({
             'Team Description'
           )}
         >
-          <textarea
-            value={
-              isEditMode
-                ? editTeamDescription
-                : detailTeam?.description ?? ''
-            }
-            onChange={(e) => {
-              if (isEditMode) setEditTeamDescription(e.target.value);
-            }}
-            readOnly={!isEditMode}
-            placeholder={
-              isEditMode
-                ? t(
-                    'workspace.teams.detail.descriptionPlaceholder',
-                    'Describe the purpose of this team'
-                  )
-                : ''
-            }
-            rows={4}
-            style={{
-              width: '100%',
-              minHeight: 88,
-              padding: '10px 12px',
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--slate-a5)',
-              borderRadius: 'var(--radius-2)',
-              fontSize: 14,
-              lineHeight: '20px',
-              fontFamily: 'var(--default-font-family)',
-              color: 'var(--slate-12)',
-              outline: 'none',
-              boxSizing: 'border-box',
-              resize: 'vertical',
-              cursor: isEditMode ? 'text' : 'default',
-            }}
-            onFocus={(e) => {
-              if (isEditMode) {
-                e.currentTarget.style.border = '2px solid var(--accent-8)';
-                e.currentTarget.style.padding = '9px 11px';
-              }
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.border = '1px solid var(--slate-a5)';
-              e.currentTarget.style.padding = '10px 12px';
-            }}
+          <EntityDescriptionInput
+            value={isEditMode ? editTeamDescription : detailTeam?.description ?? ''}
+            onChange={setEditTeamDescription}
+            canEdit={isEditMode}
+            placeholder={t('workspace.teams.detail.descriptionPlaceholder')}
           />
         </FormField>
 
@@ -701,30 +663,13 @@ export function TeamDetailSidebar({
               const isCurrentMemberUser = isSameAsCurrentUser(member);
               const canEditRole = isEditMode && !isCurrentMemberUser && !isPendingRemove;
               return (
-                <Flex
-                  align="center"
-                  justify="between"
-                  gap="2"
-                  style={{
-                    opacity: isPendingRemove ? 0.5 : 1,
-                    transition: 'opacity 0.15s ease',
-                  }}
+                <EntityMemberRow
+                  pendingRemoval={isPendingRemove}
+                  name={member.userName?.trim() || member.userEmail?.trim() || member.userId || 'Unknown'}
+                  email={member.userEmail}
+                  isSelf={isCurrentMemberUser}
+                  profilePicture={member.profilePicture}
                 >
-                  <Box style={{ flex: 1, minWidth: 0 }}>
-                    <AvatarCell
-                      name={
-                        member.userName?.trim() ||
-                        member.userEmail?.trim() ||
-                        member.userId ||
-                        'Unknown'
-                      }
-                      email={member.userEmail}
-                      avatarSize={28}
-                      isSelf={isCurrentMemberUser}
-                      profilePicture={member.profilePicture}
-                    />
-                  </Box>
-                  <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
                     {canEditRole ? (
                       <RoleDropdownMenu
                         role={effectiveRole as TeamMemberRole}
@@ -760,8 +705,7 @@ export function TeamDetailSidebar({
                           : t('workspace.teams.edit.remove', 'Remove')}
                       </Text>
                     )}
-                  </Flex>
-                </Flex>
+                </EntityMemberRow>
               );
             }}
           />

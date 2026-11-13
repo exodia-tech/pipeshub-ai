@@ -20,7 +20,7 @@ class AccessGroups:
     async def list(self, org_id: str, skip: int, limit: int) -> list[dict]:
         if not org_id or skip < 0 or not 1 <= limit <= 100:
             raise ValueError("Invalid group listing parameters")
-        return await self.graph.get_documents_paginated(
+        groups = await self.graph.get_documents_paginated(
             CollectionNames.TEAMS.value,
             skip=skip,
             limit=limit,
@@ -28,10 +28,25 @@ class AccessGroups:
             sort_field="_key",
             raise_on_error=True,
         )
+        creator_keys = list({group["createdBy"] for group in groups if group.get("createdBy")})
+        creators = await self.graph.get_nodes_by_field_in(
+            CollectionNames.USERS.value, "_key", creator_keys,
+            return_fields=["_key", "orgId", "userId", "fullName", "email"],
+            raise_on_error=True,
+        ) if creator_keys else []
+        by_key = {user["_key"]: user for user in creators if user.get("orgId") == org_id}
+        for group in groups:
+            creator = by_key.get(group.get("createdBy"))
+            group["createdByUser"] = {
+                "userId": creator.get("userId"),
+                "name": creator.get("fullName"),
+                "email": creator.get("email"),
+            } if creator else None
+        return groups
 
-    async def create(self, org_id: str, creator_id: str, name: str) -> str:
+    async def create(self, org_id: str, creator_id: str, name: str, description: str = "") -> str:
         name = name.strip()
-        if not name or not org_id or not creator_id:
+        if not name or len(name) > 120 or len(description) > 2000 or not org_id or not creator_id:
             raise ValueError("Organization, creator and group name are required")
         # shortcut: concurrent creates can use the same name until graph stores have an org/name constraint.
         if await self.graph.find_team_by_name(org_id, name):
@@ -48,6 +63,7 @@ class AccessGroups:
                 {
                     "_key": group_id,
                     "name": name,
+                    "description": description.strip(),
                     "orgId": org_id,
                     "createdBy": creator[creator_id],
                     "createdAtTimestamp": now,
@@ -79,17 +95,18 @@ class AccessGroups:
         finally:
             await notify_principals_changed(org_id)
 
-    async def rename(self, org_id: str, group_id: str, name: str) -> None:
+    async def rename(self, org_id: str, group_id: str, name: str, description: str | None = None) -> None:
         await self._require_group(org_id, group_id)
         name = name.strip()
-        if not name or len(name) > 120:
+        if not name or len(name) > 120 or (description is not None and len(description) > 2000):
             raise ValueError("Invalid group name")
         if await self.graph.find_team_by_name(org_id, name, exclude_team_id=group_id):
             raise ValueError("A team or group with this name already exists")
         if not await self.graph.update_node(
             group_id,
             CollectionNames.TEAMS.value,
-            {"name": name, "updatedAtTimestamp": get_epoch_timestamp_in_ms()},
+            {"name": name, "updatedAtTimestamp": get_epoch_timestamp_in_ms(),
+             **({"description": description.strip()} if description is not None else {})},
         ):
             raise RuntimeError("Could not rename access group")
 

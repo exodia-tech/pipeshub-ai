@@ -62,6 +62,7 @@ class UserEmailUpdateRequest(BaseModel):
 
 class AccessGroupCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
 
 
 class AccessGroupMembersRequest(BaseModel):
@@ -120,7 +121,7 @@ async def create_access_group(request: Request, body: AccessGroupCreateRequest) 
         raise HTTPException(status_code=401, detail="Service token missing identity")
     graph = (await get_services(request))["graph_provider"]
     try:
-        group_id = await AccessGroups(graph).create(org_id, actor_id, body.name)
+        group_id = await AccessGroups(graph).create(org_id, actor_id, body.name, body.description or "")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid group") from exc
     return JSONResponse(status_code=201, content={"id": group_id})
@@ -173,7 +174,7 @@ async def rename_access_group(request: Request, group_id: uuid.UUID, body: Acces
         raise HTTPException(status_code=401, detail="Service token missing organization")
     graph = (await get_services(request))["graph_provider"]
     try:
-        await AccessGroups(graph).rename(org_id, str(group_id), body.name)
+        await AccessGroups(graph).rename(org_id, str(group_id), body.name, body.description)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Group not found or name invalid") from exc
     return JSONResponse(content={"success": True})

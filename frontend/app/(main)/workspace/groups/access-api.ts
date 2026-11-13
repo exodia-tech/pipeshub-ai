@@ -3,11 +3,15 @@ import { apiClient } from "@/lib/api";
 export interface AccessGroup {
   _key: string;
   name: string;
+  description?: string;
+  createdAtTimestamp?: number;
+  createdByUser?: { userId: string; name?: string; email?: string } | null;
 }
 export interface AccessGroupMember {
   userId: string;
   userName?: string;
   userEmail?: string;
+  profilePicture?: string;
 }
 
 export interface ResourcePolicy {
@@ -62,10 +66,10 @@ export const AccessGroupsApi = {
     );
     return data.groups;
   },
-  async create(name: string): Promise<string> {
+  async create(name: string, description?: string): Promise<string> {
     const { data } = await apiClient.post<{ id: string }>(
       "/api/v1/access-groups",
-      { name },
+      { name, description },
     );
     return data.id;
   },
@@ -92,8 +96,8 @@ export const AccessGroupsApi = {
       userIds,
     });
   },
-  async rename(id: string, name: string): Promise<void> {
-    await apiClient.put(`/api/v1/access-groups/${id}`, { name });
+  async rename(id: string, name: string, description?: string): Promise<void> {
+    await apiClient.put(`/api/v1/access-groups/${id}`, { name, description });
   },
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/v1/access-groups/${id}`);
