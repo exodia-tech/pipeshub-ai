@@ -36,13 +36,13 @@ info:
     name: API Support
     email: support@pipeshub.com
 servers:
-  - url: "{instance_url}/api/v1"
+  - url: "https://{instance_url}/api/v1"
     description: Base API URL
     variables:
       instance_url:
         default: app.pipeshub.com
         description: Host name, with an optional port, of a PipesHub instance served over HTTPS. For a plain-HTTP instance, such as a local one, set the full server URL instead.
-  - url: "{instance_url}"
+  - url: "https://{instance_url}"
     description: Root URL (used for MCP endpoints mounted at /mcp)
     variables:
       instance_url:
@@ -25375,6 +25375,7 @@ security:
 paths:
   /access-groups:
     get:
+      operationId: exodiaGetAccessGroups
       tags: [Administration]
       summary: List access groups
       security:
@@ -25410,6 +25411,7 @@ paths:
         '403': { description: Administrator access required }
         '503': { description: Group service unavailable }
     post:
+      operationId: exodiaPostAccessGroups
       tags: [Administration]
       summary: Create an access group
       description: Administrator-only. The creator is not automatically a member of the group.
@@ -25434,6 +25436,7 @@ paths:
         '503': { description: Audit or group service unavailable; check the group list before retrying }
   /access-groups/{id}:
     put:
+      operationId: exodiaPutAccessGroupsId
       tags: [Administration]
       summary: Update an access group name and description
       security:
@@ -25457,6 +25460,7 @@ paths:
         '404': { description: Group not found }
         '503': { description: Outcome may be unknown; check the group before retrying }
     delete:
+      operationId: exodiaDeleteAccessGroupsId
       tags: [Administration]
       summary: Delete an access group and its permissions
       security:
@@ -25471,6 +25475,7 @@ paths:
         '503': { description: Outcome may be unknown; check the group before retrying }
   /entity/access-groups/effective-scopes:
     get:
+      operationId: exodiaGetEntityAccessGroupsEffectiveScopes
       tags: [Administration]
       summary: Resolve a user’s live group feature ceiling (Internal)
       description: |
@@ -25504,6 +25509,7 @@ paths:
         '500': { description: Live membership or policy could not be verified; callers must fail closed }
   /access-groups/scopes:
     get:
+      operationId: exodiaGetAccessGroupsScopes
       tags: [Administration]
       summary: List native action scopes available for group limits
       description: Uses the platform OAuth catalogue. Identity, refresh-token and administrator-only scopes are excluded. Groups do not grant admin rights.
@@ -25531,6 +25537,7 @@ paths:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
     get:
+      operationId: exodiaGetAccessGroupsIdAccess
       tags: [Administration]
       summary: Read content and native feature-scope restrictions
       responses:
@@ -25539,6 +25546,7 @@ paths:
         '404': { description: Group not found }
         '503': { description: Policy storage unavailable }
     put:
+      operationId: exodiaPutAccessGroupsIdAccess
       tags: [Administration]
       summary: Save audited content and feature-scope restrictions with revision checking
       requestBody:
@@ -25576,6 +25584,7 @@ paths:
         '503': { description: Save outcome unknown; refresh before retrying }
   /access-groups/{id}/resources:
     get:
+      operationId: exodiaGetAccessGroupsIdResources
       tags: [Administration]
       summary: Browse resource hierarchy and inherited group restrictions
       description: Admin catalogue including denied nodes for policy editing. Reader counts reflect saved rules intersected with source permissions and every member's other group restrictions; null means not fully verified. An allow never creates a source permission.
@@ -25598,7 +25607,7 @@ paths:
                 properties:
                   hasMore: { type: boolean }
                   memberCount: { type: integer, minimum: 0 }
-                  policy: { type: object, description: Saved defaultAllow, revision and rules }
+                  policy: { type: object, description: "Saved defaultAllow, revision and rules" }
                   nodes:
                     type: array
                     items:
@@ -25619,6 +25628,7 @@ paths:
         '503': { description: Resource service unavailable }
   /access-groups/{id}/members:
     get:
+      operationId: exodiaGetAccessGroupsIdMembers
       tags: [Administration]
       summary: List access group members
       security:
@@ -25635,6 +25645,7 @@ paths:
         '503': { description: Group service unavailable }
   /access-groups/{id}/members/{operation}:
     post:
+      operationId: exodiaPostAccessGroupsIdMembersOperation
       tags: [Administration]
       summary: Add or remove access group members
       security:
@@ -25660,6 +25671,7 @@ paths:
         '503': { description: Audit or group service unavailable; check the group before retrying }
   /audit:
     get:
+      operationId: exodiaGetAudit
       tags: [Administration]
       summary: Read recent organization audit events
       description: Administrator-only, scoped to the authenticated organization. Initial coverage includes successful sign-ins, group administration, collection permission changes, selected document stream starts and audit-log access; a stream-start event does not prove that the download completed. Sign-in continues if its audit event cannot be recorded, and a server error is logged. Returns up to 100 events per page, ordered newest first; the end of a time range is exclusive. The export flag records an export request, but cannot detect copies made by other clients.
@@ -25706,13 +25718,14 @@ paths:
                         resource_id: { type: string, description: Collection identifier when applicable }
                         permission_role: { type: string, enum: [OWNER, WRITER, READER] }
                         recorded_at: { type: string, format: date-time }
-        '400': { description: Invalid filter, time range, page size or cursor }
+        '400': { description: "Invalid filter, time range, page size or cursor" }
         '401': { description: Authentication required }
         '403': { description: Administrator access and config:read scope required }
         '503': { description: Audit storage is unavailable }
 
   /audit/internal/events:
     post:
+      operationId: exodiaPostAuditInternalEvents
       tags: [Administration]
       summary: Record an upstream agent event (Internal)
       description: |
@@ -25756,7 +25769,7 @@ paths:
                 properties:
                   recorded: { type: boolean, enum: [true] }
         '400': { description: Invalid or unexpected fields }
-        '401': { description: Missing, expired or incorrectly scoped service identity }
+        '401': { description: "Missing, expired or incorrectly scoped service identity" }
         '409': { description: Event ID already recorded with different actor or metadata }
         '503': { description: Audit event was not confirmed saved }
 
@@ -25764,6 +25777,7 @@ paths:
     parameters:
       - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
     put:
+      operationId: exodiaPutAgentsAgentKeyAvatar
       tags: [Agents]
       summary: Upload or replace an agent's private profile picture
       description: |
@@ -25791,9 +25805,10 @@ paths:
                 required: [avatarUrl]
                 properties:
                   avatarUrl: { type: string }
-        '400': { description: Missing, oversized or invalid image. }
+        '400': { description: "Missing, oversized or invalid image." }
         '403': { description: Caller lacks scope or creator ownership. }
     delete:
+      operationId: exodiaDeleteAgentsAgentKeyAvatar
       tags: [Agents]
       summary: Remove an agent's profile picture
       description: Requires agent:read, agent:write and creator ownership. Clears metadata before deleting stored image bytes.
@@ -25812,6 +25827,7 @@ paths:
       - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
       - { in: path, name: version, required: true, schema: { type: string, format: uuid } }
     get:
+      operationId: exodiaGetAgentsAgentKeyAvatarVersion
       tags: [Agents]
       summary: Read the current private agent picture
       description: Requires agent:read and current agent visibility. Organization and active version are checked on every read. Responses use Cache-Control private, no-store.
@@ -25831,6 +25847,7 @@ paths:
     parameters:
       - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
     get:
+      operationId: exodiaGetAgentsAgentKeyScheduleSlackBots
       tags: [Agents]
       summary: List existing Slack bots bound to this agent
       description: Requires agent:read and creator ownership. Live organization administrators receive bot IDs and names only; other creators receive canManage false and an empty list. Never returns credentials or expands Slack scopes.
@@ -25858,6 +25875,7 @@ paths:
       - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
       - { in: query, name: projectId, required: true, schema: { type: string, maxLength: 128 } }
     get:
+      operationId: exodiaGetAgentsAgentKeyScheduleProjectGrantPreview
       tags: [Agents]
       summary: Review the sources and model for a project draft schedule
       description: Requires agent:read, project:read, agent ownership, live organization administrator role and direct or organization-wide project access. The returned fingerprint binds the exact current agent, project and model configuration. No credentials are returned.
@@ -25882,11 +25900,12 @@ paths:
                       modelName: { type: string }
                       provider: { type: string }
                   fingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
-        '403': { description: Missing privilege, inaccessible project, unsupported agent or invalid model. }
+        '403': { description: "Missing privilege, inaccessible project, unsupported agent or invalid model." }
   /agents/{agentKey}/schedule/project-grant:
     parameters:
       - { in: path, name: agentKey, required: true, schema: { type: string, format: uuid } }
     post:
+      operationId: exodiaPostAgentsAgentKeyScheduleProjectGrant
       tags: [Agents]
       summary: Approve the exact reviewed project and model scope
       description: Requires agent:read, agent:write, agent:execute, project:read, agent ownership and a live organization administrator. Preview first; approval fails when the fingerprint changed. Approving a replacement invalidates any schedule bound to the earlier grant until it is saved again.
@@ -25903,8 +25922,9 @@ paths:
                 fingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
       responses:
         '201': { description: Project scope approved; response contains the bound grant metadata. }
-        '403': { description: Scope or privilege changed, or caller lacks ownership. }
+        '403': { description: "Scope or privilege changed, or caller lacks ownership." }
     delete:
+      operationId: exodiaDeleteAgentsAgentKeyScheduleProjectGrant
       tags: [Agents]
       summary: Revoke a project schedule approval
       description: Requires agent:read, agent:write, project:read and agent ownership. Future runs fail closed. A run already underway cannot be recalled.
@@ -25918,6 +25938,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      operationId: exodiaGetAgentsAgentKeySchedule
       tags: [Agents]
       summary: Read the creator's native agent schedule and recent runs
       description: Requires agent:read and agent ownership. Returns null before a schedule is saved.
@@ -25929,6 +25950,7 @@ paths:
               schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
         '403': { description: Caller is not the agent creator or lacks scope. }
     put:
+      operationId: exodiaPutAgentsAgentKeySchedule
       tags: [Agents]
       summary: Save or pause a native agent schedule
       description: |
@@ -25959,7 +25981,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
         '400': { description: Invalid settings or timezone. }
-        '403': { description: Ownership, scopes, public-research or delivery policy denied. }
+        '403': { description: "Ownership, scopes, public-research or delivery policy denied." }
         '409': { description: Stale revision; reload before saving. }
   /agents/{agentKey}/schedule/run:
     parameters:
@@ -25968,6 +25990,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      operationId: exodiaPostAgentsAgentKeyScheduleRun
       tags: [Agents]
       summary: Run the saved native schedule now
       description: |
@@ -25981,10 +26004,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AgentScheduleResponse' }
-        '403': { description: Owner, agent policy or delivery authorization denied. }
-        '409': { description: No saved schedule, or another run is active. }
+        '403': { description: "Owner, agent policy or delivery authorization denied." }
+        '409': { description: "No saved schedule, or another run is active." }
   /usage:
     get:
+      operationId: exodiaGetUsage
       tags: [Usage Analytics]
       summary: Filter personal or organization model usage
       description: |
@@ -26016,10 +26040,11 @@ paths:
               schema: { $ref: '#/components/schemas/UsageReport' }
         '401': { description: Authentication required }
         '403': { description: Insufficient scope or organization administrator required }
-        '422': { description: Invalid filters, date range or pagination }
+        '422': { description: "Invalid filters, date range or pagination" }
         '503': { description: Persistent tracking storage is not configured }
   /usage/observability:
     get:
+      operationId: exodiaGetUsageObservability
       tags: [Usage Analytics]
       summary: Read the organization's observability export setting
       description: Requires an organization administrator and config:read. Disabled by default; server-side collector configuration is also required.
@@ -26035,6 +26060,7 @@ paths:
                   enabled: { type: boolean }
         '403': { description: Administrator or config:read scope required }
     put:
+      operationId: exodiaPutUsageObservability
       tags: [Usage Analytics]
       summary: Enable or disable usage export for the organization
       description: Requires an organization administrator and config:write.
@@ -26054,6 +26080,7 @@ paths:
         '422': { description: Invalid setting }
   /usage/rates:
     get:
+      operationId: exodiaGetUsageRates
       tags: [Usage Analytics]
       summary: List administrator pricing overrides
       description: Requires an organization administrator and config:read for OAuth/PAT clients.
@@ -26070,6 +26097,7 @@ paths:
                   unit: { type: string, enum: [per_million_tokens] }
         '403': { description: Administrator or config:read scope required }
     put:
+      operationId: exodiaPutUsageRates
       tags: [Usage Analytics]
       summary: Set a model's USD token rates for future calls
       description: Requires an organization administrator and config:write for OAuth/PAT clients. Existing event cost snapshots are preserved.
@@ -26081,8 +26109,9 @@ paths:
       responses:
         '200': { description: Saved; applies to future events }
         '403': { description: Administrator or config:write scope required }
-        '422': { description: Rates must be finite, nonnegative and at most 100000 USD per million tokens }
+        '422': { description: "Rates must be finite, nonnegative and at most 100000 USD per million tokens" }
     delete:
+      operationId: exodiaDeleteUsageRates
       tags: [Usage Analytics]
       summary: Restore catalog pricing for future model calls
       description: Requires an organization administrator and config:write for OAuth/PAT clients. Historical event costs remain unchanged. If the catalog has no applicable price, future costs remain unpriced.
@@ -26101,6 +26130,7 @@ paths:
         '403': { description: Administrator or config:write scope required }
   /usage/budgets:
     get:
+      operationId: exodiaGetUsageBudgets
       tags: [Usage Analytics]
       summary: Get current monthly warning budgets and progress
       description: Requires org:read for OAuth/PAT clients. Personal view exposes only budgets for the verified caller; organization view requires an administrator. Unpriced calls are reported alongside spend.
@@ -26119,6 +26149,7 @@ paths:
                   enforced: { type: boolean, enum: [false] }
         '403': { description: Insufficient scope or organization administrator required }
     put:
+      operationId: exodiaPutUsageBudgets
       tags: [Usage Analytics]
       summary: Create or update a monthly warning budget
       description: Requires an organization administrator and config:write for OAuth/PAT clients. Upserts by scope and subject. Warnings appear in the dashboard; this version does not block model calls or send messages.
@@ -26130,9 +26161,10 @@ paths:
       responses:
         '200': { description: Saved; enforcement remains off }
         '403': { description: Administrator or config:write scope required }
-        '422': { description: Invalid scope, target, amount or warning threshold }
+        '422': { description: "Invalid scope, target, amount or warning threshold" }
   /usage/budgets/{budgetId}:
     delete:
+      operationId: exodiaDeleteUsageBudgetsBudgetId
       tags: [Usage Analytics]
       summary: Remove a monthly warning budget
       description: Requires an organization administrator and config:write for OAuth/PAT clients. Usage history is never removed.
@@ -48182,7 +48214,7 @@ paths:
       tags: [Conversations]
       operationId: steerConversationStreamInternal
       summary: Send a user update to an active Slack run
-      description: Scoped token is resolved to its user before conversation and run ownership checks. Updates apply at the next safe step; finished runs return queued false. No permissions change.
+      description: Scoped token is resolved to its user before checking effective conversation:chat access, including the live group ceiling, and conversation and run ownership. Updates apply at the next safe step; finished runs return queued false. No permissions change.
       security:
         - bearerAuth: []
       parameters:
@@ -48211,17 +48243,17 @@ paths:
                   duplicate: { type: boolean }
         '400': { description: Invalid steering message }
         '401': { description: Invalid scoped authentication }
-        '403': { description: Run belongs to a different user or conversation }
+        '403': { description: Action scope denied or run belongs to a different user or conversation }
         '404': { description: Conversation unavailable to caller }
         '429': { description: Run update limit reached }
-        '503': { description: Steering storage unavailable }
+        '503': { description: Steering storage or live group policy verification unavailable }
 
   /agents/{agentKey}/conversations/internal/{conversationId}/steer:
     post:
       tags: [Conversations]
       operationId: steerAgentConversationStreamInternal
       summary: Send a user update to an active Slack run
-      description: Scoped token is resolved to its user before conversation and run ownership checks. Updates apply at the next safe step; finished runs return queued false. No permissions change.
+      description: Scoped token is resolved to its user before checking effective agent:execute access, including the live group ceiling, and conversation and run ownership. Updates apply at the next safe step; finished runs return queued false. No permissions change.
       security:
         - bearerAuth: []
       parameters:
@@ -48251,10 +48283,10 @@ paths:
                   duplicate: { type: boolean }
         '400': { description: Invalid steering message }
         '401': { description: Invalid scoped authentication }
-        '403': { description: Run belongs to a different user or conversation }
+        '403': { description: Action scope denied or run belongs to a different user or conversation }
         '404': { description: Conversation unavailable to caller }
         '429': { description: Run update limit reached }
-        '503': { description: Steering storage unavailable }
+        '503': { description: Steering storage or live group policy verification unavailable }
 
   /conversations/{conversationId}/cancel:
     post:
@@ -74581,7 +74613,7 @@ paths:
         `Content-Type` must be `application/json`.
       operationId: handleMCPRequest
       servers:
-        - url: "{instance_url}"
+        - url: "https://{instance_url}"
           variables:
             instance_url:
               default: app.pipeshub.com
@@ -74755,7 +74787,7 @@ paths:
         message with `POST /mcp`.
       operationId: handleMCPStreamingRequest
       servers:
-        - url: "{instance_url}"
+        - url: "https://{instance_url}"
           variables:
             instance_url:
               default: app.pipeshub.com

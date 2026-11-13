@@ -51,8 +51,17 @@ async def steer_chat_stream(
     )
     if not body.text.strip():
         raise HTTPException(400, "A non-empty update is required")
+
+    async def authorize(named_agent: bool) -> None:
+        scopes = (OAuthScopes.AGENT_EXECUTE,) if named_agent else (
+            OAuthScopes.CONVERSATION_CHAT, OAuthScopes.AGENT_EXECUTE,
+        )
+        await require_scopes(*scopes)(request)
+
     try:
-        outcome = await inbox.submit(body.runId, requester, body.messageId, body.text)
+        outcome = await inbox.submit(body.runId, requester, body.messageId, body.text, authorize=authorize)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             503, "The update could not be delivered; retry later"

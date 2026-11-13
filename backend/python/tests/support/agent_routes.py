@@ -70,7 +70,7 @@ class InMemoryGraph:
         self._txn = itertools.count(1)
         self.logger = logging.getLogger("test.agent_routes.graph")
         for name, user in USERS.items():
-            self.add_node(USERS_COLL, {"_key": user_key(name), **user, "fullName": name.title()})
+            self.add_node(USERS_COLL, {"_key": user_key(name), **user, "fullName": name.title(), "isActive": True})
         for org in ("org-1", "org-2"):
             self.add_node(ORGS_COLL, {"_key": org, "accountType": "enterprise", "name": org})
 
@@ -125,6 +125,11 @@ class InMemoryGraph:
         return [(a, k) for m, a, k in self.calls if m == method]
 
     # -- IGraphDBProvider surface used by the agent routes -------------------
+    async def get_graph_user_keys_by_mongo_user_ids(self, user_ids: list[str], *, org_id: str, chunk_size: int) -> dict[str, str]:
+        self._enter("get_graph_user_keys_by_mongo_user_ids", user_ids, org_id)
+        return {doc["userId"]: key for key, doc in self.nodes.get(USERS_COLL, {}).items()
+                if doc.get("userId") in user_ids and doc.get("orgId") == org_id}
+
     async def get_user_by_user_id(
         self, user_id: str, *, raise_on_error: bool = False, **_: Any,
     ) -> dict[str, Any] | None:
@@ -394,7 +399,7 @@ class InMemoryGraph:
         ]
         return before - len(self.edges[collection])
 
-    async def get_edges_from_node(self, node_id: str, edge_collection: str, transaction: str | None = None) -> list[dict]:
+    async def get_edges_from_node(self, node_id: str, edge_collection: str, transaction: str | None = None, *, raise_on_error: bool = False) -> list[dict]:
         self._enter("get_edges_from_node", node_id, edge_collection)
         return copy.deepcopy(self.edges_from(edge_collection, node_id))
 
@@ -520,6 +525,7 @@ def make_client(graph: InMemoryGraph, config: FakeConfigService | None = None,
     from app.api.routes.agent import router
 
     app = FastAPI()
+    app.state.graph_provider = graph
     app.include_router(router, prefix="/api/v1/agent")
     container = FakeContainer(graph, config or FakeConfigService())
     app.container = container

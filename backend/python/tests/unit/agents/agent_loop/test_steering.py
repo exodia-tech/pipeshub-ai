@@ -23,6 +23,29 @@ class Store:
 
 
 class TestSteeringInbox(unittest.IsolatedAsyncioTestCase):
+    async def test_legacy_run_requires_named_permission_before_enqueue(self) -> None:
+        state = await self.worker.read("run-a")
+        state.pop("namedAgent", None)
+        await self.worker.write("run-a", state)
+        checked = []
+
+        async def refuse(named_agent: bool) -> None:
+            checked.append(named_agent)
+            raise PermissionError("Execution access was revoked")
+
+        with self.assertRaises(PermissionError):
+            await self.other_worker.submit("run-a", self.owner, "revoked", "New instructions", authorize=refuse)
+        self.assertEqual(checked, [True])
+        self.assertEqual((await self.worker.read("run-a"))["messages"], [])
+
+    async def test_invalid_action_metadata_is_not_treated_as_universal_chat(self) -> None:
+        state = await self.worker.read("run-a")
+        state["namedAgent"] = "false"
+        await self.worker.write("run-a", state)
+        with self.assertRaises(RuntimeError):
+            await self.worker.submit("run-a", self.owner, "invalid", "New instructions")
+        self.assertEqual((await self.worker.read("run-a"))["messages"], [])
+
     async def asyncSetUp(self) -> None:
         self.store = Store()
         self.worker = SteeringInbox(self.store)

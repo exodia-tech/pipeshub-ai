@@ -33,7 +33,7 @@ Project context uses effective scopes rather than raw token scopes. Internal bot
 - Local fixture checks use synthetic identities, connectors and a deterministic responder. No company data or external model is used.
 - Roll out matching Node and Python builds together. A rollback to code that predates these guards ignores saved feature limits; treat that as an authorization change, not a transparent rollback. This draft has not been combined with newer main or tested live.
 
-This work is local/draft; it is not deployed. Final application/build source: `f0be6f0d3`; subsequent evidence commits contain documentation and screenshots only.
+The original application/build source was `f0be6f0d3`; the following results describe that candidate. Release validation against newer main is recorded separately below. Deployment must be confirmed from the running application's build metadata.
 
 | Check | Confirmed result |
 | --- | --- |
@@ -83,3 +83,13 @@ Independent read-only review: no remaining actionable Standards findings in the 
 Independent read-only review: no remaining actionable Spec findings within the documented identity boundary. Earlier findings on named agents, project context, internal bot hydration and native service-account compatibility were corrected and regression-tested.
 
 Standards: 0 remaining findings. Spec: 0 remaining findings. Real Slack bootstrap, external OAuth/MCP clients and deployment are not verified by these local fixture checks.
+
+## PR #55 release validation
+
+Combined with main `ea6a6775d72200d299b952cf3de9f843d734b895` before release, preserving subsequent usage and Slack changes. Review found that newly added active-run steering also needed the live action ceiling. Node now checks the hydrated actor before forwarding; Python checks the server-stored run kind inside the inbox lock before enqueueing. Named and legacy runs require `agent:execute`; malformed metadata fails closed. Client run-kind claims cannot weaken the check. These checks do not cancel an already-running stream.
+
+Regression tests reproduced the named-agent steering bypass before the fix. Focused Node steering/chat/scoped-request tests passed (81); Python scope/inbox/route tests passed (39), including forged run metadata, legacy state and rejected updates leaving the inbox unchanged. Independent read-only Spec review found no remaining concrete blocker; Standards review requested the matching steering OpenAPI authorization descriptions, which were updated.
+
+Release checks also repaired the OpenAPI validation errors without changing existing operation IDs or SDK export selections, refreshed stale permission-matrix source anchors, and expanded the admin-route inventory for the audited group middleware and literal loop routes. Pinned Spectral 6.17.0 reported zero errors; permission-matrix checks passed (8, with one existing expected failure); the integration guard suite passed (82, with one existing skip).
+
+Other observed GitHub failures are not evidence of a successful check: PostgreSQL store/migration jobs fail during setup; Dependency Review reports unavailable Dependency Graph support; connector oracle checks include five existing Linear synthetic-folder classification failures. The self-hosted core workflows on this draft were queued. No CI gate, coverage threshold or runner access policy was weakened.

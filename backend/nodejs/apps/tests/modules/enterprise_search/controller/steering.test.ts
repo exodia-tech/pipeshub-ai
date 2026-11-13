@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import * as repo from '../../../../src/libs/repositories/conversation';
 import * as utils from '../../../../src/modules/enterprise_search/utils/utils';
 import { AIServiceCommand } from '../../../../src/libs/commands/ai_service/ai.service.command';
-import { steerConversationStream } from '../../../../src/modules/enterprise_search/controller/es_controller';
+import { steerConversationStream, steerConversationStreamInternal } from '../../../../src/modules/enterprise_search/controller/es_controller';
 
 describe('Steering conversation ownership and history', () => {
   afterEach(() => sinon.restore());
@@ -47,6 +47,20 @@ describe('Steering conversation ownership and history', () => {
       'Only the AI project',
     );
     expect(f.next.called).to.equal(false);
+  });
+  it('refuses new named-agent instructions after the registered caller loses execution access', async () => {
+    const f = setup();
+    Object.assign(f.req.params, { agentKey: 'named-agent' });
+    Object.assign(f.req, { resolveFeatureScopes: async () => {
+      Object.assign(f.req.user, { featureScopes: ['conversation:chat'] });
+    } });
+    await steerConversationStreamInternal({ aiBackend: 'http://query.test' } as never, true)(
+      f.req as never, f.res as never, f.next,
+    );
+    expect(f.next.firstCall?.args[0]).to.have.property('statusCode', 403);
+    expect(f.findForTurn.called).to.equal(false);
+    expect(f.forward.called).to.equal(false);
+    expect(f.append.called).to.equal(false);
   });
   it('does not forward or persist when the conversation is unauthorized', async () => {
     const f = setup(true, false, false);

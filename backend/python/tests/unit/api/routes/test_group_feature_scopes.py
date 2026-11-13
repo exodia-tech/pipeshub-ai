@@ -1,4 +1,5 @@
 """Native user-facing scope dependencies apply live group limits, including sessions."""
+import asyncio
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,7 +19,8 @@ def request_action(scopes: list[str] | None, *, token_scopes: list[str] | None =
                    storage_failure: bool = False, admin: bool = False,
                    other_scopes: list[str] | None = None, corrupt: bool = False,
                    agent_id: str | None = None, service: bool = False,
-                   virtual_service_account: bool = False) -> int:
+                   virtual_service_account: bool = False,
+                   steering_named: bool | None = None) -> int:
     app = FastAPI()
     graph = AsyncMock()
     graph.get_graph_user_keys_by_mongo_user_ids.return_value = {"member": "graph-member"}
@@ -51,6 +53,21 @@ def request_action(scopes: list[str] | None, *, token_scopes: list[str] | None =
             await require_agent_execute_for_named_agents(request, agent_id)
         return {"allowed": True}
 
+    if steering_named is not None:
+        from app.agents.agent_loop.cancellation.registry import RunOwner
+        from app.agents.agent_loop.steering import SteeringInbox
+        from app.api.routes.steering import router, steering_inbox_dependency
+        from tests.unit.agents.agent_loop.test_steering import Store
+
+        inbox = SteeringInbox(Store())
+        run = "11111111-1111-4111-8111-111111111111"
+        asyncio.run(inbox.register(run, RunOwner(user_id="member", org_id="org", conversation_id="chat")))
+        state = asyncio.run(inbox.read(run))
+        state["namedAgent"] = steering_named
+        asyncio.run(inbox.write(run, state))
+        app.include_router(router, dependencies=[Depends(authMiddleware)])
+        app.dependency_overrides[steering_inbox_dependency] = lambda: inbox
+
     claims = {"orgId": "org", "userId": "member", "featureScopes": ["agent:execute"]}
     if virtual_service_account:
         claims["isServiceAccount"] = True
@@ -61,6 +78,14 @@ def request_action(scopes: list[str] | None, *, token_scopes: list[str] | None =
         claims["scopes"] = ["conversation:create"]
     token = jwt.encode(claims, SECRET + "-service" if service else SECRET, algorithm="HS256")
     with patch("app.api.middlewares.auth.resolve_request_role", new=AsyncMock(return_value="admin" if admin else "member")), TestClient(app) as client:
+        if steering_named is not None:
+            response = client.post("/chat/steer", headers={"Authorization": f"Bearer {token}"}, json={
+                "runId": run, "conversationId": "chat", "messageId": "message", "text": "New instructions",
+                "namedAgent": False,
+            })
+            if response.status_code == 403:
+                assert asyncio.run(inbox.read(run))["messages"] == []
+            return response.status_code
         return client.get("/execute", headers={"Authorization": f"Bearer {token}"}).status_code
 
 
@@ -115,3 +140,12 @@ async def test_org_only_indexing_tokens_keep_the_native_service_policy() -> None
 
 def test_universal_chat_keeps_its_native_chat_scope() -> None:
     assert request_action(["conversation:chat"], agent_id="agentIdPlaceholder") == 200
+
+
+def test_named_steering_cannot_use_chat_permission_or_a_forged_run_kind() -> None:
+    assert request_action(["conversation:chat"], steering_named=True) == 403
+
+
+@pytest.mark.parametrize("scope", ["conversation:chat", "agent:execute"])
+def test_universal_steering_keeps_both_native_scope_alternatives(scope: str) -> None:
+    assert request_action([scope], token_scopes=[scope], steering_named=False) == 200

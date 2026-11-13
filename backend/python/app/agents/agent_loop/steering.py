@@ -62,17 +62,18 @@ class SteeringInbox:
         ):
             raise RuntimeError("Steering update could not be stored")
 
-    async def register(self, run_id: str, owner: RunOwner) -> None:
+    async def register(self, run_id: str, owner: RunOwner, *, named_agent: bool = True) -> None:
         async with self.locked(run_id):
             if await self.read(run_id):
                 raise ValueError("Run already registered for steering")
             await self.write(
                 run_id,
-                {"owner": owner.model_dump(), "open": True, "next": 0, "messages": []},
+                {"owner": owner.model_dump(), "namedAgent": named_agent, "open": True, "next": 0, "messages": []},
             )
 
     async def submit(
-        self, run_id: str, owner: RunOwner, message_id: str, text: str
+        self, run_id: str, owner: RunOwner, message_id: str, text: str,
+        *, authorize: Callable[[bool], Awaitable[None]] | None = None,
     ) -> str:
         if (
             not text.strip()
@@ -87,6 +88,12 @@ class SteeringInbox:
                 return "finished"
             if not owner.conversation_id or state["owner"] != owner.model_dump():
                 return "forbidden"
+            # Pre-rollout runs have no action metadata; require named-agent permission.
+            named_agent = state.get("namedAgent", True)
+            if not isinstance(named_agent, bool):
+                raise RuntimeError("Invalid steering action metadata")
+            if authorize is not None:
+                await authorize(named_agent)
             if any(m["id"] == message_id for m in state["messages"]):
                 return "duplicate"
             if not state["open"]:
