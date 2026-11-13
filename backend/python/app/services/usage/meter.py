@@ -12,7 +12,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterator
