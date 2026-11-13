@@ -430,14 +430,14 @@ export default function AccessGroupsPage() {
           }}
           key={selected}
         >
-          <Tabs.List>
-            <Tabs.Trigger value="members">
+          <Tabs.List style={{ flexWrap: "wrap", height: "auto" }}>
+            <Tabs.Trigger value="members" style={{ minHeight: 44, paddingInline: "var(--space-2)" }}>
               {t("accessGroups.members")}
             </Tabs.Trigger>
-            <Tabs.Trigger value="access">
+            <Tabs.Trigger value="access" style={{ minHeight: 44, paddingInline: "var(--space-2)" }}>
               {t("groupScopes.content")}
             </Tabs.Trigger>
-            <Tabs.Trigger value="features" aria-label={t("groupScopes.title")}>{t("groupScopes.title")}</Tabs.Trigger>
+            <Tabs.Trigger value="features" style={{ minHeight: 44, paddingInline: "var(--space-2)" }} aria-label={t("groupScopes.title")}>{t("groupScopes.title")}</Tabs.Trigger>
           </Tabs.List>
           <Box pt="4">
             <Tabs.Content value="members">
