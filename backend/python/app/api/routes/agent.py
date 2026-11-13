@@ -33,7 +33,6 @@ from app.agents.openapi.store import ApiToolsetStore
 from app.agents.registry.toolset_registry import ToolsetRegistry
 from app.api.middlewares.auth import connection_limit, require_scopes
 from app.api.middlewares.caller_role import CallerRoleStatus, fetch_caller_role
-from app.api.middlewares.token_policy import is_service_token
 from app.api.routes.chatbot import (
     get_llm_for_chat,
     get_run_cancellation_registry,
