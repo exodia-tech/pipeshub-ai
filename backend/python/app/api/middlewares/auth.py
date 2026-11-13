@@ -25,7 +25,7 @@ from app.api.middlewares.token_policy import (
     token_scopes,
 )
 from app.config.configuration_service import ConfigurationService
-from app.config.constants.service import config_node_constants
+from app.config.constants.service import TokenScopes, config_node_constants
 from app.core.org_context import OrgContext, set_request_context
 from app.utils.logging_fields import log_once
 from app.utils.request_context import get_context as get_request_context
