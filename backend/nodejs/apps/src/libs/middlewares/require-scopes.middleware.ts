@@ -34,7 +34,7 @@ export function effectiveScopes(user: Record<string, unknown>): string[] | undef
  * );
  */
 export function requireScopes(...requiredScopes: OAuthScopeNames[]) {
-  return (
+  return async (
     req: AuthenticatedUserRequest,
     _res: Response,
     next: NextFunction,
@@ -46,6 +46,7 @@ export function requireScopes(...requiredScopes: OAuthScopeNames[]) {
         throw new ForbiddenError('Authentication required');
       }
 
+      if (req.resolveFeatureScopes) await req.resolveFeatureScopes();
       const scopes = effectiveScopes(user);
       const hasScope = scopes === undefined || requiredScopes.some((scope) => scopes.includes(scope));
 

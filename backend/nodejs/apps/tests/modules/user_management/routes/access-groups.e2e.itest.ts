@@ -95,6 +95,7 @@ describe('access groups across authenticated services', function () {
     app.use(requestContextMiddleware);
     app.get('/feature-probe', container.get<AuthMiddleware>('AuthMiddleware').authenticate,
       requireScopes(OAuthScopeNames.AGENT_EXECUTE), (_req, res) => res.json({ allowed: true }));
+    app.get('/identity-probe', container.get<AuthMiddleware>('AuthMiddleware').authenticate, (_req, res) => res.json({ signedIn: true }));
     app.use('/access-groups', createAccessGroupsRouter(container));
     app.use('/audit', createAuditRouter(container));
     app.use(
@@ -612,6 +613,7 @@ describe('access groups across authenticated services', function () {
     app.locals.resolveGroupScopes = groupScopeResolver({ connectorBackend: 'http://127.0.0.1:1', scopedJwtSecret: secret });
     try {
       const memberHeaders = { authorization: `Bearer ${jwt.sign({ userId: member, orgId: org, role: 'member' }, secret)}` };
+      assert.equal((await fetch(`${base}/identity-probe`, { headers: memberHeaders })).status, 200);
       assert.equal((await fetch(`${base}/feature-probe`, { headers: memberHeaders })).status, 503);
       assert.equal((await fetch(`${base}/feature-probe`, { headers: { authorization: `Bearer ${token}` } })).status, 200);
     } finally { app.locals.resolveGroupScopes = original; }

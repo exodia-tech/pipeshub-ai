@@ -4152,18 +4152,11 @@ async def require_agent_execute_for_named_agents(request: Request, agent_id: str
     Node's conversation routes (agent chat mode, `conversation:chat`) run the
     universal agent through these routes with the caller's token, so the route
     admits `conversation:chat` too. A named Agent Builder agent still needs
-    `agent:execute`. Session and service tokens are not scope-restricted here.
+    `agent:execute`. Live group limits also apply to sessions and admitted actor-service tokens.
     """
     if agent_id == UNIVERSAL_AGENT_ID:
         return
-    user = getattr(request.state, "user", None) or {}
-    if is_service_token(user) or not user.get("isOAuth", False):
-        return
-    if OAuthScopes.AGENT_EXECUTE.value not in user.get("oauthScopes", []):
-        raise HTTPException(
-            status_code=403,
-            detail=f"Insufficient scope. Required: {OAuthScopes.AGENT_EXECUTE.value}",
-        )
+    await require_scopes(OAuthScopes.AGENT_EXECUTE, service_scopes=(TokenScopes.CONVERSATION_CREATE,))(request)
 
 
 @router.post(

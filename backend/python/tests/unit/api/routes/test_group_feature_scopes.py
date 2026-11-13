@@ -4,17 +4,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
 import pytest
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 
 from app.api.middlewares.auth import authMiddleware, require_scopes
+from app.config.constants.service import TokenScopes
 
 SECRET = "synthetic-feature-scope-test-secret-32-characters"
 
 
 def request_action(scopes: list[str] | None, *, token_scopes: list[str] | None = None,
                    storage_failure: bool = False, admin: bool = False,
-                   other_scopes: list[str] | None = None, corrupt: bool = False) -> int:
+                   other_scopes: list[str] | None = None, corrupt: bool = False,
+                   agent_id: str | None = None, service: bool = False) -> int:
     app = FastAPI()
     graph = AsyncMock()
     graph.get_graph_user_keys_by_mongo_user_ids.return_value = {"member": "graph-member"}
@@ -39,14 +41,20 @@ def request_action(scopes: list[str] | None, *, token_scopes: list[str] | None =
     config.get_config.return_value = {"jwtSecret": SECRET, "scopedJwtSecret": SECRET + "-service"}
     app.container.config_service.return_value = config
 
-    @app.get("/execute", dependencies=[Depends(authMiddleware), Depends(require_scopes("agent:execute"))])
-    async def execute() -> dict:
+    required = ("agent:execute", "conversation:chat") if agent_id else ("agent:execute",)
+    @app.get("/execute", dependencies=[Depends(authMiddleware), Depends(require_scopes(*required, service_scopes=(TokenScopes.CONVERSATION_CREATE,)))])
+    async def execute(request: Request) -> dict:
+        if agent_id:
+            from app.api.routes.agent import require_agent_execute_for_named_agents
+            await require_agent_execute_for_named_agents(request, agent_id)
         return {"allowed": True}
 
     claims = {"orgId": "org", "userId": "member", "featureScopes": ["agent:execute"]}
     if token_scopes is not None:
         claims.update({"tokenType": "oauth", "scope": " ".join(token_scopes)})
-    token = jwt.encode(claims, SECRET, algorithm="HS256")
+    if service:
+        claims["scopes"] = ["conversation:create"]
+    token = jwt.encode(claims, SECRET + "-service" if service else SECRET, algorithm="HS256")
     with patch("app.api.middlewares.auth.resolve_request_role", new=AsyncMock(return_value="admin" if admin else "member")), TestClient(app) as client:
         return client.get("/execute", headers={"Authorization": f"Bearer {token}"}).status_code
 
@@ -74,3 +82,16 @@ def test_storage_failure_and_malformed_policy_fail_closed() -> None:
 def test_admin_recovery_still_respects_oauth_grant() -> None:
     assert request_action([], storage_failure=True, admin=True) == 200
     assert request_action([], admin=True, token_scopes=["agent:read"]) == 403
+
+
+@pytest.mark.parametrize("service,token", [(False, None), (False, ["agent:execute", "conversation:chat"]), (True, None)])
+def test_named_agents_cannot_use_the_generic_chat_scope(service: bool, token: list[str] | None) -> None:
+    assert request_action(["conversation:chat"], token_scopes=token, agent_id="named-agent", service=service) == 403
+
+
+def test_actor_service_tokens_cannot_bypass_group_limits() -> None:
+    assert request_action([], service=True) == 403
+
+
+def test_universal_chat_keeps_its_native_chat_scope() -> None:
+    assert request_action(["conversation:chat"], agent_id="agentIdPlaceholder") == 200

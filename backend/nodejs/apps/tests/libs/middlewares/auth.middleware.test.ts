@@ -188,6 +188,8 @@ describe('AuthMiddleware', () => {
       const next = createMockNext()
       await authMiddleware.authenticate(req, createMockResponse(), next)
       expect(next.calledOnceWithExactly()).to.be.true
+      expect(req.user.featureScopes).to.equal(undefined)
+      await req.resolveFeatureScopes()
       expect(req.user.featureScopes).to.deep.equal([])
       expect(resolver.calledOnceWithExactly('org1', 'user1')).to.be.true
     })

@@ -11,6 +11,7 @@ import {
   loadProjectForSession,
   resolveProjectLink,
   PROJECT_ID_UNASSIGNED,
+  projectCallerFromRequest,
 } from '../../../../src/modules/enterprise_search/utils/project-context'
 import {
   ConflictError,
@@ -40,6 +41,11 @@ function makeProject(overrides: Record<string, any> = {}): any {
 }
 
 describe('project-context', () => {
+  it('carries the live group ceiling into project-backed conversation checks', () => {
+    const user = { featureScopes: ['conversation:chat'] };
+    const caller = projectCallerFromRequest({ user } as any, {} as any);
+    expect(caller.oauthScopes).to.deep.equal(['conversation:chat']);
+  });
   // The Projects flag is read from the worker's settings store, which an earlier test file in the same
   // worker may have connected (flag off by default). These tests are about project context, so the flag
   // is on unless a test turns it off.

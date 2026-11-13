@@ -6,11 +6,11 @@ import { TokenScopes } from '../enums/token-scopes.enum';
 import { getAllowedScopeNamesForRole } from '../../modules/oauth_provider/config/scopes.config';
 
 /** Live, request-bound policy lookup; a graph outage is never an unrestricted grant. */
-export function groupScopeResolver(config: Pick<AppConfig, 'connectorBackend' | 'scopedJwtSecret'>) {
+export function groupScopeResolver(config: Pick<AppConfig, 'connectorBackend' | 'scopedJwtSecret'>, adminRecovery = true) {
   const names = new Set(getAllowedScopeNamesForRole(false).filter((scope) => scope.includes(':')));
   return async (orgId: string, userId: string): Promise<string[] | null> => {
     try {
-      if (await isUserOrgAdmin(userId, orgId)) return null;
+      if (adminRecovery && await isUserOrgAdmin(userId, orgId)) return null;
       const token = jwt.sign({ orgId, userId, scopes: [TokenScopes.ACCESS_GROUP_MANAGE] }, config.scopedJwtSecret, { expiresIn: '1m' });
       const response = await fetch(`${config.connectorBackend}/api/v1/entity/access-groups/effective-scopes`, {
         headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000),

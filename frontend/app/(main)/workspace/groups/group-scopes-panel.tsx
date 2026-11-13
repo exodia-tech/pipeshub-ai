@@ -52,11 +52,11 @@ export function GroupScopesPanel({ groupId, onDirtyChange, onBusyChange }: {
   return <Flex direction="column" gap="4">
     <Flex align="center" justify="between" gap="3" wrap="wrap">
       <Flex align="center" gap="2">
-        <Switch id={`limit-${groupId}`} checked={value !== null} disabled={!editing || busy}
+        <Switch className="touch-hit" id={`limit-${groupId}`} checked={value !== null} disabled={!editing || busy}
           onCheckedChange={(checked) => setDraft({ ...(draft ?? policy), featureScopes: checked ? scopes.map((scope) => scope.name) : null })} />
         <Text as="label" htmlFor={`limit-${groupId}`} size="2">{t('groupScopes.limit')}</Text>
         <HelpTooltip content={t('groupScopes.help')} open={helpOpen} onOpenChange={setHelpOpen}>
-          <IconButton variant="ghost" color="gray" aria-label={t('groupScopes.about')} onClick={() => setHelpOpen(!helpOpen)}><MaterialIcon name="help_outline" size={18} /></IconButton>
+          <IconButton className="touch-hit" variant="ghost" color="gray" aria-label={t('groupScopes.about')} onClick={() => setHelpOpen(!helpOpen)}><MaterialIcon name="help_outline" size={18} /></IconButton>
         </HelpTooltip>
       </Flex>
       {!editing && <Button variant="soft" onClick={() => { setDraft(policy); setEditing(true); }}>{t('workspace.groups.actions.managePermissions')}</Button>}

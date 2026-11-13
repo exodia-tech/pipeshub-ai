@@ -418,7 +418,8 @@ def require_scopes(
 
     Args:
         *required_scopes: OAuth scopes; an OAuth/PAT token needs at least one (OR logic).
-            Session tokens are not scope-restricted.
+            Session tokens have no token-grant restriction. All user-facing tokens
+            remain subject to live group feature limits.
         service_scopes: Service-token scopes this route admits. Empty (the default)
             rejects every service token with 403.
     """
@@ -428,10 +429,9 @@ def require_scopes(
         user = _authenticated_user(request)
 
         if is_service_token(user):
-            if has_service_scope(user, *admitted_service_scopes):
-                return
-            raise AuthRejected(status.HTTP_403_FORBIDDEN, "This route does not accept service tokens",
-                               reason="service_token_not_allowed")
+            if not has_service_scope(user, *admitted_service_scopes):
+                raise AuthRejected(status.HTTP_403_FORBIDDEN, "This route does not accept service tokens",
+                                   reason="service_token_not_allowed")
 
         limits = None
         if any(":" in scope for scope in required_scopes) and not is_request_admin(request):
@@ -439,7 +439,9 @@ def require_scopes(
 
             try:
                 graph = request.app.state.graph_provider
-                limits = await GroupResourceAccess(graph).feature_scopes_for_user(user["orgId"], user["userId"])
+                if not hasattr(request.state, "group_feature_scopes"):
+                    request.state.group_feature_scopes = await GroupResourceAccess(graph).feature_scopes_for_user(user["orgId"], user["userId"])
+                limits = request.state.group_feature_scopes
             except Exception as exc:
                 raise AuthRejected(status.HTTP_503_SERVICE_UNAVAILABLE, "Feature permissions could not be verified",
                                    reason="feature_permissions_unavailable") from exc

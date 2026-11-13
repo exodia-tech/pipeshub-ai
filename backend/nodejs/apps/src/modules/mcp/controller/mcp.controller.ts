@@ -231,6 +231,7 @@ export const handleMCPRequest = (appConfig: AppConfig) => {
     next: NextFunction,
   ): Promise<void> => {
     try {
+      await req.resolveFeatureScopes?.();
       // Extract the raw Bearer token from the Authorization header for the MCP SDK
       const token = req.headers.authorization?.replace('Bearer ', '') || '';
       const serverURL = `${appConfig.oauthBackendUrl}/api/v1`;

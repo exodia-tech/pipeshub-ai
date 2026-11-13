@@ -5,6 +5,7 @@ import {
 } from '../../../libs/errors/http.errors';
 import { AuthenticatedUserRequest } from '../../../libs/middlewares/types';
 import { OAuthScopeNames } from '../../../libs/enums/oauth-scopes.enum';
+import { effectiveScopes } from '../../../libs/middlewares/require-scopes.middleware';
 import { getConversationRepository } from '../../../libs/repositories/conversation';
 import { isValidId } from '../../../libs/repositories/ids';
 import { getProjectRepository } from '../../../libs/repositories/project';
@@ -30,20 +31,18 @@ export interface ResolvedProjectLink {
 export interface ProjectCaller {
   /** Graph team ids, fetched only when a chat actually involves a project. */
   resolveTeamIds: () => Promise<string[]>;
-  /** The scopes of an OAuth token or PAT; undefined for a session token, which is not scope-limited. */
+  /** The effective token/group scope ceiling; undefined only for an unrestricted session. */
   oauthScopes?: string[];
 }
 
-type TokenFields = { isOAuth?: boolean; oauthScopes?: string[] };
 
 export function projectCallerFromRequest(
   req: AuthenticatedUserRequest,
   appConfig: AppConfig,
 ): ProjectCaller {
-  const user = req.user as TokenFields | undefined;
   return {
     resolveTeamIds: () => resolveCallerTeamIds(req, appConfig),
-    oauthScopes: user?.isOAuth === true ? (user.oauthScopes ?? []) : undefined,
+    oauthScopes: effectiveScopes(req.user ?? {}),
   };
 }
 
