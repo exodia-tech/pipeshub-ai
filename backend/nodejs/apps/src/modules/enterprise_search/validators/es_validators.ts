@@ -1744,3 +1744,10 @@ export const compareChooseParamsSchema = z.object({
     }),
   }),
 });
+
+export const steerRunBodySchema = cancelRunBodySchema.extend({
+  messageId: z.string().min(1).max(100),
+  text: z.string().min(1).max(8000).refine((value) => value.trim().length > 0),
+});
+export const steerConversationStreamParamsSchema = conversationIdParamsSchema.extend({ body: steerRunBodySchema });
+export const steerAgentConversationStreamParamsSchema = agentConversationParamsSchema.extend({ body: steerRunBodySchema });

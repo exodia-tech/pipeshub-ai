@@ -9,6 +9,7 @@ import { initDocStore } from '../../../libs/repositories/doc-store';
 import { usesMongo } from '../../../libs/repositories/store-select';
 import { getFromDatabase, saveToDatabase } from "./utils/conversation";
 import { shouldHandleSlackMessage } from './message-routing';
+import { activeSlackRuns, slackRunKey, SlackActiveRun, trySteerSlackRun } from './active-runs';
 import axios from "axios";
 import { marked } from "marked";
 // Disable marked's email mangling to prevent HTML entity encoding of email addresses.
@@ -342,11 +343,19 @@ async function processSlackMessage(
     { configId: currentBotId },
   );
 
-  const conversation = await getFromDatabase(
+  let conversation = await getFromDatabase(
     threadId,
     currentBotId,
     email,
   );
+  const runKey = slackRunKey(typedMessage, currentBotId, typedContext.teamId);
+  const existingRun = runKey ? activeSlackRuns.get(runKey) : undefined;
+  if (existingRun) {
+    if (await trySteerSlackRun(existingRun, typedMessage, typedClient, accessToken, currentAgentId)) return;
+    await existingRun.done;
+    conversation = await getFromDatabase(threadId, currentBotId, email);
+  }
+  let activeRun: SlackActiveRun | null = null;
   const replyStream = new SlackReplyStream(typedClient.chat, typedMessage.channel, threadId);
   let streamTs: string | null = null;
   let streamStopped = false;
@@ -475,6 +484,11 @@ async function processSlackMessage(
   };
 
   try {
+    if (runKey) {
+      if (activeSlackRuns.has(runKey)) throw new Error('Another reply is starting in this thread. Please try again.');
+      activeRun = new SlackActiveRun(typedMessage.ts, conversation);
+      activeSlackRuns.set(runKey, activeRun);
+    }
     const streamRecipientPayload: Record<string, unknown> = {};
     streamRecipientPayload.recipient_user_id = typedMessage.user;
     if (typedContext.teamId) {
@@ -549,6 +563,7 @@ async function processSlackMessage(
       url,
       {
         query,
+        ...(activeRun ? { runId: activeRun.runId } : {}),
         chatMode: currentAgentId? "quick" : "agent",
         currentTime: new Date().toISOString(),
         ...(userTimezone ? { timezone: userTimezone } : {}),
@@ -881,6 +896,7 @@ async function processSlackMessage(
     };
 
     const aguiHandler = createSlackAGUIEventHandler({
+      onRunStarted: (runId) => activeRun?.runStarted(runId),
       onStatus: (message) => {
         activityBuilder.setStatus(message);
         scheduleActivityUpdate();
@@ -937,6 +953,7 @@ async function processSlackMessage(
       onAskUserQuestion: handleAskUserQuestion,
       onArtifact: handleArtifact,
       onConversationCreated: (conversationId) => {
+        activeRun?.conversationCreated(conversationId);
         conversationPersistPromise = persistConversationId(conversationId);
       },
       onComplete: (conv) => {
@@ -1351,7 +1368,14 @@ async function processSlackMessage(
       console.error("Error in Slack message error handler:", handlerError);
     }
   } finally {
-    await nativeStatus.clear();
+    try {
+      await nativeStatus.clear();
+    } finally {
+      if (activeRun && runKey) {
+        if (activeSlackRuns.get(runKey) === activeRun) activeSlackRuns.delete(runKey);
+        activeRun.finish();
+      }
+    }
   }
 }
 

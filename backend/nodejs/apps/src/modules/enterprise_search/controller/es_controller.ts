@@ -9070,3 +9070,36 @@ export const listAllAgentsArchivedConversationsGrouped =
       next(error);
     }
   };
+
+
+export const steerConversationStream = (appConfig: AppConfig, agent = false) =>
+  async (req: AuthenticatedUserRequest, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, agentKey } = req.params;
+      const { runId, text, messageId } = req.body;
+      const conversation = await convRepo().findForTurn(
+        agent ? agentScope(agentKey) : CHAT_SCOPE,
+        conversationId as string, actorOf(req.user?.orgId, req.user?.userId),
+      );
+      if (!conversation) throw new NotFoundError('Conversation not found or unauthorized');
+      const result = await new AIServiceCommand({
+        uri: `${appConfig.aiBackend}/api/v1/chat/steer`, method: HttpMethod.POST,
+        headers: { ...(req.headers as Record<string, string>), 'Content-Type': 'application/json' },
+        body: { runId, conversationId, text, messageId },
+      }).execute();
+      if (!result || result.statusCode !== 200) throw handleBackendError(result, 'Steer conversation');
+      const delivery = result.data as { queued?: boolean; duplicate?: boolean };
+      if (delivery.queued && !delivery.duplicate) {
+        await appendMessages(conversation._id, conversation.orgId, [buildUserQueryMessage(text)]);
+      }
+      res.status(200).json(delivery);
+    } catch (error) { next(error); }
+  };
+
+export const steerConversationStreamInternal = (appConfig: AppConfig, agent = false, keyValueStoreService?: KeyValueStoreService) =>
+  async (req: AuthenticatedServiceRequest, res: Response, next: NextFunction) => {
+    try {
+      await hydrateScopedRequestAsUser(req, appConfig, keyValueStoreService);
+      await steerConversationStream(appConfig, agent)(req, res, next);
+    } catch (error) { next(error); }
+  };
