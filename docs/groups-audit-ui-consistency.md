@@ -10,7 +10,29 @@ Group names and membership edits are staged until **Save edits**. Cancel restore
 
 The shared people picker now supports keyboard opening, arrow navigation, selection, and Escape with focus restoration. Escape dismisses the picker before the containing drawer. This correction applies to its existing Users, Teams and Groups callers. `AGENTS.md` now names the shared controls and requires a comparison with the reference screen before finishing workspace UI work.
 
-## Verification
+## Metadata and member-layout follow-up
+
+Groups now show Description, Created by and Created on alongside their name, using the same table labels, creator avatars and date formatter as Teams. Missing historical metadata displays an em dash; no creator or creation date is invented. The detail drawer includes these fields too.
+
+Both Teams and Groups use `EntityMemberRow` (avatar sizing, identity, spacing, removal opacity and action alignment) and `EntityDescriptionInput` (label association, typography, border and focus treatment). Groups retain their access-policy tab and do not acquire Teams roles. Add-users controls occupy their own section, as in Teams.
+
+Descriptions persist through the existing administrator-only create/update APIs and graph provider. They are limited to 2,000 characters at both gateways. Omitting a description preserves it; an empty string clears it. Creator lookup uses one bounded batch per group page and only returns users belonging to the requested organization. The authenticated actor remains the creator. Existing audit events and authorization guards are retained. OpenAPI documents the new fields.
+
+Follow-up candidate `7c5ab1bd6`: **58 UI tests / 17 files**, **39 service-backed security tests**, the Python gateway authorization test, production build/type validation and locale parity/key checks passed. A real `TeamDetailSidebar` test preserves team roles and verifies cancellation of member/description drafts. API checks cover description persistence, clearing, omitted-field compatibility, length validation, unchanged creation metadata and rejection of a foreign-organization identity.
+
+The metadata UI/API tests first failed because the fields were absent. Review also caught a cancelled creation description surviving into a fresh draft; the cancel/reopen test failed before the reset was added and passed afterward. Both review axes have zero remaining actionable findings.
+
+In the real local UI, a synthetic group's description was saved and survived reload. At 390px, staged description/member removal was cancelled without changing saved values. Table columns and the member drawer were inspected at desktop width; mobile document width was 390px with no horizontal overflow. Normal desktop sizing was restored. These checks use synthetic data, not live company sources.
+
+![Group table with stored creator and creation date](images/workspace-consistency/groups-table-metadata.jpg)
+
+![Shared member layout and group metadata](images/workspace-consistency/groups-members-metadata.jpg)
+
+![Group details at phone width](images/workspace-consistency/groups-mobile-metadata.jpg)
+
+## Earlier pagination candidate verification
+
+The following full-suite result applies to code candidate `952a0f743`, before the metadata follow-up above. The full 5,330-test suite was not repeated for that follow-up; its focused checks are listed separately.
 
 - Final Linux frontend coverage run: **5,330 passed / 520 files**; no failed or skipped tests. Coverage: statements **61.72%**, branches **56.74%**, functions **57.51%**, lines **63.15%**; existing thresholds unchanged.
 - Final production build, frontend type validation, and locale parity/key checks passed. Both added strings are present in all 11 supported locales.
@@ -44,4 +66,4 @@ All names, email addresses, groups and events below are synthetic local fixtures
 
 ## Boundaries
 
-This change contains frontend controls and agent guidance. It does not change backend authorization, source ACLs, audit storage or retention, or deploy the pending upstream merge. Local verification does not establish live-provider behavior, a new production rollout, full Python type cleanliness or backup/restore readiness.
+This change contains frontend controls, agent guidance and group-description/metadata API support. It does not change backend authorization, source ACLs, audit storage or retention, or deploy the pending upstream merge. Local verification does not establish live-provider behavior, a new production rollout, full Python type cleanliness or backup/restore readiness. Existing membership saves remain sequential, not atomic.
