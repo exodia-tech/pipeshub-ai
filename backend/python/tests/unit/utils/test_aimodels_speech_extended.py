@@ -15,7 +15,7 @@ import builtins
 import struct
 import sys
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -41,6 +41,10 @@ from app.utils.aimodels import (
     get_stt_model,
     get_tts_model,
 )
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -1161,8 +1165,13 @@ class TestOpenAISTTExtended:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", ["speech_to_text", "text_to_speech"])
-async def test_gemini_speech_factory_records_model_and_reported_usage(tmp_path, monkeypatch, kind):
-    from app.services.model_identity.call_context import ModelCallContext, bind_call_context
+async def test_gemini_speech_factory_records_model_and_reported_usage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    from app.services.model_identity.call_context import (
+        ModelCallContext,
+        bind_call_context,
+    )
     from app.services.model_identity.principal import user_principal
     from app.services.model_identity.workload import Workload
     from app.services.usage.ledger import UsageLedger

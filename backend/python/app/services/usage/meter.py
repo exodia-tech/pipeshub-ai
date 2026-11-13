@@ -12,7 +12,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterator
@@ -591,7 +591,15 @@ def collect_speech_usage(raw: dict | None) -> None:
         target.append(raw)
 
 
-def metered_speech(adapter: Any, kind: str) -> Any:
+class _SpeechAdapter(Protocol):
+    provider: str
+    model: str
+
+
+_SpeechAdapterT = TypeVar("_SpeechAdapterT", bound=_SpeechAdapter)
+
+
+def metered_speech(adapter: _SpeechAdapterT, kind: str) -> _SpeechAdapterT:
     """Measure the adapter operation, including providers without an HTTP hook."""
     if not enabled():
         return adapter
@@ -601,7 +609,7 @@ def metered_speech(adapter: Any, kind: str) -> Any:
     operation = getattr(adapter, method)
 
     @wraps(operation)
-    async def measure(*args: Any, **kwargs: Any) -> Any:
+    async def measure(*args: object, **kwargs: object) -> object:
         started, identity, readings = time.monotonic(), call_identity(), []
         token = _speech_usage.set(readings)
         status = "failed"
