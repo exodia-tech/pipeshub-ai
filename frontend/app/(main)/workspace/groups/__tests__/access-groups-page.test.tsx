@@ -2,6 +2,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -13,7 +14,7 @@ import AccessGroupsPage from "../access-groups-page";
 import { AccessGroupsApi } from "../access-api";
 import { UsersApi } from "../../users/api";
 
-const state = vi.hoisted(() => ({ admin: true }));
+const state = vi.hoisted(() => ({ admin: true, sessionActive: true }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -24,7 +25,7 @@ vi.mock("@/lib/store/user-store", () => ({
 }));
 vi.mock("@/lib/api/session-cache", () => ({
   onSessionEnd: () => () => {},
-  captureSession: () => () => true,
+  captureSession: () => () => state.sessionActive,
 }));
 vi.mock("../access-api", () => ({
   AccessGroupsApi: {
@@ -34,8 +35,22 @@ vi.mock("../access-api", () => ({
     changeMembers: vi.fn(),
     rename: vi.fn(),
     delete: vi.fn(),
-    policy: vi.fn(async()=>({defaultAllow:true,rules:[]})),
-    resources: vi.fn(async()=>({nodes:[{ref:"apps/slack",name:"Slack",kind:"connector",allowed:true,navigable:true,explicit:null,readableMembers:1}],memberCount:1,hasMore:false})),
+    policy: vi.fn(async () => ({ defaultAllow: true, rules: [] })),
+    resources: vi.fn(async () => ({
+      nodes: [
+        {
+          ref: "apps/slack",
+          name: "Slack",
+          kind: "connector",
+          allowed: true,
+          navigable: true,
+          explicit: null,
+          readableMembers: 1,
+        },
+      ],
+      memberCount: 1,
+      hasMore: false,
+    })),
     savePolicy: vi.fn(),
   },
 }));
@@ -58,6 +73,7 @@ describe("access groups", () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
     state.admin = true;
+    state.sessionActive = true;
     vi.mocked(AccessGroupsApi.list).mockResolvedValue([
       { _key: "g1", name: "Finance" },
     ]);
@@ -74,12 +90,49 @@ describe("access groups", () => {
     show();
     expect(AccessGroupsApi.list).not.toHaveBeenCalled();
   });
+  it("opens a read-only access group and cancels name edits without saving", async () => {
+    show();
+    fireEvent.click(await screen.findByText("Finance"));
+    expect(screen.getByLabelText("accessGroups.name")).toHaveProperty(
+      "readOnly",
+      true,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+      ).toHaveProperty("disabled", false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
+    fireEvent.change(screen.getByLabelText("accessGroups.name"), {
+      target: { value: "Draft name" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "common.cancel" }));
+    expect(screen.getByLabelText("accessGroups.name")).toHaveProperty(
+      "value",
+      "Finance",
+    );
+    expect(AccessGroupsApi.rename).not.toHaveBeenCalled();
+  });
   it("shows the members of the selected group and removes one", async () => {
     show();
     fireEvent.click(await screen.findByText("Finance"));
     expect(await screen.findByText("Ada")).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+      ).toHaveProperty("disabled", false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "accessGroups.remove" }),
+    );
+    expect(AccessGroupsApi.changeMembers).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
     );
     await waitFor(() =>
       expect(AccessGroupsApi.changeMembers).toHaveBeenCalledWith(
@@ -92,12 +145,14 @@ describe("access groups", () => {
   it("creates a group using its entered name", async () => {
     vi.mocked(AccessGroupsApi.create).mockResolvedValue("new-group");
     show();
-    fireEvent.click(screen.getByRole("button", { name: "accessGroups.create" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "accessGroups.create" }),
+    );
     fireEvent.change(screen.getByLabelText("accessGroups.name"), {
       target: { value: "Research" },
     });
     fireEvent.click(
-      screen.getAllByRole("button", { name: "accessGroups.create" }).at(-1)! ,
+      screen.getAllByRole("button", { name: "accessGroups.create" }).at(-1)!,
     );
     await waitFor(() =>
       expect(AccessGroupsApi.create).toHaveBeenCalledWith("Research"),
@@ -120,9 +175,28 @@ describe("access groups", () => {
     });
     show();
     fireEvent.click(await screen.findByText("Finance"));
-    fireEvent.click(await screen.findByText("workspace.teams.edit.addUsersLabel"));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+      ).toHaveProperty("disabled", false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
+    fireEvent.click(
+      await screen.findByText("workspace.groups.edit.addUsersPlaceholder"),
+    );
     fireEvent.click(await screen.findByText("Nina"));
-    fireEvent.click(screen.getByRole("button", { name: "accessGroups.add" }));
+    fireEvent.keyDown(
+      screen.getByRole("textbox", {
+        name: "workspace.groups.edit.addUsersPlaceholder",
+      }),
+      { key: "Escape" },
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+    );
     await waitFor(() =>
       expect(AccessGroupsApi.changeMembers).toHaveBeenCalledWith("g1", "add", [
         "mongo-id",
@@ -132,28 +206,187 @@ describe("access groups", () => {
   it("renames a selected group and confirms deletion", async () => {
     show();
     fireEvent.click(await screen.findByText("Finance"));
-    fireEvent.change(screen.getByLabelText("accessGroups.name"), { target: { value: "New name" } });
-    fireEvent.click(screen.getByRole("button", { name: "accessGroups.rename" }));
-    await waitFor(() => expect(AccessGroupsApi.rename).toHaveBeenCalledWith("g1", "New name"));
-    await waitFor(() => expect(screen.getByRole("button", { name: "accessGroups.delete" })).not.toHaveProperty("disabled", true));
-    fireEvent.click(screen.getByRole("button", { name: "accessGroups.delete" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+      ).toHaveProperty("disabled", false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
+    fireEvent.change(screen.getByLabelText("accessGroups.name"), {
+      target: { value: "New name" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+    );
+    await waitFor(() =>
+      expect(AccessGroupsApi.rename).toHaveBeenCalledWith("g1", "New name"),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "accessGroups.delete" }),
+      ).not.toHaveProperty("disabled", true),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "accessGroups.delete" }),
+    );
     expect(AccessGroupsApi.delete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("alertdialog").querySelector('button:last-child')!);
-    await waitFor(() => expect(AccessGroupsApi.delete).toHaveBeenCalledWith("g1"));
+    fireEvent.click(
+      screen.getByRole("alertdialog").querySelector("button:last-child")!,
+    );
+    await waitFor(() =>
+      expect(AccessGroupsApi.delete).toHaveBeenCalledWith("g1"),
+    );
   });
-  it("keeps unsaved access rules until the admin explicitly discards them",async()=>{
+  it("uses the shared pager and probes for another page without inventing a total", async () => {
+    const groups = Array.from({ length: 101 }, (_, index) => ({
+      _key: `g${index}`,
+      name: `Group ${index + 1}`,
+    }));
+    vi.mocked(AccessGroupsApi.list).mockImplementation(
+      async (skip = 0, limit = 100) => groups.slice(skip, skip + limit),
+    );
+    show();
+    await screen.findByText("Group 1");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "workspace.pagination.next" }),
+      ).toHaveProperty("disabled", false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.next" }),
+    );
+    await screen.findByText("Group 101");
+    expect(AccessGroupsApi.list).toHaveBeenCalledWith(100, 100);
+    expect(
+      screen.getByRole("button", { name: "workspace.pagination.next" }),
+    ).toHaveProperty("disabled", true);
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.previous" }),
+    );
+    await screen.findByText("Group 1");
+    expect(AccessGroupsApi.list).toHaveBeenCalledWith(0, 100);
+  });
+
+  it("does not replay a confirmed removal when a later addition fails", async () => {
+    vi.mocked(UsersApi.fetchMergedUsers).mockResolvedValue({
+      users: [
+        {
+          id: "u2",
+          userId: "u2",
+          name: "Nina",
+          email: "nina@example.invalid",
+          isActive: true,
+          hasLoggedIn: true,
+          profilePicture: null,
+        },
+      ],
+      totalCount: 1,
+    });
+    vi.mocked(AccessGroupsApi.changeMembers).mockImplementation(
+      async (_group, operation) => {
+        if (operation === "remove")
+          vi.mocked(AccessGroupsApi.members).mockResolvedValue([]);
+        else throw new Error("Fixture addition failure");
+      },
+    );
     show();
     fireEvent.click(await screen.findByText("Finance"));
-    fireEvent.mouseDown(screen.getByRole("tab",{name:/workspace.groups.detail.accessPermissions/}),{button:0,ctrlKey:false});
+    await screen.findByText("Ada");
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "accessGroups.remove" }),
+    );
+    fireEvent.click(
+      screen.getByText("workspace.groups.edit.addUsersPlaceholder"),
+    );
+    fireEvent.click(await screen.findByText("Nina"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+    );
+    await screen.findAllByText("accessGroups.error");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+      ).toHaveProperty("disabled", false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+    );
+    await waitFor(() =>
+      expect(AccessGroupsApi.changeMembers).toHaveBeenCalledTimes(3),
+    );
+    expect(
+      vi
+        .mocked(AccessGroupsApi.changeMembers)
+        .mock.calls.map((call) => call[1]),
+    ).toEqual(["remove", "add", "add"]);
+  });
+  it("stops the remaining save operations when the session ends", async () => {
+    let finish: () => void = () => {};
+    vi.mocked(AccessGroupsApi.rename).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    show();
+    fireEvent.click(await screen.findByText("Finance"));
+    await screen.findByText("Ada");
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
+    fireEvent.change(screen.getByLabelText("accessGroups.name"), {
+      target: { value: "Renamed" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "accessGroups.remove" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+    );
+    await waitFor(() => expect(AccessGroupsApi.rename).toHaveBeenCalled());
+    state.sessionActive = false;
+    await act(async () => {
+      finish();
+    });
+    expect(AccessGroupsApi.changeMembers).not.toHaveBeenCalled();
+  });
+
+  it("keeps unsaved access rules until the admin explicitly discards them", async () => {
+    show();
+    fireEvent.click(await screen.findByText("Finance"));
+    fireEvent.mouseDown(
+      screen.getByRole("tab", {
+        name: /workspace.groups.detail.accessPermissions/,
+      }),
+      { button: 0, ctrlKey: false },
+    );
     fireEvent.click(await screen.findByRole("switch"));
-    fireEvent.click(await screen.findByRole("checkbox",{name:"groupAccess.allow Slack"}));
-    fireEvent.click(screen.getByRole("button",{name:"common.close"}));
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "groupAccess.allow Slack" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "common.close" }));
     expect(await screen.findByRole("alertdialog")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button",{name:"workspace.profile.discardCancel"}));
-    expect(screen.getByRole("button",{name:"workspace.groups.permissions.save"})).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.profile.discardCancel" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "workspace.groups.permissions.save" }),
+    ).toBeTruthy();
     expect(AccessGroupsApi.savePolicy).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button",{name:"common.close"}));
-    fireEvent.click(await screen.findByRole("button",{name:"workspace.profile.discardConfirm"}));
-    await waitFor(()=>expect(screen.queryByRole("switch")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "common.close" }));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "workspace.profile.discardConfirm",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("switch")).toBeNull());
   });
 });

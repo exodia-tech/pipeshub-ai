@@ -2286,6 +2286,7 @@
     "pagination": {
       "showing_one": "Showing {{from}}-{{to}} of {{count}} item",
       "showing_other": "Showing {{from}}-{{to}} of {{count}} items",
+      "showingRange": "Showing {{from}}-{{to}}",
       "previous": "Previous",
       "next": "Next"
     },
@@ -6055,6 +6056,7 @@
     "countsHint": "Reader counts reflect saved rules, source permissions and other group restrictions. — means unverified."
   },
   "accessGroups": {
+    "helpTitle": "About access groups",
     "title": "Access groups",
     "adminOnly": "Only administrators can manage access groups.",
     "help": "Add members, then control their connector, channel and folder access in Access permissions. Collection sharing still applies.",

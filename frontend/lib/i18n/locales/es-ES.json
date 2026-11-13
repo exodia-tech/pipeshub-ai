@@ -2323,6 +2323,7 @@
       "showing_one": "Mostrando {{from}}-{{to}} de {{count}} elemento",
       "showing_many": "Mostrando {{from}}-{{to}} de {{count}} de elementos",
       "showing_other": "Mostrando {{from}}-{{to}} de {{count}} elementos",
+      "showingRange": "Mostrando {{from}}-{{to}}",
       "previous": "Anterior",
       "next": "Siguiente"
     },
@@ -6130,6 +6131,7 @@
     "countsHint": "El número de lectores refleja las reglas guardadas, los permisos de origen y las restricciones de otros grupos. — significa sin verificar."
   },
   "accessGroups": {
+    "helpTitle": "Acerca de los grupos de acceso",
     "title": "Grupos de acceso",
     "adminOnly": "Solo los administradores pueden gestionar grupos de acceso.",
     "help": "Añade miembros y controla su acceso a conectores, canales y carpetas en Permisos de acceso. Se siguen aplicando los permisos de las colecciones.",

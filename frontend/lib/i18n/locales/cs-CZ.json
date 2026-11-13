@@ -2549,6 +2549,7 @@
       "showing_few": "Zobrazeno {{from}}-{{to}} z {{count}} položek",
       "showing_many": "Zobrazeno {{from}}-{{to}} z {{count}} položky",
       "showing_other": "Zobrazeno {{from}}-{{to}} z {{count}} položek",
+      "showingRange": "Zobrazeno {{from}}–{{to}}",
       "previous": "Předchozí",
       "next": "Další"
     },
@@ -6205,6 +6206,7 @@
     "countsHint": "Počty čtenářů zohledňují uložená pravidla, oprávnění zdroje a omezení ostatních skupin. — znamená neověřeno."
   },
   "accessGroups": {
+    "helpTitle": "O přístupových skupinách",
     "title": "Přístupové skupiny",
     "adminOnly": "Přístupové skupiny mohou spravovat pouze správci.",
     "help": "Přidejte členy a spravujte jejich přístup ke konektorům, kanálům a složkám v Oprávnění přístupu. Sdílení kolekcí platí i nadále.",

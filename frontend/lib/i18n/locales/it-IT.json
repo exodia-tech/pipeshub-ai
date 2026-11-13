@@ -2499,6 +2499,7 @@
     "pagination": {
       "showing_one": "Visualizzazione di {{from}}-{{to}} su {{count}} elemento",
       "showing_other": "Visualizzazione di {{from}}-{{to}} su {{count}} elementi",
+      "showingRange": "Risultati {{from}}-{{to}}",
       "previous": "Precedente",
       "next": "Avanti",
       "showing_many": "Visualizzazione di {{from}}-{{to}} su {{count}} elementi"
@@ -6115,6 +6116,7 @@
     "countsHint": "Il numero di lettori riflette le regole salvate, i permessi della fonte e le restrizioni degli altri gruppi. — indica dati non verificati."
   },
   "accessGroups": {
+    "helpTitle": "Informazioni sui gruppi di accesso",
     "title": "Gruppi di accesso",
     "adminOnly": "Solo gli amministratori possono gestire i gruppi di accesso.",
     "help": "Aggiungi membri e controlla il loro accesso a connettori, canali e cartelle in Permessi di accesso. Restano valide le condivisioni delle raccolte.",

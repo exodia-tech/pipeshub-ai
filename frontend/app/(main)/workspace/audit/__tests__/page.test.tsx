@@ -15,9 +15,10 @@ import { auditApi } from "../api";
 
 const state = vi.hoisted(() => ({ admin: false, sessionActive: true }));
 vi.mock("react-i18next", async (importOriginal) => ({
-  ...await importOriginal<typeof import("react-i18next")>(),
+  ...(await importOriginal<typeof import("react-i18next")>()),
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, options?: { value?: number }) =>
+      key === "common.pagination.perPage" ? `${options?.value} per page` : key,
     i18n: { language: "en-US" },
   }),
 }));
@@ -32,8 +33,15 @@ vi.mock("@/lib/api/session-cache", () => ({
   captureSession: () => () => state.sessionActive,
 }));
 vi.mock("../api", () => ({ auditApi: { list: vi.fn() } }));
-vi.mock("../../groups/access-api", () => ({AccessGroupsApi:{list:vi.fn(async()=>[])}}));
-vi.mock("../../users/api", () => ({UsersApi:{getUsersByIds:vi.fn(async()=>[]),fetchMergedUsers:vi.fn(async()=>({users:[],totalCount:0}))}}));
+vi.mock("../../groups/access-api", () => ({
+  AccessGroupsApi: { list: vi.fn(async () => []) },
+}));
+vi.mock("../../users/api", () => ({
+  UsersApi: {
+    getUsersByIds: vi.fn(async () => []),
+    fetchMergedUsers: vi.fn(async () => ({ users: [], totalCount: 0 })),
+  },
+}));
 
 const showPage = () =>
   render(
@@ -46,14 +54,25 @@ const showPage = () =>
 
 describe("audit history", () => {
   beforeEach(() => {
-    vi.stubGlobal("ResizeObserver",class {observe(){} unobserve(){} disconnect(){}});
-    vi.useFakeTimers({toFake:["Date"]});
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-08T12:00:00Z"));
     state.admin = false;
     state.sessionActive = true;
     vi.mocked(auditApi.list).mockReset();
   });
-  afterEach(() => {cleanup();vi.useRealTimers();vi.unstubAllGlobals();});
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it("does not request audit history for a non-admin", () => {
     showPage();
@@ -92,7 +111,9 @@ describe("audit history", () => {
     fireEvent.click(screen.getByText("actor-a"));
     expect(await screen.findByText("member-a")).toBeTruthy();
     expect(screen.getByText("op")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "audit.next" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.next" }),
+    );
     await waitFor(() =>
       expect(auditApi.list).toHaveBeenLastCalledWith(
         expect.objectContaining({ cursor: "next-page" }),
@@ -100,16 +121,89 @@ describe("audit history", () => {
     );
   });
 
+  it("resets cursor history when page size changes without changing the active filters", async () => {
+    state.admin = true;
+    vi.mocked(auditApi.list).mockResolvedValue({
+      events: [
+        {
+          id: "paging",
+          operation_id: "op",
+          actor_id: "actor-a",
+          action: "audit.read",
+          outcome: "success",
+          group_ids: [],
+          member_ids: [],
+          recorded_at: "2026-11-08T12:00:00Z",
+        },
+      ],
+      next_cursor: "next-page",
+    });
+    showPage();
+    await screen.findByText("actor-a");
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.next" }),
+    );
+    await waitFor(() =>
+      expect(auditApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursor: "next-page", limit: "50" }),
+      ),
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: "50 per page" }), {
+      key: "Enter",
+    });
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "10 per page" }),
+    );
+    await waitFor(() =>
+      expect(auditApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ limit: "10" }),
+      ),
+    );
+    expect(vi.mocked(auditApi.list).mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      "cursor",
+    );
+    expect(
+      screen.getByRole("button", { name: "workspace.pagination.previous" }),
+    ).toHaveProperty("disabled", true);
+  });
+
   it("shows agent and tool correlation in the existing event details", async () => {
     state.admin = true;
-    vi.mocked(auditApi.list).mockResolvedValue({ events: [{
-      id: "agent-event", operation_id: "event-1", actor_id: "actor-a", action: "agent.tool", outcome: "failed",
-      group_ids: [], member_ids: [], recorded_at: "2026-11-08T12:00:00.000Z",
-      agent_event: { agent_id: "agent-1", run_id: "run-1", trace_id: "trace-1", parent_run_id: "parent-1", tool_name: "mcp_drive_read", tool_call_id: "call-1", model: "fixture-model" },
-    }], next_cursor: null });
+    vi.mocked(auditApi.list).mockResolvedValue({
+      events: [
+        {
+          id: "agent-event",
+          operation_id: "event-1",
+          actor_id: "actor-a",
+          action: "agent.tool",
+          outcome: "failed",
+          group_ids: [],
+          member_ids: [],
+          recorded_at: "2026-11-08T12:00:00.000Z",
+          agent_event: {
+            agent_id: "agent-1",
+            run_id: "run-1",
+            trace_id: "trace-1",
+            parent_run_id: "parent-1",
+            tool_name: "mcp_drive_read",
+            tool_call_id: "call-1",
+            model: "fixture-model",
+          },
+        },
+      ],
+      next_cursor: null,
+    });
     showPage();
     fireEvent.click(await screen.findByText("actor-a"));
-    for (const value of ["agent-1", "run-1", "trace-1", "parent-1", "mcp_drive_read", "call-1", "fixture-model"])
+    for (const value of [
+      "agent-1",
+      "run-1",
+      "trace-1",
+      "parent-1",
+      "mcp_drive_read",
+      "call-1",
+      "fixture-model",
+    ])
       expect(await screen.findByText(value)).toBeTruthy();
   });
   it("filters the selected UTC day as an inclusive start and exclusive end", async () => {
@@ -120,13 +214,25 @@ describe("audit history", () => {
     });
     showPage();
     await screen.findByText("audit.empty");
-    fireEvent.click(screen.getByRole("button",{name:"audit.from",exact:true}));
-    fireEvent.click(await screen.findByRole("button",{name:"Sunday, November 8, 2026"}));
-    fireEvent.click(screen.getByRole("button",{name:"datePicker.apply"}));
-    await waitFor(()=>expect(screen.queryByRole("button",{name:"datePicker.apply"})).toBeNull());
-    fireEvent.click(screen.getByRole("button",{name:"audit.to",exact:true}));
-    fireEvent.click(await screen.findByRole("button",{name:"Sunday, November 8, 2026"}));
-    fireEvent.click(screen.getByRole("button",{name:"datePicker.apply"}));
+    fireEvent.click(
+      screen.getByRole("button", { name: "audit.from", exact: true }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Sunday, November 8, 2026" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "datePicker.apply" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "datePicker.apply" }),
+      ).toBeNull(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "audit.to", exact: true }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Sunday, November 8, 2026" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "datePicker.apply" }));
     await waitFor(() =>
       expect(auditApi.list).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -135,17 +241,32 @@ describe("audit history", () => {
         }),
       ),
     );
-    fireEvent.click(screen.getByRole("button",{name:"common.clear audit.from"}));
-    await waitFor(()=>expect(auditApi.list).toHaveBeenLastCalledWith(expect.not.objectContaining({from:expect.anything()})));
+    fireEvent.click(
+      screen.getByRole("button", { name: "common.clear audit.from" }),
+    );
+    await waitFor(() =>
+      expect(auditApi.list).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ from: expect.anything() }),
+      ),
+    );
   });
-  it("keeps coverage behind a focusable help icon instead of a disclosure",async()=>{
-    state.admin=true;
-    vi.mocked(auditApi.list).mockResolvedValue({events:[],next_cursor:null});
+  it("keeps coverage behind a focusable help icon instead of a disclosure", async () => {
+    state.admin = true;
+    vi.mocked(auditApi.list).mockResolvedValue({
+      events: [],
+      next_cursor: null,
+    });
     showPage();
     await screen.findByText("audit.empty");
-    expect(screen.getByRole("button",{name:"audit.coverageTitle"})).toBeTruthy();
-    fireEvent.click(screen.getByRole("button",{name:"audit.coverageTitle"}));
-    expect((await screen.findByRole("tooltip")).textContent).toContain("audit.loginWarning");
+    expect(
+      screen.getByRole("button", { name: "audit.coverageTitle" }),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "audit.coverageTitle" }),
+    );
+    expect((await screen.findByRole("tooltip")).textContent).toContain(
+      "audit.loginWarning",
+    );
     expect(document.querySelector("details")).toBeNull();
     expect(document.querySelector('input[type="date"]')).toBeNull();
   });

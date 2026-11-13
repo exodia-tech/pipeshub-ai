@@ -2433,6 +2433,7 @@
     },
     "pagination": {
       "showing_other": "顯示第 {{from}}-{{to}} 項，共 {{count}} 項",
+      "showingRange": "顯示 {{from}}-{{to}}",
       "previous": "上一頁",
       "next": "下一頁"
     },
@@ -6020,6 +6021,7 @@
     "countsHint": "可讀人數反映已儲存的規則、來源系統權限及其他群組限制。— 表示未驗證。"
   },
   "accessGroups": {
+    "helpTitle": "關於存取群組",
     "title": "存取群組",
     "adminOnly": "只有管理員可以管理存取群組。",
     "help": "新增成員後，在存取權限中管理其連接器、頻道及資料夾存取權限。集合共用權限仍然適用。",

@@ -96,11 +96,13 @@ Style: [.gemini/styleguide.md](./.gemini/styleguide.md) (Ruff, PEP 8, ESLint, no
 When changing a screen, read [frontend/CLAUDE.md](./frontend/CLAUDE.md) and inspect the closest existing product screen before designing it.
 
 - Reuse shared frontend components first: page headers, tables, drawers, people selectors, date pickers, filters and help tooltips. Search the codebase before adding a dependency or a new component. If a shared component needs a fix, improve it for its callers.
+- For workspace management screens, start from Users or Teams and reuse `frontend/app/(main)/workspace/components/`: `EntityPageHeader`, `EntityDataTable`, `EntityPagination`, `WorkspaceRightPanel`, `FormField` and the member selectors/lists. Keep feature terminology and permissions distinct. Extend the shared pagination for cursor APIs without inventing totals.
 - Match the product's typography, spacing, corner radii, colors and interaction patterns. Use theme tokens and the existing icon wrapper. New features must look like part of the same application, including their detail panels.
 - Keep filter controls aligned at the same height. Put labels inside toolbar triggers; avoid labels above individual controls that push them below their neighbours. Use the shared calendar instead of browser-default date inputs in filter bars, and retain the date/timezone semantics.
 - Put secondary explanations behind a labelled question-mark help button with hover, keyboard-focus and touch access. Keep errors and decisions that need action visible. Do not use an expanded disclosure for routine help text.
 - Keep navigation ordered around user tasks: general settings before specialized reporting and administration. Do not place every new feature at the top of the sidebar.
 - Verify the real local screen at desktop and mobile widths, including open pickers, populated filters and detail panels. Check keyboard controls, overflow and loading/error states. Show an actual screenshot; label fixtures and distinguish local verification from deployment.
+- Before finishing a workspace UI change, compare its header, table, pagination, drawer and form controls with the reference screen; explain any remaining difference required by its data or behavior.
 
 ## Agent skills and Linear
 

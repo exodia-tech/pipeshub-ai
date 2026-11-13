@@ -2433,6 +2433,7 @@
     },
     "pagination": {
       "showing_other": "显示第 {{from}}-{{to}} 项，共 {{count}} 项",
+      "showingRange": "显示 {{from}}-{{to}}",
       "previous": "上一页",
       "next": "下一页"
     },
@@ -6020,6 +6021,7 @@
     "countsHint": "可读人数反映已保存的规则、源系统权限和其他组的限制。— 表示未验证。"
   },
   "accessGroups": {
+    "helpTitle": "关于访问组",
     "title": "访问组",
     "adminOnly": "只有管理员可以管理访问组。",
     "help": "添加成员后，在访问权限中管理其连接器、频道和文件夹访问权限。集合共享权限仍然适用。",

@@ -55,10 +55,10 @@ export const AccessGroupsApi = {
     });
     return data;
   },
-  async list(skip = 0): Promise<AccessGroup[]> {
+  async list(skip = 0, limit = 100): Promise<AccessGroup[]> {
     const { data } = await apiClient.get<{ groups: AccessGroup[] }>(
       "/api/v1/access-groups",
-      { params: { skip, limit: 100 } },
+      { params: { skip, limit } },
     );
     return data.groups;
   },
