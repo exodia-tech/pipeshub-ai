@@ -452,7 +452,15 @@ async def run_agent_loop_stream(
                 inbox = get_steering_inbox()
                 await inbox.register(run_id, run_owner)
                 steering_inbox = inbox
-                install_steering(agent, _runtime, goal, inbox, run_id)
+                async def steering_applied() -> None:
+                    from app.agents.agent_loop.protocol.agui import AGUIEventType, frame
+
+                    if protocol == "agui":
+                        await event_sink.write(frame(
+                            AGUIEventType.CUSTOM, name="steering_applied", runId=str(run_id),
+                        ))
+
+                install_steering(agent, _runtime, goal, inbox, run_id, steering_applied)
 
             if clarifying_questions:
                 # Too ambiguous to safely reorganize into a Goal — skip

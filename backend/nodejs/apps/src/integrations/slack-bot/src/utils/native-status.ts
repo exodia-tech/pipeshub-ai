@@ -27,6 +27,8 @@ export class SlackNativeStatus {
     };
   }
 
+  get isClosed(): boolean { return this.closed; }
+
   async start(): Promise<boolean> {
     if (this.closed) return false;
     try {

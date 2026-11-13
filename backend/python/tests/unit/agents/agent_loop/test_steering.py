@@ -132,7 +132,8 @@ class TestSteeringHooks(unittest.IsolatedAsyncioTestCase):
             ),
             turn_index=1,
         )
-        install_steering(self.agent, self.runtime, self.goal, self.worker, "run-a")
+        self.applied = AsyncMock()
+        install_steering(self.agent, self.runtime, self.goal, self.worker, "run-a", self.applied)
 
     async def test_followup_is_a_real_pinned_user_message_at_next_step(self) -> None:
         from app.agent_loop_lib.agent.hook_dispatch import dispatch_pre_turn
@@ -145,6 +146,21 @@ class TestSteeringHooks(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(message.pinned)
         self.assertEqual(self.goal.user_message, "Only the AI project")
 
+    async def test_contextual_guidance_is_injected_once_without_replacing_user_identity(self) -> None:
+        from app.agent_loop_lib.agent.hook_dispatch import dispatch_pre_turn
+
+        for index, text in enumerate(("Make the shape softer", "Use green")):
+            await self.other_worker.submit("run-a", self.owner, str(index), text)
+            await dispatch_pre_turn(self.hooks, index, scope=self.scope)
+            self.assertEqual(self.agent.context.add.call_args.args[0].content, text)
+            self.assertFalse(self.agent.context.add.call_args.args[0].injected)
+        notes = [call.args[0] for call in self.agent.context.add.call_args_list if call.args[0].injected]
+        self.assertEqual(len(notes), 1)
+        self.assertIn("specific change in your own words", notes[0].content)
+        self.assertEqual(self.applied.await_count, 2)
+        await dispatch_pre_turn(self.hooks, 3, scope=self.scope)
+        self.assertEqual(self.applied.await_count, 2)
+
     async def test_child_cannot_consume_the_parent_update(self) -> None:
         from app.agent_loop_lib.agent.hook_dispatch import dispatch_pre_turn
 
@@ -152,6 +168,7 @@ class TestSteeringHooks(unittest.IsolatedAsyncioTestCase):
         await self.other_worker.submit("run-a", self.owner, "m", "Only AI")
         await dispatch_pre_turn(self.hooks, 1, scope=self.scope)
         self.agent.context.add.assert_not_called()
+        self.applied.assert_not_awaited()
         self.assertTrue(await self.worker.pending("run-a"))
 
     async def test_update_arriving_during_thinking_forces_a_new_model_step(

@@ -942,6 +942,20 @@ async function processSlackMessage(
         streamTableProbeText = '';
         tablePauseHintSent = false;
       },
+      onSteeringNarration: (text) => {
+        if (!useNativeStatus) return; // The message fallback already displays this narration.
+        queuedStreamAppend = queuedStreamAppend.then(async () => {
+          try {
+            await typedClient.chat.postMessage({
+              channel: typedMessage.channel!, thread_ts: threadId,
+              text: truncateForSlack(markdownToSlackMrkdwn(text)), ...NO_UNFURL_OPTIONS,
+            });
+          } finally {
+            if (await nativeStatus.start()) useNativeStatus = true;
+            if (!nativeStatus.isClosed) await updateActivityMessage(activityBuilder.format());
+          }
+        }).catch(() => console.error('Unable to post Slack steering progress'));
+      },
       onNarration: (text) => {
         activityBuilder.appendNarration(text);
         scheduleActivityUpdate();
