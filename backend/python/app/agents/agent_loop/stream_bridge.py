@@ -36,6 +36,7 @@ from app.agent_loop_lib.core.context import CancellationToken
 from app.agents.agent_loop import parked_turn, tool_approvals
 from app.agents.agent_loop.answer_streamer import TerminalAnswerStreamer
 from app.agents.agent_loop.cancellation.registry import RunOwner
+from app.agents.agent_loop.steering import get_steering_inbox, install_steering
 from app.agents.agent_loop.clarification import (
     emit_already_answered,
     emit_pre_run_clarification,
@@ -344,6 +345,14 @@ async def run_agent_loop_stream(
     )
     if cancellation_registry is not None:
         await cancellation_registry.register(run_id, cancellation_token, run_owner)
+    steering_inbox = None
+
+    async def close_steering() -> None:
+        if steering_inbox is not None:
+            try:
+                await steering_inbox.unregister(run_id)
+            except Exception:
+                log.warning("Steering cleanup unavailable for run %s; state expires automatically", run_id)
     # `stage_timer` stops at the first agent event; this one times the rest
     # of the run (turns, tools, pattern-match wait, finish) for the turn's
     # end line. Same flag, so off together; the counts are kept either way.
@@ -378,12 +387,14 @@ async def run_agent_loop_stream(
         )
     except asyncio.CancelledError:
         run_timing.end(log, "client_disconnect")
+        await close_steering()
         raise
     except Exception as exc:
         error_code, user_message = classify_exception(exc)
         run_timing.end(log, "error", exc=exc, code=error_code)
         if cancellation_registry is not None:
             await cancellation_registry.unregister(run_id)
+        await close_steering()
         yield _pre_stream_error_frame(protocol, user_message, error_code)
         return
 
@@ -410,6 +421,7 @@ async def run_agent_loop_stream(
     )
 
     async def _produce() -> None:
+        nonlocal steering_inbox
         # Every line of the run carries run_id; the task dies with the turn, so no reset.
         bind_log_fields(run_id=run_id)
         # Record headers rendered by tools show dates in the user's zone,
@@ -436,6 +448,19 @@ async def run_agent_loop_stream(
             )
             if stage_timer:
                 stage_timer.mark("factory.create")
+            if client_name == "slack" and not clarifying_questions:
+                inbox = get_steering_inbox()
+                await inbox.register(run_id, run_owner)
+                steering_inbox = inbox
+                async def steering_applied() -> None:
+                    from app.agents.agent_loop.protocol.agui import AGUIEventType, frame
+
+                    if protocol == "agui":
+                        await event_sink.write(frame(
+                            AGUIEventType.CUSTOM, name="steering_applied", runId=str(run_id),
+                        ))
+
+                install_steering(agent, _runtime, goal, inbox, run_id, steering_applied)
 
             if clarifying_questions:
                 # Too ambiguous to safely reorganize into a Goal — skip
@@ -539,6 +564,7 @@ async def run_agent_loop_stream(
             log.debug("agent-loop stream: _DONE enqueued, starting cleanup")
             if cancellation_registry is not None:
                 await cancellation_registry.unregister(run_id)
+            await close_steering()
             await _cancel_orphaned_agent_tasks(agent)
             if context.sandbox_manager is not None:
                 try:

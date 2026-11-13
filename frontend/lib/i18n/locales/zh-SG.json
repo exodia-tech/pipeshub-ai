@@ -5856,6 +5856,12 @@
   },
   "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "usage": {
+    "dateHelp": "Date range information",
+    "speech_to_text": "Speech to text",
+    "text_to_speech": "Text to speech",
+    "consumption": "用量",
+    "organizationTotal": "组织总计（用户 + 服务）",
+    "allUsers": "所有用户",
     "title": "用量与费用",
     "subtitle": "跟踪模型调用、Token 和预估支出。",
     "refresh": "刷新",

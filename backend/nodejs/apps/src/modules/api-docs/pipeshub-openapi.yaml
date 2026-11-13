@@ -25995,6 +25995,7 @@ paths:
         Breakdowns return the 100 most active groups. Tracking begins when enabled; no fabricated historical backfill.
       parameters:
         - { name: view, in: query, schema: { type: string, enum: [personal, organization], default: personal } }
+        - { name: audience, in: query, description: "Organization view only for users/services; all includes people and background services. Personal view always uses the authenticated user.", schema: { type: string, enum: [all, users, services], default: all } }
         - { name: from, in: query, schema: { type: string, format: date-time } }
         - { name: to, in: query, schema: { type: string, format: date-time } }
         - { name: interval, in: query, schema: { type: string, enum: [hour, day, week, month], default: day } }
@@ -48176,6 +48177,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /conversations/internal/{conversationId}/steer:
+    post:
+      tags: [Conversations]
+      operationId: steerConversationStreamInternal
+      summary: Send a user update to an active Slack run
+      description: Scoped token is resolved to its user before conversation and run ownership checks. Updates apply at the next safe step; finished runs return queued false. No permissions change.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId, messageId, text]
+              properties:
+                runId: { type: string, format: uuid }
+                messageId: { type: string, minLength: 1, maxLength: 100 }
+                text: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        '200':
+          description: Delivery acknowledgement; duplicate updates are not appended again.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queued, duplicate]
+                properties:
+                  queued: { type: boolean }
+                  duplicate: { type: boolean }
+        '400': { description: Invalid steering message }
+        '401': { description: Invalid scoped authentication }
+        '403': { description: Run belongs to a different user or conversation }
+        '404': { description: Conversation unavailable to caller }
+        '429': { description: Run update limit reached }
+        '503': { description: Steering storage unavailable }
+
+  /agents/{agentKey}/conversations/internal/{conversationId}/steer:
+    post:
+      tags: [Conversations]
+      operationId: steerAgentConversationStreamInternal
+      summary: Send a user update to an active Slack run
+      description: Scoped token is resolved to its user before conversation and run ownership checks. Updates apply at the next safe step; finished runs return queued false. No permissions change.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+        - { name: agentKey, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId, messageId, text]
+              properties:
+                runId: { type: string, format: uuid }
+                messageId: { type: string, minLength: 1, maxLength: 100 }
+                text: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        '200':
+          description: Delivery acknowledgement; duplicate updates are not appended again.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queued, duplicate]
+                properties:
+                  queued: { type: boolean }
+                  duplicate: { type: boolean }
+        '400': { description: Invalid steering message }
+        '401': { description: Invalid scoped authentication }
+        '403': { description: Run belongs to a different user or conversation }
+        '404': { description: Conversation unavailable to caller }
+        '429': { description: Run update limit reached }
+        '503': { description: Steering storage unavailable }
+
   /conversations/{conversationId}/cancel:
     post:
       tags:
@@ -50034,6 +50114,110 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   # -------------------- Conversational Speech --------------------
+  /conversations/internal/{conversationId}/artifacts/{recordId}/preview:
+    get:
+      tags: [Artifacts]
+      summary: Read an authorized conversation artifact for Slack preview
+      description: Internal scoped-token transport. Verifies the requester, conversation access, artifact access and exact conversation provenance. Allows supported media/PDF up to 20 MiB. Never accepts a download URL or creates an access grant.
+      operationId: previewInternalConversationArtifact
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: conversationId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: recordId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Private artifact bytes; Cache-Control private, no-store.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Unsupported artifact type, size or identifier.
+        '401':
+          description: Invalid scoped caller.
+        '404':
+          description: Conversation or artifact inaccessible, or provenance mismatch.
+
+  /agents/{agentKey}/conversations/internal/{conversationId}/artifacts/{recordId}/preview:
+    get:
+      tags: [Artifacts]
+      summary: Read an authorized conversation artifact for Slack preview
+      description: Internal scoped-token transport. Verifies the requester, conversation access, artifact access and exact conversation provenance. Allows supported media/PDF up to 20 MiB. Never accepts a download URL or creates an access grant.
+      operationId: previewInternalAgentArtifact
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: agentKey
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: conversationId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: recordId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Private artifact bytes; Cache-Control private, no-store.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Unsupported artifact type, size or identifier.
+        '401':
+          description: Invalid scoped caller.
+        '404':
+          description: Conversation or artifact inaccessible, or provenance mismatch.
+
+  /chat/internal/transcribe:
+    post:
+      tags: [Conversational Speech]
+      summary: Transcribe Slack audio as the verified requester
+      description: Internal scoped-token endpoint. Resolves the caller from the signed Slack identity, then uses the configured Speech-to-Text provider and caller usage attribution. Does not grant record access. Maximum audio size is 25 MiB; Slack bot intake separately caps downloads at 5 MiB.
+      operationId: transcribeInternalChatAudio
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Transcript from the configured provider.
+        '401':
+          description: Invalid scoped authorization.
+        '409':
+          description: Speech-to-Text provider is not configured.
+        '413':
+          description: Audio exceeds the upload limit.
+        '502':
+          description: Transcription provider failed.
+
   /chat/transcribe:
     post:
       tags:

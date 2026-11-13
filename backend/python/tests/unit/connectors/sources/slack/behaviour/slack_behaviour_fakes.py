@@ -380,7 +380,7 @@ class SlackWorkspace:
 
     def _api_files_list(self, params: dict[str, str]) -> dict[str, Any]:
         channel = params.get("channel", "")
-        items = [f for f in self.files.values() if f.get("is_huddle_canvas")
+        items = [f for f in self.files.values() if (params.get("types") == "all" or f.get("is_huddle_canvas"))
                  and channel in (f.get("channels", []) + f.get("groups", []) + f.get("ims", []))]
         size = self.page_size.get("files.list", 200)
         page = int(params.get("page", 1))
@@ -565,7 +565,7 @@ class FakeSlackStore:
         self.records[record.external_record_id] = record
 
     async def on_updated_record_permissions(self, record: Record, permissions: list[Any]) -> None:
-        if not record.external_record_id.startswith("slack-huddle:"):
+        if not record.external_record_id.startswith(("slack-huddle:", "slack-voice:")):
             raise AssertionError("Slack messages inherit access from their channel")
         self.record_permissions[record.external_record_id] = list(permissions)
 

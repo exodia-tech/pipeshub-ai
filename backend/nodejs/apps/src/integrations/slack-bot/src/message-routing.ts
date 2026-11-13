@@ -1,14 +1,17 @@
+import { activeSlackRuns, slackRunKey } from './active-runs';
 import { isIgnoredSlackMessage, isThreadFollowUpMessage, resolveOwnBotIdentity, type SlackMessagePayload, type TypedSlackClient } from './helpers';
 import { getFromDatabase } from './utils/conversation';
 
 export async function shouldHandleSlackMessage(
   message: SlackMessagePayload,
   client: TypedSlackClient,
-  context: { botUserId?: string },
+  context: { botUserId?: string; teamId?: string },
   botId?: string,
 ): Promise<boolean> {
   if (isIgnoredSlackMessage(message, context)) return false;
   if (message.channel?.startsWith('D')) return true;
+  const activeKey = slackRunKey(message, botId, context.teamId);
+  if (activeKey && activeSlackRuns.has(activeKey) && (!context.botUserId || !message.text?.includes(`<@${context.botUserId}`))) return true;
   const threadId = message.thread_ts;
   if (!message.user || !message.channel || !/^[CG]/.test(message.channel) || !botId || !threadId || !isThreadFollowUpMessage(message)) return false;
 

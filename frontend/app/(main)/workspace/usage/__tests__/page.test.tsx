@@ -12,9 +12,11 @@ import locale from "@/lib/i18n/locales/en-US.json";
 import UsagePage from "../page";
 import { usageApi, type UsageReport } from "../api";
 
-const fixture: { admin: boolean; report: UsageReport | null } = vi.hoisted(
-  () => ({ admin: false, report: null }),
-);
+const fixture: {
+  admin: boolean;
+  report: UsageReport | null;
+  params?: Record<string, unknown>;
+} = vi.hoisted(() => ({ admin: false, report: null }));
 const translations: Record<string, string> = locale.usage;
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -25,7 +27,14 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/lib/store/user-store", () => ({
   selectIsAdmin: (state: { admin: boolean }) => state.admin,
   useUserStore: (select: (state: { admin: boolean }) => boolean) =>
-    select(fixture),
+    select({
+      ...fixture,
+      profile: {
+        fullName: "Alice Example",
+        email: "alice@example.test",
+        avatarUrl: null,
+      },
+    }),
 }));
 vi.mock("@/lib/api/session-cache", () => ({ onSessionEnd: () => () => {} }));
 vi.mock("@/app/components/ui/MaterialIcon", () => ({
@@ -45,19 +54,24 @@ vi.mock("../api", () => ({
   },
 }));
 vi.mock("swr", () => ({
-  default: (key: unknown) => ({
-    data:
-      Array.isArray(key) && key[0] === "usage-report"
-        ? fixture.report
-        : undefined,
-    error: undefined,
-    isLoading: false,
-    mutate: vi.fn(),
-  }),
+  default: (key: unknown) => {
+    if (Array.isArray(key) && key[0] === "usage-report")
+      fixture.params = key[1];
+    return {
+      data:
+        Array.isArray(key) && key[0] === "usage-report"
+          ? fixture.report
+          : undefined,
+      error: undefined,
+      isLoading: false,
+      mutate: vi.fn(),
+    };
+  },
 }));
 
 describe("usage dashboard", () => {
   beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -136,6 +150,13 @@ describe("usage dashboard", () => {
         <UsagePage />
       </Theme>,
     );
+  it("shows the signed-in member and uses the shared range calendar", () => {
+    show();
+    expect(screen.getByText("Alice Example")).toBeTruthy();
+    expect(screen.getByText("alice@example.test")).toBeTruthy();
+    expect(document.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.getByRole("button", { name: /^From.*To:/ })).toBeTruthy();
+  });
   it("does not present entirely unpriced activity as free", () => {
     show();
     expect(
@@ -148,9 +169,77 @@ describe("usage dashboard", () => {
   it("keeps personal view free of member filters and administrator pricing controls", () => {
     show();
     expect(
-      screen.queryByRole("combobox", { name: "Member", exact: true }),
+      screen.queryByRole("button", { name: "Member", exact: true }),
     ).toBeNull();
     expect(screen.queryByRole("tab", { name: /^Model pricing/ })).toBeNull();
+  });
+  it("shows an admin the audience and member controls without opening advanced filters", async () => {
+    fixture.admin = true;
+    show();
+    fireEvent.keyDown(
+      screen.getByRole("combobox", { name: "View", exact: true }),
+      { key: "Enter" },
+    );
+    fireEvent.click(
+      await screen.findByRole("option", { name: "Organization", exact: true }),
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Consumption", exact: true }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Member", exact: true }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("table", { name: "Usage by member", exact: true }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Filters" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    fireEvent.keyDown(
+      screen.getByRole("combobox", { name: "Consumption", exact: true }),
+      { key: "Enter" },
+    );
+    fireEvent.click(
+      await screen.findByRole("option", { name: "All users", exact: true }),
+    );
+    expect(fixture.params?.audience).toBe("users");
+    fireEvent.keyDown(
+      screen.getByRole("combobox", { name: "Consumption", exact: true }),
+      { key: "Enter" },
+    );
+    fireEvent.click(
+      await screen.findByRole("option", {
+        name: "Background services",
+        exact: true,
+      }),
+    );
+    expect(fixture.params?.audience).toBe("services");
+    expect(
+      screen.queryByRole("button", { name: "Member", exact: true }),
+    ).toBeNull();
+  });
+  it("lets an administrator select an accessible member filter", async () => {
+    fixture.admin = true;
+    fixture.report!.user_id = [
+      { ...fixture.report!.summary, id: "alice", label: "Alice Example" },
+    ];
+    show();
+    fireEvent.keyDown(
+      screen.getByRole("combobox", { name: "View", exact: true }),
+      { key: "Enter" },
+    );
+    fireEvent.click(
+      await screen.findByRole("option", { name: "Organization", exact: true }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Member", exact: true }),
+    );
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "Alice Example", exact: true }),
+    );
+    expect(fixture.params?.user_id).toBe("alice");
   });
   it("keeps secondary filters collapsed and makes chart values accessible without an extra dropdown", () => {
     fixture.report!.timeline = [
@@ -165,10 +254,10 @@ describe("usage dashboard", () => {
     show();
     const filters = screen.getByRole("button", { name: "Filters" });
     expect(filters.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("combobox", { name: "Provider" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Provider" })).toBeNull();
     fireEvent.click(filters);
     expect(filters.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Provider" })).toBeTruthy();
     expect(screen.getByRole("table", { name: "Usage over time" })).toBeTruthy();
     expect(screen.queryByText("View chart data")).toBeNull();
   });
@@ -244,6 +333,24 @@ describe("usage dashboard", () => {
     });
     expect(screen.getByText("test-model")).toBeTruthy();
     expect(screen.getAllByText("Not reported").length).toBeGreaterThan(0);
+  });
+  it("uses the shared read-only call table and pagination", async () => {
+    fixture.report!.summary.requests = 120;
+    show();
+    fireEvent.keyDown(screen.getByRole("tab", { name: /^Call history/ }), {
+      key: "Enter",
+    });
+    const table = screen.getByTestId("entity-data-table");
+    expect(table.textContent).toContain("test-model");
+    expect(table.querySelector('[role="checkbox"]')).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(fixture.params?.offset).toBe(50);
+    fireEvent.keyDown(screen.getByTestId("page-size-trigger"), {
+      key: "Enter",
+    });
+    fireEvent.click((await screen.findAllByRole("menuitem"))[1]);
+    expect(fixture.params?.limit).toBe(25);
+    expect(fixture.params?.offset).toBe(0);
   });
   it("exposes pricing management to administrators", () => {
     fixture.admin = true;

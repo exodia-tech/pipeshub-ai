@@ -11,14 +11,26 @@ const THINKING_MESSAGES = [
 export class SlackNativeStatus {
   private active = false;
   private lastStatus = '';
+  private closed = false;
+  private pending: Promise<unknown> = Promise.resolve();
+  private readonly apiCall: (method: string, args: Record<string, unknown>) => Promise<unknown>;
 
   constructor(
-    private readonly apiCall: (method: string, args: Record<string, unknown>) => Promise<unknown>,
+    apiCall: (method: string, args: Record<string, unknown>) => Promise<unknown>,
     private readonly channel: string,
     private readonly threadTs: string,
-  ) {}
+  ) {
+    this.apiCall = (method, args) => {
+      const next = this.pending.then(() => apiCall(method, args));
+      this.pending = next.catch(() => undefined);
+      return next;
+    };
+  }
+
+  get isClosed(): boolean { return this.closed; }
 
   async start(): Promise<boolean> {
+    if (this.closed) return false;
     try {
       const result = await this.apiCall('assistant.threads.setStatus', {
         channel_id: this.channel,
@@ -36,7 +48,7 @@ export class SlackNativeStatus {
   }
 
   async update(status: string): Promise<boolean> {
-    if (!this.active) return false;
+    if (!this.active || (this.closed && status !== '')) return false;
     const phase = status.toLowerCase().startsWith('thinking') ? 'thinking'
       : status.toLowerCase().startsWith('writing reply') ? 'writing' : status;
     // Duplicate snapshots must not restart Slack's rotation or move an answer back to thinking.
@@ -59,6 +71,8 @@ export class SlackNativeStatus {
   }
 
   async clear(): Promise<void> {
+    this.closed = true;
+    await this.pending;
     if (this.active) await this.update('');
     this.active = false;
   }

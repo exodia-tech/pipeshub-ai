@@ -5951,6 +5951,12 @@
   },
   "_exodiaModificationNotice": "Modificato da EXODIA: branding rivolto al cliente; attribuzione mantenuta.",
   "usage": {
+    "dateHelp": "Informazioni sulle date",
+    "speech_to_text": "Trascrizione vocale",
+    "text_to_speech": "Sintesi vocale",
+    "consumption": "Consumo",
+    "organizationTotal": "Totale organizzazione (utenti + servizi)",
+    "allUsers": "Tutti gli utenti",
     "title": "Utilizzo e costi",
     "subtitle": "Monitora chiamate ai modelli, token e spesa stimata.",
     "refresh": "Aggiorna",

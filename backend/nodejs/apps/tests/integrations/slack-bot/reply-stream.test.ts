@@ -58,4 +58,19 @@ describe('Slack reply message identity', () => {
     expect(chat.update.lastCall.args[0].text).to.equal('Hello again');
     expect(chat.postMessage.callCount).to.equal(1);
   });
+  for (const partialAlreadyVisible of [true, false]) {
+    it(`keeps contextual steering and the final answer in one reply (partial visible: ${partialAlreadyVisible})`, async () => {
+      const chat = { postMessage: sinon.stub().resolves({ ts: '1.2' }), update: sinon.stub().resolves({ ts: '1.2' }) };
+      const stream = new SlackReplyStream(chat, 'C1', '1.0');
+      if (partialAlreadyVisible) await stream.call('chat.startStream', { markdown_text: 'I’ll switch' });
+      await stream.reset();
+      await stream.call('chat.stopStream', { markdown_text: 'I’ll switch to a green rounded square.' });
+      await stream.reset();
+      expect(chat.postMessage.callCount).to.equal(1);
+      clock.tick(1100);
+      await stream.call('chat.startStream', { markdown_text: 'Here is the updated green design.' });
+      expect(chat.postMessage.callCount).to.equal(1);
+      expect(chat.update.lastCall.args[0]).to.include({ ts: '1.2', text: 'Here is the updated green design.' });
+    });
+  }
 });

@@ -69,3 +69,34 @@ describe('Slack native activity status', () => {
     await status.clear();
   });
 });
+
+describe('Steering status lifecycle', () => {
+  it('restores rotation after writing, then refuses late steering after completion', async () => {
+    const api = sinon.stub().resolves({ ok: true });
+    const status = new SlackNativeStatus(api, 'C1', '1.1');
+    await status.start();
+    await status.update('Writing reply...');
+    await status.start();
+    expect(api.lastCall.args[1].loading_messages).to.include('Connecting the dots…');
+    await status.clear();
+    const calls = api.callCount;
+    expect(await status.start()).to.equal(false);
+    expect(await status.update('Searching...')).to.equal(false);
+    expect(api.callCount).to.equal(calls);
+  });
+  it('clears an in-flight steering status last and cannot resurrect it', async () => {
+    let release!: () => void;
+    const api = sinon.stub().resolves({ ok: true });
+    api.onSecondCall().callsFake(() => new Promise(resolve => { release = () => resolve({ ok: true }); }));
+    const status = new SlackNativeStatus(api, 'C1', '1.1');
+    await status.start();
+    const restarting = status.start();
+    await Promise.resolve();
+    const clearing = status.clear();
+    release();
+    await Promise.all([restarting, clearing]);
+    expect(api.lastCall.args[1].status).to.equal('');
+    expect(await status.start()).to.equal(false);
+    expect(api.callCount).to.equal(3);
+  });
+});

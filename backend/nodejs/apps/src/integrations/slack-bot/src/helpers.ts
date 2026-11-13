@@ -85,6 +85,9 @@ export interface SlackUserRecord {
 }
 
 export interface TypedSlackClient {
+  files?: {
+    uploadV2: (params: { channel_id: string; thread_ts: string; file: Buffer; filename: string; title: string }) => Promise<unknown>;
+  };
   botUserId?: string;
   users: {
     info: (params: { user: string }) => Promise<{
@@ -116,11 +119,16 @@ export interface TypedSlackClient {
 }
 
 export interface SlackFile {
+  is_external?: boolean;
+  mode?: string;
+  vtt?: string;
   id: string;
   name?: string;
   mimetype?: string;
   filetype?: string;
   size?: number;
+  user?: string;
+  transcription?: { status?: string; has_more?: boolean; text?: string; preview?: { has_more?: boolean; content?: string }; lines?: { contents?: string }[] };
   url_private_download?: string;
   url_private?: string;
 }
@@ -249,7 +257,7 @@ export const MAX_ATTACHMENT_MB = Math.floor(MAX_ATTACHMENT_BYTES / (1024 * 1024)
 
 export const SUPPORTED_ATTACHMENTS_HINT =
   "I can read PDF, JPEG and PNG files, and text files: plain text (.txt), " +
-  "Markdown (.md, .markdown, .mdx), CSV (.csv) and TSV (.tsv). " +
+  "Markdown (.md, .markdown, .mdx), CSV (.csv), TSV (.tsv), and audio clips (Slack transcript or configured Speech-to-Text). " +
   `Each file can be up to ${MAX_ATTACHMENT_MB} MB.`;
 
 export const USER_INFO_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
@@ -318,9 +326,17 @@ export function resolveTextAttachmentMimetype(file: SlackFile): string | null {
   return TEXT_ATTACHMENT_MIMETYPES[mime] ?? null;
 }
 
+export function isSlackAudio(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const file = value as SlackFile;
+  return !file.is_external && file.mode !== 'external' && (
+    (typeof file.mimetype === 'string' && file.mimetype.toLowerCase().startsWith('audio/')) ||
+    ['mp3', 'm4a', 'aac', 'ogg', 'wav', 'flac', 'opus'].includes(file.filetype || ''));
+}
+
 export function isSlackSupportedAttachment(file: SlackFile): boolean {
   return (
-    SUPPORTED_ATTACHMENT_MIMETYPES.has(normalizeMimetype(file.mimetype)) ||
+    isSlackAudio(file) || SUPPORTED_ATTACHMENT_MIMETYPES.has(normalizeMimetype(file.mimetype)) ||
     resolveTextAttachmentMimetype(file) !== null
   );
 }
@@ -453,15 +469,22 @@ export async function downloadSlackFile(
 ): Promise<Buffer> {
   const url = file.url_private_download || file.url_private;
   if (!url) throw new Error(`No download URL for file ${file.id}`);
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'files.slack.com' || parsed.username || parsed.password || parsed.port) {
+    throw new Error('Unsupported Slack file download URL');
+  }
   try {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${botToken}` },
       responseType: "arraybuffer",
+      maxRedirects: 0,
       timeout: 60_000,
       // Slack's size field is optional, so cap the transfer itself.
       maxContentLength: MAX_ATTACHMENT_BYTES,
     });
-    return Buffer.from(response.data);
+    const binary = Buffer.from(response.data);
+    if (binary.length > MAX_ATTACHMENT_BYTES) throw new SlackFileTooLargeError(file.id);
+    return binary;
   } catch (error) {
     if (isAxiosMaxContentLengthError(error)) throw new SlackFileTooLargeError(file.id);
     throw error;

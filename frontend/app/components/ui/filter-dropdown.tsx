@@ -500,7 +500,7 @@ export function FilterDropdown({
           backdropFilter: 'var(--frost-filter)',
           WebkitBackdropFilter: 'var(--frost-filter)',
           border: '1px solid var(--olive-3)',
-          borderRadius: 'var(--radius-1)',
+          borderRadius: 'var(--radius-2)',
           boxShadow:
             '0 12px 32px -16px var(--slate-a5, rgba(217, 237, 254, 0.15)), 0 12px 60px 0 var(--black-a3, rgba(0, 0, 0, 0.15))',
           ...popoverContentStyle,
@@ -582,6 +582,7 @@ export function FilterDropdown({
                 >
                   <RadioGroup.Item
                     value={option.value}
+                    aria-label={option.label}
                     onClick={(e) => e.stopPropagation()}
                     style={{ cursor: 'pointer', flexShrink: 0 }}
                   />

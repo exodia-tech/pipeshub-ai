@@ -3237,6 +3237,10 @@ class _GeminiTTSAdapter(TTSAdapter):
 
         try:
             payload = response.json()
+            from app.services.usage.meter import collect_speech_usage
+
+            if isinstance(payload, dict):
+                collect_speech_usage(payload.get("usageMetadata") or payload.get("usage"))
         except Exception as exc:
             raise RuntimeError(
                 "Gemini TTS returned a non-JSON response."
@@ -3348,7 +3352,9 @@ def get_tts_model(
         raise ValueError(f"Unsupported TTS provider: {provider}")
     adapter = builder(configuration, model_name)
     adapter.identity_forwarding = _forwarding_configuration(configuration)
-    return adapter
+    from app.services.usage.meter import metered_speech
+
+    return metered_speech(adapter, "text_to_speech")
 
 
 # ---------------------------------------------------------------------------
@@ -3802,6 +3808,10 @@ class _GeminiSTTAdapter(STTAdapter):
 
         try:
             payload = response.json()
+            from app.services.usage.meter import collect_speech_usage
+
+            if isinstance(payload, dict):
+                collect_speech_usage(payload.get("usageMetadata") or payload.get("usage"))
         except Exception as exc:
             raise RuntimeError(
                 "Gemini STT returned a non-JSON response."
@@ -3935,6 +3945,10 @@ class _OpenRouterSTTAdapter(STTAdapter):
 
         try:
             data = response.json()
+            from app.services.usage.meter import collect_speech_usage
+
+            if isinstance(data, dict):
+                collect_speech_usage(data.get("usageMetadata") or data.get("usage"))
         except Exception as exc:
             raise RuntimeError("OpenRouter STT returned a non-JSON response.") from exc
 
@@ -4019,4 +4033,6 @@ def get_stt_model(
         raise ValueError(f"Unsupported STT provider: {provider}")
     adapter = builder(configuration, model_name)
     adapter.identity_forwarding = _forwarding_configuration(configuration)
-    return adapter
+    from app.services.usage.meter import metered_speech
+
+    return metered_speech(adapter, "speech_to_text")

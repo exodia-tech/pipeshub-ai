@@ -64,6 +64,8 @@ import {
   getModelUsage,
   regenerateAgentAnswers,
   cancelConversationStream,
+  steerConversationStreamInternal,
+  previewConversationArtifactInternal,
   cancelAgentConversationStream,
   streamChatInternal,
   addMessageStreamInternal,
@@ -96,6 +98,7 @@ import {
   getSpeechCapabilities,
   synthesizeSpeech,
   transcribeAudio,
+  transcribeAudioInternal,
 } from '../controller/speech.controller';
 import { ValidationMiddleware } from '../../../libs/middlewares/validation.middleware';
 import {
@@ -122,6 +125,8 @@ import {
   compareListParamsSchema,
   compareChooseParamsSchema,
   cancelConversationStreamParamsSchema,
+  steerConversationStreamParamsSchema,
+  steerAgentConversationStreamParamsSchema,
   cancelAgentConversationStreamParamsSchema,
   updateFeedbackParamsSchema,
   searchShareParamsSchema,
@@ -539,6 +544,13 @@ export function createConversationalRouter(container: Container): Router {
    * @param {string} conversationId - Conversation ID
    * @body { runId: string (UUID) }
    */
+  router.get('/internal/:conversationId/artifacts/:recordId/preview',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE), previewConversationArtifactInternal(appConfig));
+
+  router.post('/internal/:conversationId/steer',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE),
+    ValidationMiddleware.validate(steerConversationStreamParamsSchema), steerConversationStreamInternal(appConfig));
+
   router.post(
     '/:conversationId/cancel',
     authMiddleware.authenticate,
@@ -961,6 +973,13 @@ export function createAgentConversationalRouter(container: Container): Router {
    * @param {string} conversationId - Conversation ID
    * @body { runId: string (UUID) }
    */
+  router.get('/:agentKey/conversations/internal/:conversationId/artifacts/:recordId/preview',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE), previewConversationArtifactInternal(appConfig, true, keyValueStoreService));
+
+  router.post('/:agentKey/conversations/internal/:conversationId/steer',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE),
+    ValidationMiddleware.validate(steerAgentConversationStreamParamsSchema), steerConversationStreamInternal(appConfig, true, keyValueStoreService));
+
   router.post(
     '/:agentKey/conversations/:conversationId/cancel',
     authMiddleware.authenticate,
@@ -1208,6 +1227,10 @@ export function createChatSpeechRouter(container: Container): Router {
     requireScopes(OAuthScopeNames.CONVERSATION_CHAT),
     synthesizeSpeech(appConfig),
   );
+
+  router.post('/internal/transcribe',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE),
+    audioUpload.single('file'), transcribeAudioInternal(appConfig));
 
   router.post(
     '/transcribe',

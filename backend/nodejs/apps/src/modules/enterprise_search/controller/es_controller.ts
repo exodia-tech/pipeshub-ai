@@ -1,3 +1,4 @@
+import axios from 'axios';
 import {
   buildMessageSortOptions,
   markConversationFailed,
@@ -9069,4 +9070,70 @@ export const listAllAgentsArchivedConversationsGrouped =
       });
       next(error);
     }
+  };
+
+
+export const steerConversationStream = (appConfig: AppConfig, agent = false) =>
+  async (req: AuthenticatedUserRequest, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, agentKey } = req.params;
+      const { runId, text, messageId } = req.body;
+      const conversation = await convRepo().findForTurn(
+        agent ? agentScope(agentKey) : CHAT_SCOPE,
+        conversationId as string, actorOf(req.user?.orgId, req.user?.userId),
+      );
+      if (!conversation) throw new NotFoundError('Conversation not found or unauthorized');
+      const result = await new AIServiceCommand({
+        uri: `${appConfig.aiBackend}/api/v1/chat/steer`, method: HttpMethod.POST,
+        headers: { ...(req.headers as Record<string, string>), 'Content-Type': 'application/json' },
+        body: { runId, conversationId, text, messageId },
+      }).execute();
+      if (!result || result.statusCode !== 200) throw handleBackendError(result, 'Steer conversation');
+      const delivery = result.data as { queued?: boolean; duplicate?: boolean };
+      if (delivery.queued && !delivery.duplicate) {
+        await appendMessages(conversation._id, conversation.orgId, [buildUserQueryMessage(text)]);
+      }
+      res.status(200).json(delivery);
+    } catch (error) { next(error); }
+  };
+
+export const steerConversationStreamInternal = (appConfig: AppConfig, agent = false, keyValueStoreService?: KeyValueStoreService) =>
+  async (req: AuthenticatedServiceRequest, res: Response, next: NextFunction) => {
+    try {
+      await hydrateScopedRequestAsUser(req, appConfig, keyValueStoreService);
+      await steerConversationStream(appConfig, agent)(req, res, next);
+    } catch (error) { next(error); }
+  };
+
+/** Private generated-media transport for Slack; never accepts a download URL. */
+export const previewConversationArtifactInternal = (appConfig: AppConfig, agent = false, keyValueStoreService?: KeyValueStoreService) =>
+  async (req: AuthenticatedServiceRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { conversationId, recordId, agentKey } = req.params;
+      if (![conversationId, recordId].every(id => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))) {
+        throw new BadRequestError('Invalid conversation or artifact identifier');
+      }
+      await hydrateScopedRequestAsUser(req, appConfig, keyValueStoreService);
+      const conversation = await convRepo().findForTurn(agent ? agentScope(agentKey) : CHAT_SCOPE,
+        conversationId as string, actorOf((req as AuthenticatedUserRequest).user?.orgId, (req as AuthenticatedUserRequest).user?.userId));
+      if (!conversation) throw new NotFoundError('Conversation not found or unauthorized');
+      const headers = { Authorization: req.headers.authorization as string };
+      const metadata = await axios.get(`${appConfig.connectorBackend}/api/v1/artifacts/${encodeURIComponent(recordId as string)}`,
+        { headers, timeout: 30_000, maxRedirects: 0 });
+      const artifact = metadata.data;
+      const mime = String(artifact?.mimeType || '').toLowerCase();
+      const limit = 20 * 1024 * 1024;
+      if (artifact?.artifactId !== recordId || artifact?.conversationId !== conversationId) throw new NotFoundError('Artifact not found in this conversation');
+      if (!/^(image\/(png|jpeg|gif|webp)|audio\/[a-z0-9.+-]+|video\/(mp4|webm)|application\/pdf)$/.test(mime)) {
+        throw new BadRequestError('This artifact does not support a Slack preview');
+      }
+      if (typeof artifact.sizeInBytes === 'number' && artifact.sizeInBytes > limit) throw new BadRequestError('Artifact exceeds Slack preview limit');
+      const media = await axios.get(`${appConfig.connectorBackend}/api/v1/stream/record/${encodeURIComponent(recordId as string)}`,
+        { headers, responseType: 'arraybuffer', timeout: 60_000, maxRedirects: 0, maxContentLength: limit });
+      const binary = Buffer.from(media.data);
+      if (!binary.length || binary.length > limit) throw new BadRequestError('Invalid artifact size');
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.status(200).send(binary);
+    } catch (error) { next(error); }
   };

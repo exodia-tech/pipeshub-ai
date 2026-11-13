@@ -638,10 +638,15 @@ describe('slack-bot/helpers', () => {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       });
 
+      beforeEach(() => {
+        const get = axios.get.bind(axios);
+        sinon.stub(axios, 'get').callsFake((url, options) => get(String(url).replace('https://files.slack.com', baseUrl), options));
+      });
+
       it('stops a transfer over the limit with SlackFileTooLargeError', async () => {
         let caught: unknown;
         try {
-          await downloadSlackFile({ id: 'big', url_private: `${baseUrl}/big` }, 'xoxb-bot');
+          await downloadSlackFile({ id: 'big', url_private: `https://files.slack.com/big` }, 'xoxb-bot');
         } catch (error) {
           caught = error;
         }
@@ -649,7 +654,7 @@ describe('slack-bot/helpers', () => {
       });
 
       it('downloads a file within the limit', async () => {
-        const body = await downloadSlackFile({ id: 'small', url_private: `${baseUrl}/small` }, 'xoxb-bot');
+        const body = await downloadSlackFile({ id: 'small', url_private: `https://files.slack.com/small` }, 'xoxb-bot');
         expect(body.length).to.equal(16);
       });
     });
@@ -675,7 +680,7 @@ describe('slack-bot/helpers', () => {
           id: ext,
           name: `notes.${ext}`,
           mimetype: 'text/plain',
-          url_private_download: `https://files.slack.test/${ext}`,
+          url_private_download: `https://files.slack.com/${ext}`,
         }));
         const getStub = stubDownloads(
           Object.fromEntries(files.map((f) => [f.url_private_download, utf8Markdown])),
@@ -700,8 +705,8 @@ describe('slack-bot/helpers', () => {
       });
 
       it('skips a text file that is not valid UTF-8 and uploads the rest', async () => {
-        const good = { id: 'g', name: 'good.md', mimetype: 'text/markdown', url_private: 'https://files.slack.test/g' };
-        const bad = { id: 'b', name: 'bad.txt', mimetype: 'text/plain', url_private: 'https://files.slack.test/b' };
+        const good = { id: 'g', name: 'good.md', mimetype: 'text/markdown', url_private: 'https://files.slack.com/g' };
+        const bad = { id: 'b', name: 'bad.txt', mimetype: 'text/plain', url_private: 'https://files.slack.com/b' };
         stubDownloads({ [good.url_private]: utf8Markdown, [bad.url_private]: Buffer.from([0xc3, 0x28, 0xff]) });
         const postStub = sinon.stub(axios, 'post').resolves({ data: { attachments: [{ recordId: 'g' }] } } as any);
 
@@ -714,7 +719,7 @@ describe('slack-bot/helpers', () => {
       });
 
       it('uploads a latin1 CSV that Slack labels text/plain as text/csv', async () => {
-        const file = { id: 'c', name: 'notes.csv', mimetype: 'text/plain', url_private: 'https://files.slack.test/c' };
+        const file = { id: 'c', name: 'notes.csv', mimetype: 'text/plain', url_private: 'https://files.slack.com/c' };
         stubDownloads({ [file.url_private]: Buffer.from('café,1\n', 'latin1') });
         const postStub = sinon.stub(axios, 'post').resolves({ data: { attachments: [{ recordId: 'c' }] } } as any);
 
@@ -725,8 +730,8 @@ describe('slack-bot/helpers', () => {
       });
 
       it('refuses a CSV or TSV containing NUL bytes', async () => {
-        const csv = { id: 'c', name: 'data.csv', mimetype: 'text/csv', url_private: 'https://files.slack.test/c' };
-        const tsv = { id: 't', name: 'data.tsv', mimetype: 'text/plain', url_private: 'https://files.slack.test/t' };
+        const csv = { id: 'c', name: 'data.csv', mimetype: 'text/csv', url_private: 'https://files.slack.com/c' };
+        const tsv = { id: 't', name: 'data.tsv', mimetype: 'text/plain', url_private: 'https://files.slack.com/t' };
         const nul = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]);
         stubDownloads({ [csv.url_private]: nul, [tsv.url_private]: nul });
         const postStub = sinon.stub(axios, 'post');
@@ -738,7 +743,7 @@ describe('slack-bot/helpers', () => {
       });
 
       it('rejects a download over the size limit even when Slack gave no size, and skips the upload call', async () => {
-        const file = { id: 'o', name: 'huge.txt', mimetype: 'text/plain', url_private: 'https://files.slack.test/o' };
+        const file = { id: 'o', name: 'huge.txt', mimetype: 'text/plain', url_private: 'https://files.slack.com/o' };
         stubDownloads({ [file.url_private]: Buffer.alloc(MAX_ATTACHMENT_BYTES + 1, 0x61) });
         const postStub = sinon.stub(axios, 'post');
 
@@ -749,7 +754,7 @@ describe('slack-bot/helpers', () => {
       });
 
       it('caps the Slack download at the size limit and reports a capped file as oversized', async () => {
-        const file = { id: 'o', name: 'huge.md', mimetype: 'text/plain', url_private: 'https://files.slack.test/o' };
+        const file = { id: 'o', name: 'huge.md', mimetype: 'text/plain', url_private: 'https://files.slack.com/o' };
         const getStub = sinon.stub(axios, 'get').rejects(new SlackFileTooLargeError('o'));
         const postStub = sinon.stub(axios, 'post');
 
@@ -765,7 +770,7 @@ describe('slack-bot/helpers', () => {
       });
 
       it('keeps uploading images and PDFs with their own MIME type', async () => {
-        const pdf = { id: 'p', name: 'doc.pdf', mimetype: 'application/pdf', url_private: 'https://files.slack.test/p' };
+        const pdf = { id: 'p', name: 'doc.pdf', mimetype: 'application/pdf', url_private: 'https://files.slack.com/p' };
         stubDownloads({ [pdf.url_private]: Buffer.from([0x25, 0x50, 0x44, 0x46, 0xff]) });
         const postStub = sinon.stub(axios, 'post').resolves({ data: { attachments: [{ recordId: 'p' }] } } as any);
 

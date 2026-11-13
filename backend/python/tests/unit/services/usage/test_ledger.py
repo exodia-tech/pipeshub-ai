@@ -95,6 +95,14 @@ class TestUsageLedger(unittest.TestCase):
             "cache_write": "2.5",
         }
 
+    def test_speech_does_not_apply_text_catalog_rates(self) -> None:
+        rates = {"input": "1", "output": "2", "cache_read": "1", "cache_write": "1"}
+        with patch("app.services.usage.ledger.catalog_rates", return_value=rates):
+            recorded = self.db.record(event(kind="speech_to_text"))
+        self.assertIsNone(recorded["cost_nano_usd"])
+        self.assertEqual(recorded["measurement"], "reported")
+        self.assertEqual(recorded["pricing_source"], "unpriced")
+
     def report(self, org: str = "org-a", **filters: str) -> dict:
         return self.db.report(
             org,

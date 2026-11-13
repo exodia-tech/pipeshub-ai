@@ -65,6 +65,7 @@ export interface SlackAGUICallbacks {
    * narration the frontend keeps in the activity timeline.
    */
   onNarration?: (text: string) => void;
+  onSteeringNarration?: (text: string) => void;
   onToolStart?: (toolName: string, displayName?: string) => void;
   onToolResult?: (
     toolName: string,
@@ -80,6 +81,7 @@ export interface SlackAGUICallbacks {
   onAskUserQuestion?: (payload: AskUserQuestionEvent) => void;
   onArtifact?: (artifact: SlackArtifactPayload) => void;
   onConversationCreated?: (conversationId: string) => void;
+  onRunStarted?: (runId: string) => void;
   onComplete?: (conversation: SlackConversationComplete) => void;
   onError?: (message: string) => void;
 }
@@ -248,6 +250,8 @@ export function createSlackAGUIEventHandler(
     callbacks.onAskUserQuestion?.(askEvent);
   };
 
+  let steeringNarrationPending = false;
+
   return (event: SlackStreamEvent): void => {
     const data = asEnvelope(event.data);
     const type = data?.type ?? event.event;
@@ -268,6 +272,7 @@ export function createSlackAGUIEventHandler(
         const parentRunId =
           typeof data?.parentRunId === "string" ? data.parentRunId : undefined;
         const role = runs.handleRunStarted(runId, parentRunId);
+        if (runId && !parentRunId) callbacks.onRunStarted?.(runId);
         if (role) {
           callbacks.onSubAgent?.(role, "started");
           callbacks.onStatus?.(`Delegating to ${role}...`);
@@ -340,6 +345,10 @@ export function createSlackAGUIEventHandler(
           }
           callbacks.onClearAnswerPreamble?.();
           emitAnswer();
+          if (narration && steeringNarrationPending) {
+            steeringNarrationPending = false;
+            callbacks.onSteeringNarration?.(narration);
+          }
         }
 
         callbacks.onStatus?.(`${toolStatusLabel(toolCallName)}...`);
@@ -429,6 +438,9 @@ export function createSlackAGUIEventHandler(
           if (conversationId) {
             callbacks.onConversationCreated?.(conversationId);
           }
+        } else if (name === 'steering_applied') {
+          const runId = typeof data?.runId === 'string' ? data.runId : undefined;
+          if (runs.isRootRun(runId)) steeringNarrationPending = true;
         } else if (name === "ask_user_question") {
           emitAskUserFromRaw(value);
         } else if (name === "artifact") {

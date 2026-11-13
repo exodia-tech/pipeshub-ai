@@ -232,9 +232,10 @@ class UsageLedger:
                 "SELECT rates FROM usage_rates WHERE org_id=? AND provider=? AND model=?",
                 (e["org_id"], e["provider"], e["model"]),
             ).fetchone()
-            rates = (
-                json.loads(row[0]) if row else catalog_rates(e["provider"], e["model"])
-            )
+            rates = json.loads(row[0]) if row else None
+            # Speech can be billed by audio tokens, duration or characters; text rates are not interchangeable.
+            if not row and e["kind"] not in ("speech", "speech_to_text", "text_to_speech"):
+                rates = catalog_rates(e["provider"], e["model"])
             e["pricing_source"] = (
                 "custom" if row else "catalog" if rates else "unpriced"
             )
@@ -257,6 +258,13 @@ class UsageLedger:
         org: str, start: str, end: str, filters: dict[str, str]
     ) -> tuple[str, list]:
         parts, args = ["org_id=?", "occurred_at>=?", "occurred_at<?"], [org, start, end]
+        audience = filters.get("audience", "all")
+        if audience not in ("all", "users", "services"):
+            raise ValueError("Invalid usage audience")
+        if audience != "all":
+            parts.append(
+                "user_id IS NOT NULL" if audience == "users" else "user_id IS NULL"
+            )
         for field in DIMENSIONS:
             if filters.get(field):
                 if (
@@ -355,6 +363,8 @@ class UsageLedger:
                     else current + timedelta(days=7 if interval == "week" else 1)
                 )
             for field in DIMENSIONS:
+                # Member selection must include everyone, even outside the top 100 callers.
+                cap = "" if field == "user_id" else " LIMIT 100"
                 label = (
                     "COALESCE(MAX(user_label),user_id,'Background services')"
                     if field == "user_id"
@@ -363,7 +373,7 @@ class UsageLedger:
                 result[field] = [
                     dict(r)
                     for r in db.execute(
-                        f"SELECT {field} AS id, {label} AS label, {totals} FROM usage_events WHERE {where} GROUP BY {field} ORDER BY requests DESC LIMIT 100",
+                        f"SELECT {field} AS id, {label} AS label, {totals} FROM usage_events WHERE {where} GROUP BY {field} ORDER BY requests DESC{cap}",
                         args,
                     )
                 ]
