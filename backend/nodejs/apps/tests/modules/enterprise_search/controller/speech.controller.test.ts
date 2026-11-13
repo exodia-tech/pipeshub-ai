@@ -1,3 +1,4 @@
+import * as scopedRequest from '../../../../src/modules/enterprise_search/utils/scoped-request'
 /// <reference types="mocha" />
 import 'reflect-metadata'
 import { expect } from 'chai'
@@ -9,6 +10,7 @@ import {
   getSpeechCapabilities,
   synthesizeSpeech,
   transcribeAudio,
+  transcribeAudioInternal,
 } from '../../../../src/modules/enterprise_search/controller/speech.controller'
 
 function makeReq(overrides: Record<string, any> = {}): any {
@@ -589,5 +591,27 @@ describe('SpeechController', () => {
       }
       expect(logs.map((stub) => stub.callCount)).to.deep.equal([0, 0, 0, 0])
     })
+  })
+})
+
+describe('Internal speech caller authorization', () => {
+  afterEach(() => sinon.restore())
+  it('hydrates the verified scoped caller before forwarding audio', async () => {
+    const req = makeReq({ file: { buffer: Buffer.from('audio'), originalname: 'clip.m4a', mimetype: 'audio/mp4' } })
+    const hydrate = sinon.stub(scopedRequest, 'hydrateScopedRequestAsUser').callsFake(async request => {
+      request.headers.authorization = 'Bearer verified-user'
+    })
+    const post = sinon.stub(axios, 'post').resolves({ status: 200, data: { text: 'Transcript' } })
+    await transcribeAudioInternal(appConfig)(req, makeRes(), sinon.stub())
+    expect(hydrate.calledOnce).to.equal(true)
+    expect(post.firstCall.args[2]?.headers?.authorization).to.equal('Bearer verified-user')
+  })
+  it('does not forward when caller hydration fails', async () => {
+    sinon.stub(scopedRequest, 'hydrateScopedRequestAsUser').rejects(new Error('unauthorized'))
+    const post = sinon.stub(axios, 'post')
+    const next = sinon.stub()
+    await transcribeAudioInternal(appConfig)(makeReq(), makeRes(), next)
+    expect(post.called).to.equal(false)
+    expect(next.calledOnce).to.equal(true)
   })
 })
