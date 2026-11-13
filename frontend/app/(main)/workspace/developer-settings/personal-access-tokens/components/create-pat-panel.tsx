@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIsMobile } from '@/lib/hooks/use-is-mobile';
 import { touchTarget } from '@/app/components/ui/responsive';
-import { Box, Button, Checkbox, Flex, IconButton, Text, TextField } from '@radix-ui/themes';
+import { Box, Button, Flex, IconButton, Text, TextField } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
 import type { CheckedState } from '@radix-ui/react-checkbox';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
