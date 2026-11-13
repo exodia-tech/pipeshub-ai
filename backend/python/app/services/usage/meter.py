@@ -580,6 +580,60 @@ def metered_image_embeddings(
     return MeteredImages()
 
 
+_speech_usage: contextvars.ContextVar[list | None] = contextvars.ContextVar(
+    "speech_usage", default=None
+)
+
+
+def collect_speech_usage(raw: dict | None) -> None:
+    target = _speech_usage.get()
+    if target is not None and isinstance(raw, dict):
+        target.append(raw)
+
+
+def metered_speech(adapter: Any, kind: str) -> Any:
+    """Measure the adapter operation, including providers without an HTTP hook."""
+    if not enabled():
+        return adapter
+    from functools import wraps
+
+    method = "synthesize" if kind == "text_to_speech" else "transcribe"
+    operation = getattr(adapter, method)
+
+    @wraps(operation)
+    async def measure(*args: Any, **kwargs: Any) -> Any:
+        started, identity, readings = time.monotonic(), call_identity(), []
+        token = _speech_usage.set(readings)
+        status = "failed"
+        try:
+            with suppress_nested():
+                result = await operation(*args, **kwargs)
+            status = "success"
+            return result
+        finally:
+            _speech_usage.reset(token)
+            counts, measurement = normalize_usage(None, kind=kind)
+            for reading in readings:
+                usage, measurement = normalize_usage(reading, kind=kind)
+                for key, value in usage.items():
+                    if value is not None:
+                        counts[key] = (counts[key] or 0) + value
+            await emit_async(
+                adapter.provider,
+                adapter.model,
+                counts,
+                started,
+                identity=identity,
+                kind=kind,
+                status=status,
+                normalized=True,
+                measurement=measurement,
+            )
+
+    setattr(adapter, method, measure)
+    return adapter
+
+
 def install_media_hook(client: object) -> None:
     """Count media/decision calls without buffering binary audio or streaming bodies."""
     if not enabled():
@@ -603,7 +657,8 @@ def install_media_hook(client: object) -> None:
             if "/decisions" in path
             else None
         )
-        if kind is None or suppressed():
+        speech_readings = _speech_usage.get()
+        if kind is None or (suppressed() and speech_readings is None):
             return
         body, model = {}, "unknown"
         try:
@@ -621,6 +676,10 @@ def install_media_hook(client: object) -> None:
                 body = payload if isinstance(payload, dict) else {}
         except Exception:
             pass
+        if speech_readings is not None:
+            if response.status_code < 400:
+                collect_speech_usage(body.get("usage"))
+            return
         host = response.request.url.host
         provider = (
             "openAI"

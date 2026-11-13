@@ -1157,3 +1157,34 @@ class TestOpenAISTTExtended:
             await adapter.transcribe(b"audio")
         call_kwargs = fake_client.audio.transcriptions.create.await_args.kwargs
         assert "language" not in call_kwargs
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["speech_to_text", "text_to_speech"])
+async def test_gemini_speech_factory_records_model_and_reported_usage(tmp_path, monkeypatch, kind):
+    from app.services.model_identity.call_context import ModelCallContext, bind_call_context
+    from app.services.model_identity.principal import user_principal
+    from app.services.model_identity.workload import Workload
+    from app.services.usage.ledger import UsageLedger
+
+    ledger = UsageLedger(str(tmp_path / "speech.db"))
+    monkeypatch.setenv("PIPESHUB_USAGE_DB", ledger.path)
+    config = {"configuration": {"model": "gemini-speech-test", "apiKey": "test-only"}, "isDefault": True}
+    payload = {"usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 25},
+               "candidates": [{"content": {"parts": [{"text": "private transcript",
+                   "inlineData": {"data": base64.b64encode(b"\x00\x00").decode()}}]}}]}
+    factory, _ = _fake_client_factory(_http_response(json_payload=payload))
+    ctx = ModelCallContext(principal=user_principal({"userId": "alice", "orgId": "org-a"}), workload=Workload.SPEECH)
+    with patch("httpx.AsyncClient", factory), bind_call_context(ctx):
+        if kind == "speech_to_text":
+            adapter = aimodels.get_stt_model("gemini", config)
+            assert await adapter.transcribe(b"private audio") == "private transcript"
+        else:
+            adapter = aimodels.get_tts_model("gemini", config)
+            assert await adapter.synthesize("private input", response_format="pcm") == b"\x00\x00"
+    report = ledger.report("org-a", "2020-01-01T00:00:00+00:00", "2030-01-01T00:00:00+00:00", {}, interval="month")
+    assert len(report["events"]) == 1
+    event = report["events"][0]
+    assert (event["model"], event["kind"], event["user_id"]) == ("gemini-speech-test", kind, "alice")
+    assert (event["input_tokens"], event["output_tokens"], event["measurement"]) == (10, 25, "reported")
+    assert "private" not in str(event)

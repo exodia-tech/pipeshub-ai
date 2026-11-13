@@ -307,6 +307,78 @@ class TestUsageMeter(unittest.IsolatedAsyncioTestCase):
         ):
             emit("test", "model-a", {}, time.monotonic())
 
+    async def test_speech_adapter_tracks_multipart_model_once_and_preserves_privacy(self) -> None:
+        from app.services.usage.meter import metered_speech
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, json={
+                "text": "private transcript", "usage": {"input_tokens": 120, "output_tokens": 8}
+            })
+        )) as client:
+            install_media_hook(client)
+
+            class Adapter:
+                provider, model = "openAI", "gpt-4o-transcribe"
+
+                async def transcribe(self, audio: bytes, **kwargs: object) -> str:
+                    response = await client.post("https://api.openai.com/v1/audio/transcriptions",
+                        data={"model": self.model}, files={"file": ("audio.wav", audio)})
+                    return response.json()["text"]
+
+            adapter = metered_speech(Adapter(), "speech_to_text")
+            with bind_call_context(context(workload=Workload.SPEECH)):
+                self.assertEqual(await adapter.transcribe(b"private audio"), "private transcript")
+        rows = self.events()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]["model"], rows[0]["kind"], rows[0]["user_id"]),
+                         ("gpt-4o-transcribe", "speech_to_text", "alice"))
+        self.assertEqual(rows[0]["input_tokens"], 120)
+        self.assertNotIn("private", str(rows))
+
+    async def test_native_speech_usage_and_unknown_binary_tts_are_counted(self) -> None:
+        from app.services.usage.meter import collect_speech_usage, metered_speech
+
+        class NativeSpeech:
+            provider, model = "gemini", "gemini-tts"
+
+            async def synthesize(self, text: str) -> bytes:
+                collect_speech_usage({"promptTokenCount": 10, "candidatesTokenCount": 25})
+                return b"private audio"
+
+        class BinarySpeech:
+            provider, model = "openAI", "tts-1"
+
+            async def synthesize(self, text: str) -> bytes:
+                return b"private audio"
+
+        with bind_call_context(context(workload=Workload.SPEECH)):
+            for adapter in (NativeSpeech(), BinarySpeech()):
+                self.assertEqual(await metered_speech(adapter, "text_to_speech").synthesize("private text"), b"private audio")
+        rows = {row["model"]: row for row in self.events()}
+        self.assertEqual(rows["gemini-tts"]["output_tokens"], 25)
+        self.assertEqual(rows["gemini-tts"]["kind"], "text_to_speech")
+        self.assertEqual(rows["tts-1"]["measurement"], "unknown")
+        self.assertIsNone(rows["tts-1"]["cost_usd"])
+        self.assertEqual(len(rows), 2)
+        self.assertNotIn("private", str(rows))
+
+    async def test_speech_adapter_tracks_non_http_failure_without_inventing_cost(self) -> None:
+        from app.services.usage.meter import metered_speech
+
+        class Adapter:
+            provider, model = "whisper", "local-small"
+
+            async def transcribe(self, audio: bytes) -> str:
+                raise RuntimeError("private failure")
+
+        with bind_call_context(context(workload=Workload.SPEECH)):
+            with self.assertRaises(RuntimeError):
+                await metered_speech(Adapter(), "speech_to_text").transcribe(b"private")
+        row = self.events()[0]
+        self.assertEqual((row["status"], row["model"]), ("failed", "local-small"))
+        self.assertIsNone(row["cost_usd"])
+        self.assertEqual(row["measurement"], "unknown")
+
     async def test_media_uses_counts_without_persisting_audio_or_image_content(
         self,
     ) -> None:

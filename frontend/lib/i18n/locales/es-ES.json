@@ -5965,6 +5965,9 @@
   },
   "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "usage": {
+    "dateHelp": "Date range information",
+    "speech_to_text": "Speech to text",
+    "text_to_speech": "Text to speech",
     "consumption": "Consumo",
     "organizationTotal": "Total de la organización (usuarios + servicios)",
     "allUsers": "Todos los usuarios",

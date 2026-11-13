@@ -582,6 +582,7 @@ export function FilterDropdown({
                 >
                   <RadioGroup.Item
                     value={option.value}
+                    aria-label={option.label}
                     onClick={(e) => e.stopPropagation()}
                     style={{ cursor: 'pointer', flexShrink: 0 }}
                   />
