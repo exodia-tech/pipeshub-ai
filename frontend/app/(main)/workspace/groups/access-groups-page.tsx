@@ -257,6 +257,7 @@ export default function AccessGroupsPage() {
         ctaIcon="shield"
         onCtaClick={() => {
           setName("");
+          setDescription("");
           setCreating(true);
         }}
       />

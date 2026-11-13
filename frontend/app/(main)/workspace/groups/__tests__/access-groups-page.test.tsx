@@ -192,6 +192,14 @@ describe("access groups", () => {
       expect(AccessGroupsApi.create).toHaveBeenCalledWith("Research", undefined),
     );
   });
+  it("starts a fresh description after cancelling group creation", async () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "accessGroups.create" }));
+    fireEvent.change(screen.getByLabelText("workspace.groups.create.descriptionLabel", { exact: false }), { target: { value: "Cancelled purpose" } });
+    fireEvent.click(screen.getByRole("button", { name: "common.close" }));
+    fireEvent.click(screen.getByRole("button", { name: "accessGroups.create" }));
+    expect(screen.getByLabelText("workspace.groups.create.descriptionLabel", { exact: false })).toHaveProperty("value", "");
+  });
   it("finds an active person and adds them to the group", async () => {
     vi.mocked(UsersApi.fetchMergedUsers).mockResolvedValue({
       users: [

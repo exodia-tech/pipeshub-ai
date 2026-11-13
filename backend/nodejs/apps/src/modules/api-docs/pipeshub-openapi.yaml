@@ -25384,7 +25384,29 @@ paths:
         - { in: query, name: skip, schema: { type: integer, minimum: 0, default: 0 } }
         - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
       responses:
-        '200': { description: Organization access groups }
+        '200':
+          description: Organization access groups with stored metadata; missing creator/date values are unknown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _key: { type: string, format: uuid }
+                        name: { type: string }
+                        description: { type: string, nullable: true }
+                        createdAtTimestamp: { type: integer, nullable: true, description: Unix time in milliseconds }
+                        createdByUser:
+                          type: object
+                          nullable: true
+                          properties:
+                            userId: { type: string }
+                            name: { type: string, nullable: true }
+                            email: { type: string, nullable: true }
         '403': { description: Administrator access required }
         '503': { description: Group service unavailable }
     post:
