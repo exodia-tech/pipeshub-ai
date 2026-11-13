@@ -59,15 +59,15 @@ export function GroupScopesPanel({ groupId, onDirtyChange, onBusyChange }: {
           <IconButton className="touch-hit" variant="ghost" color="gray" aria-label={t('groupScopes.about')} onClick={() => setHelpOpen(!helpOpen)}><MaterialIcon name="help_outline" size={18} /></IconButton>
         </HelpTooltip>
       </Flex>
-      {!editing && <Button variant="soft" onClick={() => { setDraft(policy); setEditing(true); }}>{t('workspace.groups.actions.managePermissions')}</Button>}
+      {!editing && <Button className="touch-size" variant="soft" onClick={() => { setDraft(policy); setEditing(true); }}>{t('workspace.groups.actions.managePermissions')}</Button>}
     </Flex>
     <Text size="2" color="gray">{t(value === null ? 'groupScopes.unrestricted' : 'groupScopes.selected', { count: selected.size })}</Text>
     {failure && <Callout.Root color="red"><Callout.Text>{failure}</Callout.Text></Callout.Root>}
     {value !== null && <ScopeCheckboxList groups={groups} selected={selected} disabled={!editing || busy}
       onScopeChange={(name, checked) => change([name], checked)} onCategoryChange={(items, checked) => change(items.map((item) => item.name), checked)} />}
     {editing && <Flex gap="2" justify="end">
-      <Button variant="soft" color="gray" disabled={busy} onClick={() => { setDraft(null); setEditing(false); setFailure(''); }}>{t('common.cancel')}</Button>
-      <Button disabled={!dirty || busy} loading={busy} onClick={() => void save()}>{t('common.save')}</Button>
+      <Button className="touch-size" variant="soft" color="gray" disabled={busy} onClick={() => { setDraft(null); setEditing(false); setFailure(''); }}>{t('common.cancel')}</Button>
+      <Button className="touch-size" disabled={!dirty || busy} loading={busy} onClick={() => void save()}>{t('common.save')}</Button>
     </Flex>}
   </Flex>;
 }

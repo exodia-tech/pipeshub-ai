@@ -17,7 +17,8 @@ SECRET = "synthetic-feature-scope-test-secret-32-characters"
 def request_action(scopes: list[str] | None, *, token_scopes: list[str] | None = None,
                    storage_failure: bool = False, admin: bool = False,
                    other_scopes: list[str] | None = None, corrupt: bool = False,
-                   agent_id: str | None = None, service: bool = False) -> int:
+                   agent_id: str | None = None, service: bool = False,
+                   virtual_service_account: bool = False) -> int:
     app = FastAPI()
     graph = AsyncMock()
     graph.get_graph_user_keys_by_mongo_user_ids.return_value = {"member": "graph-member"}
@@ -51,6 +52,9 @@ def request_action(scopes: list[str] | None, *, token_scopes: list[str] | None =
         return {"allowed": True}
 
     claims = {"orgId": "org", "userId": "member", "featureScopes": ["agent:execute"]}
+    if virtual_service_account:
+        claims["isServiceAccount"] = True
+        graph.get_graph_user_keys_by_mongo_user_ids.return_value = {}
     if token_scopes is not None:
         claims.update({"tokenType": "oauth", "scope": " ".join(token_scopes)})
     if service:
@@ -92,6 +96,14 @@ def test_named_agents_cannot_use_the_generic_chat_scope(service: bool, token: li
 
 def test_actor_service_tokens_cannot_bypass_group_limits() -> None:
     assert request_action([], service=True) == 403
+
+
+def test_native_virtual_service_account_keeps_configured_bot_access() -> None:
+    assert request_action(None, service=True, virtual_service_account=True) == 200
+
+
+def test_regular_token_cannot_claim_virtual_service_account_privileges() -> None:
+    assert request_action([], virtual_service_account=True) == 503
 
 
 async def test_org_only_indexing_tokens_keep_the_native_service_policy() -> None:

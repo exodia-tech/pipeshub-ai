@@ -432,7 +432,8 @@ def require_scopes(
             if not has_service_scope(user, *admitted_service_scopes):
                 raise AuthRejected(status.HTTP_403_FORBIDDEN, "This route does not accept service tokens",
                                    reason="service_token_not_allowed")
-            if not has_service_scope(user, TokenScopes.CONVERSATION_CREATE):
+            # Native virtual bot identities use configured-agent access, not a human's groups.
+            if not has_service_scope(user, TokenScopes.CONVERSATION_CREATE) or user.get("isServiceAccount") is True:
                 return
 
         limits = None
