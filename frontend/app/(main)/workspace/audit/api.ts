@@ -24,6 +24,7 @@ export interface AuditEvent {
   resource_policy?: {
     default_allow: boolean;
     revision: number;
+    feature_scopes?: string[] | null;
     rules: { resource_ref: string; allow: boolean }[];
   };
 }

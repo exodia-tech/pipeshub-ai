@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Container } from 'inversify';
 import { AuthMiddleware } from '../../../libs/middlewares/auth.middleware';
 import { AuthenticatedUserRequest } from '../../../libs/middlewares/types';
-import { requireScopes } from '../../../libs/middlewares/require-scopes.middleware';
+import { requireScopes, effectiveScopes } from '../../../libs/middlewares/require-scopes.middleware';
 import { OAuthScopeNames } from '../../../libs/enums/oauth-scopes.enum';
 import { ValidationMiddleware } from '../../../libs/middlewares/validation.middleware';
 import { AgentSchedules } from '../services/agent-schedules';
@@ -237,10 +237,8 @@ export function createAgentScheduleRouter(container: Container): Router {
           'Project drafts cannot be delivered to Slack.',
         );
       if (projectId && (req.body.enabled || projectChanged)) {
-        if (
-          req.user!.isOAuth &&
-          !req.user!.oauthScopes?.includes(OAuthScopeNames.PROJECT_READ)
-        )
+        const scopes = effectiveScopes(req.user!);
+        if (scopes !== undefined && !scopes.includes(OAuthScopeNames.PROJECT_READ))
           throw new ForbiddenError('Project schedules require project:read.');
         const { grant } = await container
           .get(AgentProjectGrants)
@@ -291,10 +289,8 @@ export function createAgentScheduleRouter(container: Container): Router {
           String(req.params.agentKey),
         );
       if (schedule?.projectId) {
-        if (
-          req.user!.isOAuth &&
-          !req.user!.oauthScopes?.includes(OAuthScopeNames.PROJECT_READ)
-        )
+        const scopes = effectiveScopes(req.user!);
+        if (scopes !== undefined && !scopes.includes(OAuthScopeNames.PROJECT_READ))
           throw new ForbiddenError('Project schedules require project:read.');
         if (
           !schedule.projectGrantId ||

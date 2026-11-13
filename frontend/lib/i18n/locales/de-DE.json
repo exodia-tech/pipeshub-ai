@@ -2291,6 +2291,7 @@
     "pagination": {
       "showing_one": "Zeige {{from}}-{{to}} von {{count}} Eintrag",
       "showing_other": "Zeige {{from}}-{{to}} von {{count}} Einträgen",
+      "showingRange": "Einträge {{from}}–{{to}}",
       "previous": "Zurück",
       "next": "Weiter"
     },
@@ -6061,6 +6062,7 @@
     "countsHint": "Die Leserzahlen berücksichtigen gespeicherte Regeln, Quellberechtigungen und andere Gruppenregeln. — bedeutet ungeprüft."
   },
   "accessGroups": {
+    "helpTitle": "Über Zugriffsgruppen",
     "title": "Zugriffsgruppen",
     "adminOnly": "Nur Administratoren können Zugriffsgruppen verwalten.",
     "help": "Füge Mitglieder hinzu und verwalte ihren Zugriff auf Konnektoren, Kanäle und Ordner unter Zugriffsberechtigungen. Sammlungsfreigaben gelten weiterhin.",
@@ -6282,5 +6284,14 @@
     },
     "nothingNew": "Für diesen Knoten gibt es nichts weiter anzuzeigen.",
     "tableOnly": "Es wird nur die Tabelle angezeigt, damit alles flüssig bleibt."
+  },
+  "groupScopes": {
+    "title": "Funktionsberechtigungen",
+    "content": "Inhaltszugriff",
+    "limit": "Verfügbare Aktionen einschränken",
+    "about": "Über Funktionsberechtigungen",
+    "unrestricted": "Diese Gruppe schränkt keine Funktionen ein.",
+    "selected": "Erlaubte Aktionen: {{count}}",
+    "help": "Die Einschränkungen aller Gruppen gelten gemeinsam. Rollen, Token-Berechtigungen und Inhaltszugriff gelten weiterhin. Administratoren behalten den Verwaltungszugriff."
   }
 }

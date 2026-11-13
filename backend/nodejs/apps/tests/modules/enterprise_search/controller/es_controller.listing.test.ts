@@ -10,12 +10,20 @@ import { Org } from '../../../../src/modules/user_management/schema/org.schema'
 import { EncryptionService } from '../../../../src/libs/encryptor/encryptor'
 import { loadConfigurationManagerConfig } from '../../../../src/modules/configuration_manager/config/config'
 import { TokenScopes } from '../../../../src/libs/enums/token-scopes.enum'
+import { AuthMiddleware } from '../../../../src/libs/middlewares/auth.middleware'
+import { AuthTokenService } from '../../../../src/libs/services/authtoken.service'
+import { Logger } from '../../../../src/libs/services/logger.service'
+import { getUserRepository } from '../../../../src/libs/repositories/user'
+import { projectCallerFromRequest, resolveProjectLink } from '../../../../src/modules/enterprise_search/utils/project-context'
+import { ProjectsFeature } from '../../../../src/modules/projects/utils/projects-feature'
+import { ProjectService } from '../../../../src/modules/projects/services/project.service'
 import { FakeAIBackend, FakeSSEResponse, InMemoryChatStore, oid, settle } from './chat-test-harness'
 
 const appConfig = {
   aiBackend: 'http://ai.test',
   jwtSecret: 'test-jwt-secret',
   scopedJwtSecret: 'test-scoped-secret',
+  connectorBackend: 'http://policy.test',
 } as never
 
 const ORG = oid()
@@ -316,6 +324,24 @@ describe('es_controller listing and paging', () => {
         limit: () => ({ lean: () => ({ exec: async () => [{ _id: ORG }] }) }),
       } as never)
       sinon.stub(Org, 'findOne').resolves({ _id: ORG } as never)
+    })
+
+    it('applies a registered bot caller’s group ceiling before reading project context', async () => {
+      sinon.stub(getUserRepository(), 'getLiveByEmail').resolves({ _id: OWNER, orgId: ORG, email: 'Guest@Example.com' } as never)
+      sinon.stub(globalThis, 'fetch').callsFake(async () => new Response(JSON.stringify({ scopes: ['conversation:chat', 'agent:execute'] }), { status: 200 }))
+      sinon.stub(ProjectsFeature, 'assertEnabled').resolves()
+      const readProject = sinon.stub(ProjectService, 'assertAccess')
+      const req = serviceRequest()
+      req.headers.authorization = `Bearer ${jwt.sign({ email: 'Guest@Example.com', scopes: [TokenScopes.CONVERSATION_CREATE] }, 'test-scoped-secret')}`
+      const auth = new AuthMiddleware(Logger.getInstance(), new AuthTokenService('test-jwt-secret', 'test-scoped-secret'))
+      await new Promise<void>((resolve, reject) => auth.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE)(req as never, {} as never, error => error ? reject(error) : resolve()))
+      await controller.hydrateScopedRequestAsUser(req as never, appConfig)
+      let refused: unknown
+      try {
+        await resolveProjectLink(String(ORG), String(OWNER), { projectId: String(oid()) }, projectCallerFromRequest(req as never, appConfig))
+      } catch (error) { refused = error }
+      expect(refused).to.have.property('statusCode', 403)
+      expect(readProject.called).to.equal(false)
     })
 
     it('lets an email without an account in only for an agent set up for Slack that is a service account', async () => {

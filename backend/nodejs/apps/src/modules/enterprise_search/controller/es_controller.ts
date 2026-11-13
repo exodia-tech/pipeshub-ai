@@ -1,4 +1,7 @@
 import axios from 'axios';
+import { currentOrgContext } from '../../../libs/context/orgContext';
+import { effectiveScopes } from '../../../libs/middlewares/require-scopes.middleware';
+import { OAuthScopeNames } from '../../../libs/enums/oauth-scopes.enum';
 import {
   buildMessageSortOptions,
   markConversationFailed,
@@ -55,6 +58,7 @@ import {
 import { Logger } from '../../../libs/services/logger.service';
 import {
   BadRequestError,
+  ForbiddenError,
   InternalServerError,
   NotFoundError,
 } from '../../../libs/errors/http.errors';
@@ -9076,11 +9080,17 @@ export const listAllAgentsArchivedConversationsGrouped =
 export const steerConversationStream = (appConfig: AppConfig, agent = false) =>
   async (req: AuthenticatedUserRequest, res: Response, next: NextFunction) => {
     try {
+      await req.resolveFeatureScopes?.();
+      const scopes = effectiveScopes(req.user ?? {});
+      const action = agent ? OAuthScopeNames.AGENT_EXECUTE : OAuthScopeNames.CONVERSATION_CHAT;
+      if (scopes !== undefined && !scopes.includes(action)) {
+        throw new ForbiddenError(`Insufficient scope. Required: ${action}`);
+      }
       const { conversationId, agentKey } = req.params;
       const { runId, text, messageId } = req.body;
       const conversation = await convRepo().findForTurn(
         agent ? agentScope(agentKey) : CHAT_SCOPE,
-        conversationId as string, actorOf(req.user?.orgId, req.user?.userId),
+        conversationId as string, actorOf(currentOrgContext().orgId, req.user?.userId),
       );
       if (!conversation) throw new NotFoundError('Conversation not found or unauthorized');
       const result = await new AIServiceCommand({

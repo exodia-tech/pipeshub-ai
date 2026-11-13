@@ -62,6 +62,9 @@ export { SettingsRow } from './settings-row';
 export type { SettingsRowProps } from './settings-row';
 
 export { PaginatedMembersList } from './paginated-members-list';
+export { EntityDescriptionInput } from './entity-description-input';
+export { EntityMemberRow } from './entity-member-row';
+export { ScopeCheckboxList } from './scope-checkbox-list';
 export type { PaginatedMembersListProps, PaginatedMembersListHandle } from './paginated-members-list';
 
 export { SettingsPageContainer, pageInlinePadding, MOBILE_PAGE_PADDING_TOP } from './settings-page-container';

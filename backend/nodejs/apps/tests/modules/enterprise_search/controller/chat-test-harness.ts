@@ -577,9 +577,11 @@ export class FakeAIBackend {
       const rawBody = typeof init?.body === 'string' ? init.body : '{}'
       const headers = Object.fromEntries(new Headers(init?.headers).entries())
       const call={ url, method: init?.method ?? 'GET', headers, body: JSON.parse(rawBody) as Record<string, unknown> }
-      const permissionCheck=url.endsWith('/chat/records/access')
+      const featureCheck=url.endsWith('/entity/access-groups/effective-scopes')
+      const permissionCheck=featureCheck || url.endsWith('/chat/records/access')
       ;(permissionCheck ? this.permissionCalls : this.calls).push(call)
       const registered = this.replies.find((r) => r.path.test(url))
+      if (featureCheck && !registered) return Promise.resolve(new Response(JSON.stringify({scopes:null}),{status:200,headers:{'content-type':'application/json'}}))
       if (permissionCheck && !registered) return Promise.resolve(new Response(JSON.stringify({accessible:[],accessibleUrls:[],groupRestricted:false}),{status:200,headers:{'content-type':'application/json'}}))
       if (registered?.reply.kind === 'fn') {
         const { status, body } = registered.reply.build(call)

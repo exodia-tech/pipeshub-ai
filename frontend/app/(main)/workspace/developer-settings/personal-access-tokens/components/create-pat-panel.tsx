@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIsMobile } from '@/lib/hooks/use-is-mobile';
 import { touchTarget } from '@/app/components/ui/responsive';
-import { Box, Button, Checkbox, Flex, IconButton, Text, TextField } from '@radix-ui/themes';
+import { Box, Button, Flex, IconButton, Text, TextField } from '@radix-ui/themes';
 import { useTranslation } from 'react-i18next';
 import type { CheckedState } from '@radix-ui/react-checkbox';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
@@ -13,7 +13,7 @@ import {
   knowledgeLimitForApi,
   type KnowledgeLimitValue,
 } from '@/app/components/knowledge-limit';
-import { FormField, WorkspaceRightPanel } from '../../../components';
+import { FormField, WorkspaceRightPanel, ScopeCheckboxList } from '../../../components';
 import { useToastStore } from '@/lib/store/toast-store';
 import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 import { PatApi } from '../api';
@@ -477,59 +477,9 @@ export function CreatePatPanel({ open, onOpenChange, onCreated }: CreatePatPanel
 
           {!scopesLoading &&
             !scopesErrorKey &&
-            sortedScopesByCategory.map(([category, items]) => {
-              const selectedInCat = items.filter((i) => selectedScopes.has(i.name)).length;
-              const totalInCat = items.length;
-              const groupChecked: CheckedState =
-                selectedInCat === totalInCat ? true : selectedInCat === 0 ? false : 'indeterminate';
+            <ScopeCheckboxList groups={sortedScopesByCategory} selected={selectedScopes}
+              onScopeChange={toggleScope} onCategoryChange={toggleCategory} />}
 
-              return (
-                <Box key={category} style={{ ...CARD_STYLE, padding: 'var(--space-3)' }}>
-                  <Flex align="center" justify="between" gap="3" wrap="wrap">
-                    <Flex align="center" gap="2" style={{ minWidth: 0 }}>
-                      <Checkbox
-                        checked={groupChecked}
-                        onCheckedChange={(c) => toggleCategory(items, c as CheckedState)}
-                      />
-                      <Text size="2" weight="medium" style={{ color: 'var(--slate-12)' }}>
-                        {category}
-                      </Text>
-                    </Flex>
-                    <Text size="2" style={{ color: 'var(--slate-11)' }}>
-                      {selectedInCat}/{totalInCat}
-                    </Text>
-                  </Flex>
-                  <Flex direction="column" gap="2" style={{ marginTop: 'var(--space-3)' }}>
-                    {items.map((scope) => (
-                      <Flex
-                        key={scope.name}
-                        align="start"
-                        gap="2"
-                        style={{
-                          padding: 'var(--space-2)',
-                          borderRadius: 'var(--radius-2)',
-                          border: '1px solid var(--olive-4)',
-                        }}
-                      >
-                        <Checkbox
-                          checked={selectedScopes.has(scope.name)}
-                          onCheckedChange={(c) => toggleScope(scope.name, Boolean(c))}
-                          style={{ marginTop: 2 }}
-                        />
-                        <Flex direction="column" gap="1" style={{ minWidth: 0 }}>
-                          <Text size="2" weight="medium" style={{ ...CREDENTIAL_MONO, color: 'var(--slate-12)' }}>
-                            {scope.name}
-                          </Text>
-                          <Text size="2" style={{ color: 'var(--slate-11)' }}>
-                            {scope.description}
-                          </Text>
-                        </Flex>
-                      </Flex>
-                    ))}
-                  </Flex>
-                </Box>
-              );
-            })}
         </Flex>
       )}
     </WorkspaceRightPanel>

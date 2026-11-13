@@ -96,6 +96,8 @@ export const PaginatedMembersList = React.forwardRef(function PaginatedMembersLi
       ) : (
         <Flex
           ref={listRef}
+          role="region"
+          aria-label={searchPlaceholder}
           className={listClassName}
           direction="column"
           gap="3"

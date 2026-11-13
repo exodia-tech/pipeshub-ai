@@ -16,6 +16,7 @@ describe('hydrateScopedRequestAsUser', () => {
   })
 
   it('gives the token it mints the role claim Node requires of a session, as member', async () => {
+    sinon.stub(globalThis, 'fetch').callsFake(async () => new Response(JSON.stringify({ scopes: null }), { status: 200 }))
     const orgId = new mongoose.Types.ObjectId()
     sinon.stub(Org, 'find').returns({
       limit: sinon.stub().returnsThis(),
@@ -38,12 +39,14 @@ describe('hydrateScopedRequestAsUser', () => {
     await hydrateScopedRequestAsUser(req, {
       jwtSecret: 'session-secret',
       scopedJwtSecret: 'scoped-secret',
+      connectorBackend: 'http://policy.test',
     } as any)
 
     const token = req.headers.authorization.replace('Bearer ', '')
     const claims = jwt.verify(token, 'session-secret') as Record<string, unknown>
     expect(claims.role).to.equal('member')
     expect(claims.email).to.equal('person@example.com')
+    expect(req.user.featureScopes).to.equal(null)
     // Node honours it like a session, so it must not outlive the request.
     expect((claims.exp as number) - (claims.iat as number)).to.equal(STAND_IN_TOKEN_TTL_SECONDS)
     expect(STAND_IN_TOKEN_TTL_SECONDS).to.be.at.most(60)

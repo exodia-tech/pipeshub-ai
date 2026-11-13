@@ -25,7 +25,7 @@ from app.api.middlewares.token_policy import (
     token_scopes,
 )
 from app.config.configuration_service import ConfigurationService
-from app.config.constants.service import config_node_constants
+from app.config.constants.service import TokenScopes, config_node_constants
 from app.core.org_context import OrgContext, set_request_context
 from app.utils.logging_fields import log_once
 from app.utils.request_context import get_context as get_request_context
@@ -418,7 +418,8 @@ def require_scopes(
 
     Args:
         *required_scopes: OAuth scopes; an OAuth/PAT token needs at least one (OR logic).
-            Session tokens are not scope-restricted.
+            Session tokens have no token-grant restriction. All user-facing tokens
+            remain subject to live group feature limits.
         service_scopes: Service-token scopes this route admits. Empty (the default)
             rejects every service token with 403.
     """
@@ -428,16 +429,28 @@ def require_scopes(
         user = _authenticated_user(request)
 
         if is_service_token(user):
-            if has_service_scope(user, *admitted_service_scopes):
+            if not has_service_scope(user, *admitted_service_scopes):
+                raise AuthRejected(status.HTTP_403_FORBIDDEN, "This route does not accept service tokens",
+                                   reason="service_token_not_allowed")
+            # Native virtual bot identities use configured-agent access, not a human's groups.
+            if not has_service_scope(user, TokenScopes.CONVERSATION_CREATE) or user.get("isServiceAccount") is True:
                 return
-            raise AuthRejected(status.HTTP_403_FORBIDDEN, "This route does not accept service tokens",
-                               reason="service_token_not_allowed")
 
-        if not user.get("isOAuth", False):
-            return
+        limits = None
+        if any(":" in scope for scope in required_scopes) and not is_request_admin(request):
+            from app.services.group_resource_policy import GroupResourceAccess
 
-        token_scopes = user.get("oauthScopes", [])
-        if not any(scope in token_scopes for scope in required_scopes):
+            try:
+                graph = request.app.state.graph_provider
+                if not hasattr(request.state, "group_feature_scopes"):
+                    request.state.group_feature_scopes = await GroupResourceAccess(graph).feature_scopes_for_user(user["orgId"], user["userId"])
+                limits = request.state.group_feature_scopes
+            except Exception as exc:
+                raise AuthRejected(status.HTTP_503_SERVICE_UNAVAILABLE, "Feature permissions could not be verified",
+                                   reason="feature_permissions_unavailable") from exc
+        token_scopes = user.get("oauthScopes", []) if user.get("isOAuth", False) else None
+        if not any((token_scopes is None or scope in token_scopes) and (limits is None or scope in limits)
+                   for scope in required_scopes):
             raise AuthRejected(status.HTTP_403_FORBIDDEN, f"Insufficient scope. Required: {' or '.join(required_scopes)}",
                                reason="insufficient_scope")
 

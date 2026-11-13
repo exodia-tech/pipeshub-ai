@@ -48,6 +48,19 @@ function createMockNext(): sinon.SinonStub {
 // ---------------------------------------------------------------------------
 
 describe('requireScopes Middleware', () => {
+  it('applies a live group feature limit to browser sessions', () => {
+    const req = createMockRequest({ user: { userId: 'member', featureScopes: ['agent:read'] } });
+    const next = createMockNext();
+    requireScopes(OAuthScopeNames.AGENT_EXECUTE)(req, createMockResponse(), next);
+    expect(next.firstCall.args[0]).to.be.instanceOf(ForbiddenError);
+  });
+
+  it('requires the same alternative scope in the token and group limit', () => {
+    const req = createMockRequest({ user: { isOAuth: true, oauthScopes: ['semantic:read'], featureScopes: ['semantic:write'] } });
+    const next = createMockNext();
+    requireScopes(OAuthScopeNames.SEMANTIC_READ, OAuthScopeNames.SEMANTIC_WRITE)(req, createMockResponse(), next);
+    expect(next.firstCall.args[0]).to.be.instanceOf(ForbiddenError);
+  });
   afterEach(() => {
     sinon.restore()
   })

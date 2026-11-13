@@ -1,6 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  useId,
+} from 'react';
 import { Avatar, Badge, Box, Flex, Text } from '@radix-ui/themes';
 import { MaterialIcon } from '@/app/components/ui/MaterialIcon';
 import { Spinner } from '@/app/components/ui/spinner';
@@ -78,6 +85,8 @@ export function SearchableCheckboxDropdown({
   const [searchQuery, setSearchQuery] = useState('');
   const [openDirection, setOpenDirection] = useState<'down' | 'up'>('down');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const chipsContainerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -117,7 +126,7 @@ export function SearchableCheckboxDropdown({
     return options.filter(
       (o) =>
         o.label.toLowerCase().includes(q) ||
-        (o.subtitle && o.subtitle.toLowerCase().includes(q))
+        (o.subtitle && o.subtitle.toLowerCase().includes(q)),
     );
   }, [options, searchQuery, isServerSearch]);
 
@@ -130,7 +139,7 @@ export function SearchableCheckboxDropdown({
         searchTimerRef.current = setTimeout(() => onSearch!(value), 300);
       }
     },
-    [isServerSearch, onSearch]
+    [isServerSearch, onSearch],
   );
 
   // Release scroll lock when parent finishes loading (covers one-frame gap before isLoadingMore updates)
@@ -142,12 +151,7 @@ export function SearchableCheckboxDropdown({
 
   // Infinite scroll
   const handleScroll = useCallback(() => {
-    if (
-      !onLoadMore ||
-      !hasMore ||
-      isLoadingMore ||
-      loadMoreLockRef.current
-    ) {
+    if (!onLoadMore || !hasMore || isLoadingMore || loadMoreLockRef.current) {
       return;
     }
     const el = listRef.current;
@@ -188,15 +192,16 @@ export function SearchableCheckboxDropdown({
       }
       // Clear search text after selection so the full list is visible again
       setSearchQuery('');
+      inputRef.current?.focus();
     },
-    [selectedIds, onSelectionChange]
+    [selectedIds, onSelectionChange],
   );
 
   const removeChip = useCallback(
     (id: string) => {
       onSelectionChange(selectedIds.filter((sid) => sid !== id));
     },
-    [selectedIds, onSelectionChange]
+    [selectedIds, onSelectionChange],
   );
 
   const handleTriggerClick = () => {
@@ -222,25 +227,64 @@ export function SearchableCheckboxDropdown({
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (
-      e.key === 'Backspace' &&
-      searchQuery === '' &&
-      selectedIds.length > 0
-    ) {
+    if (e.key === 'Backspace' && searchQuery === '' && selectedIds.length > 0) {
       // Remove last selected chip
       onSelectionChange(selectedIds.slice(0, -1));
-    }
-    if (e.key === 'Escape') {
-      setIsOpen(false);
     }
   };
 
   const selectedOptions = options.filter((o) => selectedIds.includes(o.id));
 
   return (
-    <Box ref={dropdownRef} style={{ position: 'relative' }}>
+    <Box
+      ref={dropdownRef}
+      style={{ position: 'relative' }}
+      onKeyDown={(event) => {
+        if (!isOpen) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsOpen(false);
+          triggerRef.current?.focus();
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          const options = Array.from(
+            listRef.current?.querySelectorAll<HTMLElement>('[role="option"]') ??
+              [],
+          );
+          if (!options.length) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const current = options.indexOf(
+            document.activeElement as HTMLElement,
+          );
+          const next =
+            current < 0
+              ? event.key === 'ArrowDown'
+                ? 0
+                : options.length - 1
+              : (current +
+                  (event.key === 'ArrowDown' ? 1 : -1) +
+                  options.length) %
+                options.length;
+          options[next].focus();
+        }
+      }}
+    >
       {/* Trigger */}
       <Box
+        ref={triggerRef}
+        role="combobox"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={placeholder}
+        aria-expanded={isOpen}
+        aria-disabled={disabled}
+        aria-controls={isOpen ? listId : undefined}
+        onKeyDown={(event) => {
+          if (!isOpen && ['Enter', ' ', 'ArrowDown'].includes(event.key)) {
+            event.preventDefault();
+            handleTriggerClick();
+          }
+        }}
         onClick={handleTriggerClick}
         style={{
           display: 'flex',
@@ -310,11 +354,7 @@ export function SearchableCheckboxDropdown({
                   flexShrink: 0,
                 }}
               >
-                <MaterialIcon
-                  name="close"
-                  size={14}
-                  color="var(--slate-11)"
-                />
+                <MaterialIcon name="close" size={14} color="var(--slate-11)" />
               </Box>
             </Flex>
           ))}
@@ -322,6 +362,7 @@ export function SearchableCheckboxDropdown({
           {isOpen ? (
             <input
               ref={inputRef}
+              aria-label={placeholder}
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
@@ -377,6 +418,10 @@ export function SearchableCheckboxDropdown({
       {isOpen && (
         <Box
           ref={listRef}
+          id={listId}
+          role="listbox"
+          aria-label={placeholder}
+          aria-multiselectable="true"
           className="no-scrollbar"
           onScroll={handleScroll}
           style={{
@@ -391,7 +436,8 @@ export function SearchableCheckboxDropdown({
             backgroundColor: 'var(--olive-2)',
             border: '1px solid var(--olive-3)',
             borderRadius: 'var(--radius-2)',
-            boxShadow: '0 12px 32px -16px var(--slate-a5, rgba(217, 237, 254, 0.15)), 0 12px 60px 0 var(--black-3, rgba(0, 0, 0, 0.15))',
+            boxShadow:
+              '0 12px 32px -16px var(--slate-a5, rgba(217, 237, 254, 0.15)), 0 12px 60px 0 var(--black-3, rgba(0, 0, 0, 0.15))',
             zIndex: 100,
           }}
         >
@@ -422,6 +468,16 @@ export function SearchableCheckboxDropdown({
               return (
                 <Flex
                   key={option.id}
+                  role="option"
+                  aria-selected={isChecked}
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      toggleOption(option.id);
+                    }
+                  }}
                   align="center"
                   gap="3"
                   onClick={() => toggleOption(option.id)}
@@ -444,9 +500,7 @@ export function SearchableCheckboxDropdown({
                       width: 'var(--space-4)',
                       height: 'var(--space-4)',
                       borderRadius: 'var(--radius-1)',
-                      border: isChecked
-                        ? 'none'
-                        : '1px solid var(--slate-a7)',
+                      border: isChecked ? 'none' : '1px solid var(--slate-a7)',
                       backgroundColor: isChecked
                         ? 'var(--emerald-9)'
                         : 'transparent',
@@ -457,16 +511,16 @@ export function SearchableCheckboxDropdown({
                     }}
                   >
                     {isChecked && (
-                      <MaterialIcon
-                        name="check"
-                        size={12}
-                        color="white"
-                      />
+                      <MaterialIcon name="check" size={12} color="white" />
                     )}
                   </Box>
 
                   {showAvatar ? (
-                    <Flex align="center" gap="2" style={{ flex: 1, minWidth: 0 }}>
+                    <Flex
+                      align="center"
+                      gap="2"
+                      style={{ flex: 1, minWidth: 0 }}
+                    >
                       <Avatar
                         size="2"
                         variant="soft"
@@ -493,7 +547,11 @@ export function SearchableCheckboxDropdown({
                             {option.label}
                           </Text>
                           {option.badge && (
-                            <Badge color="gray" size="1" style={{ flexShrink: 0 }}>
+                            <Badge
+                              color="gray"
+                              size="1"
+                              style={{ flexShrink: 0 }}
+                            >
                               {option.badge}
                             </Badge>
                           )}
@@ -514,10 +572,7 @@ export function SearchableCheckboxDropdown({
                       </Flex>
                     </Flex>
                   ) : (
-                    <Text
-                      size="2"
-                      style={{ color: 'var(--slate-12)' }}
-                    >
+                    <Text size="2" style={{ color: 'var(--slate-12)' }}>
                       {option.label}
                     </Text>
                   )}
@@ -526,9 +581,16 @@ export function SearchableCheckboxDropdown({
             })
           )}
           {isLoadingMore && (
-            <Flex align="center" justify="center" gap="2" style={{ padding: '8px' }}>
+            <Flex
+              align="center"
+              justify="center"
+              gap="2"
+              style={{ padding: '8px' }}
+            >
               <Spinner size={12} />
-              <Text size="1" style={{ color: 'var(--slate-9)' }}>Loading...</Text>
+              <Text size="1" style={{ color: 'var(--slate-9)' }}>
+                Loading...
+              </Text>
             </Flex>
           )}
         </Box>

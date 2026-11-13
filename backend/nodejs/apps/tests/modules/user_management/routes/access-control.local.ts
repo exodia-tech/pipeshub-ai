@@ -10,6 +10,7 @@ import { requestContextMiddleware } from '../../../../src/libs/middlewares/reque
 import { AuthTokenService } from '../../../../src/libs/services/authtoken.service';
 import { Logger } from '../../../../src/libs/services/logger.service';
 import { createAccessGroupsRouter } from '../../../../src/modules/user_management/routes/accessGroups.routes';
+import { groupScopeResolver } from '../../../../src/libs/services/group-scope-policy';
 import { createAuditRouter } from '../../../../src/modules/audit/audit.routes';
 import { fixtureChat } from './fixture-chat';
 import { AuthenticatedUserRequest } from '../../../../src/libs/middlewares/types';
@@ -67,6 +68,7 @@ async function main() {
     .bind('AppConfig')
     .toConstantValue({ connectorBackend: backend, scopedJwtSecret: secret });
   const app = express();
+  app.locals.resolveGroupScopes = groupScopeResolver({ connectorBackend: backend, scopedJwtSecret: secret });
   app.use((req, res, next) => {
     if (
       ![

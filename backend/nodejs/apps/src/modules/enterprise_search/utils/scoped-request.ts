@@ -21,6 +21,7 @@ import { getSlackBotStore } from '../../configuration_manager/controller/cm_cont
 import { AppConfig } from '../../tokens_manager/config/config';
 import { getOrgRepository } from '../../../libs/repositories/org';
 import { getUserRepository } from '../../../libs/repositories/user';
+import { groupScopeResolver } from '../../../libs/services/group-scope-policy';
 
 /**
  * Turns a scoped service token (`/internal/...` routes: Slack bot, service
@@ -67,6 +68,7 @@ export const hydrateScopedRequestAsUser = async (
 ): Promise<void> => {
   const existingUser = (req as AuthenticatedUserRequest).user;
   if (existingUser?.userId && existingUser?.orgId) {
+    await (req as AuthenticatedUserRequest).resolveFeatureScopes?.();
     return;
   }
 
@@ -119,6 +121,7 @@ export const hydrateScopedRequestAsUser = async (
               email: email,
               scopes: [TokenScopes.CONVERSATION_CREATE],
               isServiceAccount: true,
+              featureScopes: [],
             };
             return;
           }
@@ -157,6 +160,7 @@ export const hydrateScopedRequestAsUser = async (
     fullName: user.fullName,
     mobile: user.mobile,
     userSlug: user.slug,
+    featureScopes: await groupScopeResolver(appConfig, false)(String(user.orgId), String(user._id)),
   };
 };
 

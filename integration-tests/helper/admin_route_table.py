@@ -77,6 +77,19 @@ def _no_admin(method: str, path: str, why: str, **kw: Any) -> AdminRoute:
 _CM = "/api/v1/configurationManager"
 
 NODE_ADMIN_ROUTES: tuple[AdminRoute, ...] = (
+    # Access groups use their audited wrapper around the native admin check.
+    AdminRoute("GET", "/api/v1/access-groups"),
+    AdminRoute("GET", "/api/v1/access-groups/scopes"),
+    AdminRoute("GET", "/api/v1/access-groups/:id/access"),
+    AdminRoute("GET", "/api/v1/access-groups/:id/resources"),
+    AdminRoute("GET", "/api/v1/access-groups/:id/members"),
+    _no_admin("POST", "/api/v1/access-groups", "creates a group; no validator middleware follows the admin check"),
+    AdminRoute("PUT", "/api/v1/access-groups/:id"),
+    AdminRoute("DELETE", "/api/v1/access-groups/:id"),
+    AdminRoute("PUT", "/api/v1/access-groups/:id/access"),
+    AdminRoute("POST", "/api/v1/access-groups/:id/members/add"),
+    AdminRoute("POST", "/api/v1/access-groups/:id/members/remove"),
+    AdminRoute("GET", "/api/v1/audit"),
     # orgAuthConfig.routes.ts (router-level userAdminCheck)
     AdminRoute("GET", "/api/v1/orgAuthConfig/authMethods"),
     AdminRoute("GET", "/api/v1/orgAuthConfig/signInRemoval"),

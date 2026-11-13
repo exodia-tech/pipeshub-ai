@@ -3,6 +3,8 @@ import { Router, type Response, type NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
 import mongoose from 'mongoose';
 import { AuthMiddleware } from '../../../../src/libs/middlewares/auth.middleware';
+import { requireScopes } from '../../../../src/libs/middlewares/require-scopes.middleware';
+import { OAuthScopeNames } from '../../../../src/libs/enums/oauth-scopes.enum';
 import { AuthenticatedUserRequest } from '../../../../src/libs/middlewares/types';
 import { recordAuditEvent } from '../../../../src/modules/audit/audit.store';
 import {
@@ -111,7 +113,7 @@ export function fixtureChat(auth: AuthMiddleware, backend: string): Router {
       ),
     };
   }
-  router.get('/', (req: AuthenticatedUserRequest, res) =>
+  router.get('/', requireScopes(OAuthScopeNames.CONVERSATION_READ), (req: AuthenticatedUserRequest, res) =>
     res.json({
       conversations: [...conversations.values()]
         .filter(
@@ -123,7 +125,7 @@ export function fixtureChat(auth: AuthMiddleware, backend: string): Router {
       pagination: { totalCount: conversations.size, hasNextPage: false },
     }),
   );
-  router.get('/:id', async (req: AuthenticatedUserRequest, res, next) => {
+  router.get('/:id', requireScopes(OAuthScopeNames.CONVERSATION_READ), async (req: AuthenticatedUserRequest, res, next) => {
     try {
       const row = owned(req, String(req.params.id));
       if (!row) {
@@ -280,7 +282,7 @@ export function fixtureChat(auth: AuthMiddleware, backend: string): Router {
       next(error);
     }
   }
-  router.post('/stream', stream);
-  router.post('/:id/messages/stream', stream);
+  router.post('/stream', requireScopes(OAuthScopeNames.CONVERSATION_CHAT), stream);
+  router.post('/:id/messages/stream', requireScopes(OAuthScopeNames.CONVERSATION_CHAT), stream);
   return router;
 }

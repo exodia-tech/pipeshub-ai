@@ -113,8 +113,8 @@ CONNECTORS: tuple[Connector, ...] = (
     Connector("google/drive/individual", "container", CONTAINER, "google/drive/individual/connector.py:185"),
     Connector("linear", "linear", CONTAINER, "linear/connector.py:1190",
               "team group RECORD_GROUP_LEVEL, ORG grant (public) or group grant (private); the source doc calls it override"),
-    Connector("slack/team", "container", CONTAINER, "slack/team/connector.py:1655"),
-    Connector("slack/individual", "container", CONTAINER, "slack/individual/connector.py:332"),
+    Connector("slack/team", "container", CONTAINER, "slack/team/connector.py:2230"),
+    Connector("slack/individual", "container", CONTAINER, "slack/individual/connector.py:345"),
     Connector("google/gmail/team", "container", CONTAINER, "google/gmail/team/connector.py:1787"),
     Connector("google/gmail/individual", "container", CONTAINER, "google/gmail/individual/connector.py:131"),
     Connector("microsoft/outlook", "container", CONTAINER, "microsoft/outlook/connector.py:1190"),
@@ -154,7 +154,7 @@ CONNECTORS: tuple[Connector, ...] = (
     Connector("zoom", "item-acl", OVERRIDE, "zoom/connector.py:907", "per-user groups, inherit=False", read=False),
     Connector("drupal_wiki", "item-acl", OVERRIDE, "drupal_wiki/connector.py:769", "spaces inherit=False with org, user and group grants", read=False),
     Connector("bookstack", "item-acl", OVERRIDE, "bookstack/connector.py:1224", "each chapter and page carries its own access (inherit=False): BookStack decides it apart from its book's", read=False),
-    Connector("demo", "item-acl", OVERRIDE, "demo/connector.py:202", "RECORD_LEVEL demo connector", read=False),
+    Connector("demo", "item-acl", OVERRIDE, "demo/connector.py:234", "RECORD_LEVEL demo connector", read=False),
 )
 
 

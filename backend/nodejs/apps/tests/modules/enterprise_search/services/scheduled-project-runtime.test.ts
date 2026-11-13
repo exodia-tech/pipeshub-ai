@@ -45,6 +45,7 @@ describe('Project schedule runtime', () => {
     periodEnd: 1000,
   };
   function setup() {
+    const policy = sinon.stub(globalThis, 'fetch').callsFake(async () => new Response(JSON.stringify({ scopes: null }), { status: 200 }));
     const getLive = sinon.stub().resolves({
       _id: 'owner',
       orgId: 'org',
@@ -69,6 +70,7 @@ describe('Project schedule runtime', () => {
         jwtSecret: 'test',
         scopedJwtSecret: 'test',
         aiBackend: 'http://test.invalid',
+        connectorBackend: 'http://policy.invalid',
       }),
       {},
       grants,
@@ -86,8 +88,23 @@ describe('Project schedule runtime', () => {
       },
       recordsUsed: 1,
     });
-    return { runtime, validate, open, complete, delivery, getLive };
+    return { runtime, validate, open, complete, delivery, getLive, policy };
   }
+  it('denies a scheduled project run before reading context when group project access was revoked', async () => {
+    const { runtime, policy, validate, open, complete } = setup();
+    policy.callsFake(async () => new Response(JSON.stringify({ scopes: ['agent:read', 'agent:execute'] }), { status: 200 }));
+    await assert.rejects(runtime.execute(schedule, run, async () => {}), /access group/);
+    assert.equal(validate.called, false);
+    assert.equal(open.called, false);
+    assert.equal(complete.called, false);
+  });
+  it('rechecks the live scope ceiling immediately before dispatch', async () => {
+    const { runtime, policy, complete } = setup();
+    policy.onFirstCall().callsFake(async () => new Response(JSON.stringify({ scopes: null }), { status: 200 }));
+    policy.onSecondCall().callsFake(async () => new Response(JSON.stringify({ scopes: [] }), { status: 200 }));
+    await assert.rejects(runtime.execute(schedule, run, async () => {}), /access group/);
+    assert.equal(complete.called, false);
+  });
   it('creates an owner-private project draft with pinned model, strict source scope and no actions', async () => {
     const { runtime, validate, open, complete, delivery } = setup();
     const result = await runtime.execute(schedule, run, async () => {});

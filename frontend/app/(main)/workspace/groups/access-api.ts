@@ -3,16 +3,21 @@ import { apiClient } from "@/lib/api";
 export interface AccessGroup {
   _key: string;
   name: string;
+  description?: string;
+  createdAtTimestamp?: number;
+  createdByUser?: { userId: string; name?: string; email?: string } | null;
 }
 export interface AccessGroupMember {
   userId: string;
   userName?: string;
   userEmail?: string;
+  profilePicture?: string;
 }
 
 export interface ResourcePolicy {
   defaultAllow: boolean;
   revision?: number;
+  featureScopes?: string[] | null;
   rules: { ref: string; allow: boolean }[];
 }
 export interface GroupResource {
@@ -28,6 +33,10 @@ export interface GroupResource {
 }
 
 export const AccessGroupsApi = {
+  async scopes(): Promise<{ name: string; description: string; category: string }[]> {
+    const { data } = await apiClient.get<{ scopes: { name: string; description: string; category: string }[] }>('/api/v1/access-groups/scopes');
+    return data.scopes;
+  },
   async policy(id: string): Promise<ResourcePolicy> {
     const { data } = await apiClient.get<{ policy: ResourcePolicy }>(
       `/api/v1/access-groups/${id}/access`,
@@ -55,17 +64,17 @@ export const AccessGroupsApi = {
     });
     return data;
   },
-  async list(skip = 0): Promise<AccessGroup[]> {
+  async list(skip = 0, limit = 100): Promise<AccessGroup[]> {
     const { data } = await apiClient.get<{ groups: AccessGroup[] }>(
       "/api/v1/access-groups",
-      { params: { skip, limit: 100 } },
+      { params: { skip, limit } },
     );
     return data.groups;
   },
-  async create(name: string): Promise<string> {
+  async create(name: string, description?: string): Promise<string> {
     const { data } = await apiClient.post<{ id: string }>(
       "/api/v1/access-groups",
-      { name },
+      { name, description },
     );
     return data.id;
   },
@@ -92,8 +101,8 @@ export const AccessGroupsApi = {
       userIds,
     });
   },
-  async rename(id: string, name: string): Promise<void> {
-    await apiClient.put(`/api/v1/access-groups/${id}`, { name });
+  async rename(id: string, name: string, description?: string): Promise<void> {
+    await apiClient.put(`/api/v1/access-groups/${id}`, { name, description });
   },
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/v1/access-groups/${id}`);

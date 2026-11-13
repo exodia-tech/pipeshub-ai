@@ -95,10 +95,10 @@ const slug = (name: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
-/** `{instance_url}/api/v1` -> `/api/v1`; an absolute URL is kept whole. */
+/** Instance templates use this origin; other absolute URLs are kept whole. */
 const serverBasePath = (servers: unknown): string => {
   const url = Array.isArray(servers) ? (servers[0] as { url?: unknown } | undefined)?.url : undefined;
-  return typeof url === 'string' ? url.replace(/^\{[^}]+\}/, '').replace(/\/$/, '') : '';
+  return typeof url === 'string' ? url.replace(/^(?:https?:\/\/)?\{[^}]+\}/, '').replace(/\/$/, '') : '';
 };
 
 type SpecNode = Record<string, unknown>;

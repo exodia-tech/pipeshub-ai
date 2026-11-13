@@ -19,6 +19,9 @@ import { type AuditAction, recordAuditEvent } from '../../audit/audit.store';
 import { AppConfig } from '../../tokens_manager/config/config';
 import { groupAdminCheck } from './userGroups.routes';
 import { userAdminCheck } from '../middlewares/userAdminCheck';
+import { getAllowedScopeNamesForRole, OAuthScopes } from '../../oauth_provider/config/scopes.config';
+
+const featureScopeNames = getAllowedScopeNamesForRole(false).filter((scope) => scope.includes(':'));
 
 // eslint-disable-next-line no-control-regex -- Resource references must reject C0 control characters.
 const resourceReference = /^(apps|recordGroups|records)\/[^/\x00-\x1f]{1,256}$/;
@@ -33,8 +36,10 @@ const accessPolicy = z.object({
       }),
     )
     .max(1000),
+  featureScopes: z.array(z.string().refine((scope) => featureScopeNames.includes(scope))).max(100).nullable().optional()
+    .refine((scopes) => scopes == null || new Set(scopes).size === scopes.length),
 });
-const namedGroup = z.object({ name: z.string() });
+const namedGroup = z.object({ name: z.string(), description: z.string().max(2000).optional() });
 const groupMembers = z.object({
   userIds: z
     .array(z.string().regex(/^[a-f0-9]{24}$/i))
@@ -46,6 +51,9 @@ export function createAccessGroupsRouter(container: Container): Router {
   const router = Router();
   const auth = container.get<AuthMiddleware>('AuthMiddleware');
   const config = container.get<AppConfig>('AppConfig');
+  router.get('/scopes', auth.authenticate.bind(auth), userAdminCheck, (_req, res) => {
+    res.json({ scopes: featureScopeNames.map((scope) => OAuthScopes[scope]) });
+  });
   for (const part of ['access', 'resources'] as const) {
     router.get(
       `/:id/${part}`,
@@ -127,6 +135,7 @@ export function createAccessGroupsRouter(container: Container): Router {
           resource_policy: {
             default_allow: body.defaultAllow,
             revision: body.revision ?? 0,
+            ...(body.featureScopes !== undefined ? { feature_scopes: body.featureScopes } : {}),
             rules: body.rules.map((rule: { ref: string; allow: boolean }) => ({
               resource_ref: rule.ref,
               allow: rule.allow,
@@ -154,6 +163,7 @@ export function createAccessGroupsRouter(container: Container): Router {
             body: JSON.stringify({
               defaultAllow: body.defaultAllow,
               revision: body.revision ?? 0,
+              ...(body.featureScopes !== undefined ? { featureScopes: body.featureScopes } : {}),
               rules: body.rules.map(
                 (rule: { ref: string; allow: boolean }) => ({
                   ref: rule.ref,
@@ -315,7 +325,7 @@ export function createAccessGroupsRouter(container: Container): Router {
                 authorization: `Bearer ${token}`,
                 'content-type': 'application/json',
               },
-              body: JSON.stringify({ name: name.trim() }),
+              body: JSON.stringify({ name: name.trim(), description: parsedName.success ? parsedName.data.description?.trim() : undefined }),
               signal: AbortSignal.timeout(15_000),
             },
           );
@@ -490,7 +500,7 @@ export function createAccessGroupsRouter(container: Container): Router {
                 'content-type': 'application/json',
               },
               ...(operation === 'rename'
-                ? { body: JSON.stringify({ name: name?.trim() }) }
+                ? { body: JSON.stringify({ name: name?.trim(), description: parsedName.success ? parsedName.data.description?.trim() : undefined }) }
                 : {}),
               signal: AbortSignal.timeout(15_000),
             },

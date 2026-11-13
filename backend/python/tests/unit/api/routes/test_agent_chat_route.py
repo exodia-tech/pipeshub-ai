@@ -154,7 +154,8 @@ class TestChatStreamAccess:
 
     def test_service_account_artifacts_of_a_service_caller_stay_the_creators(self, graph, loop) -> None:
         """The Slack bot's JWT is a service identity with no user to grant files to."""
-        bot = {"slack-bot": {"userId": "u-slack-bot", "orgId": "org-1", "isServiceAccount": True}}
+        bot = {"slack-bot": {"userId": "u-slack-bot", "orgId": "org-1", "isServiceAccount": True,
+                             "token_type": "scoped", "scopes": ["conversation:create"]}}
         c, _ = make_client(graph, extra_users=bot)
         assert _stream(c, "sa", "slack-bot", {"query": "hi", "callerDisplayName": "Bob"}).status_code == 200
         (call,) = loop.calls
@@ -162,15 +163,14 @@ class TestChatStreamAccess:
         assert call["user_info"]["userId"] == "u-alice"
 
     @pytest.mark.parametrize("change", ["missing", "other-org"])
-    def test_service_account_artifacts_of_an_unknown_caller_stay_the_creators(self, graph, loop, change) -> None:
+    def test_unknown_human_caller_cannot_bypass_group_verification(self, graph, loop, change) -> None:
         if change == "missing":
             del graph.nodes["users"][user_key("bob")]
         else:
             graph.nodes["users"][user_key("bob")]["orgId"] = "org-2"
         c, _ = make_client(graph)
-        assert _stream(c, "sa", "bob", {"query": "hi", "callerDisplayName": "Bob B."}).status_code == 200
-        (call,) = loop.calls
-        assert call["query_info"]["artifact_owner_user_id"] is None
+        assert _stream(c, "sa", "bob", {"query": "hi", "callerDisplayName": "Bob B."}).status_code == 503
+        assert not loop.calls
 
     def test_service_account_chat_fails_rather_than_guess_the_owner(self, graph, loop) -> None:
         """A caller who cannot be read is not handed to the creator: their files would go to the wrong person."""

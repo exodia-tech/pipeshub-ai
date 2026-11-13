@@ -90,6 +90,20 @@ export class AuthMiddleware {
 
       // Bind the verified token's org for the rest of the request (never a client field).
       const orgId = req.user?.orgId as string | undefined;
+      const verifiedUserId = req.user?.userId ? String(req.user.userId) : undefined;
+      // Limits are resolved by the host application, never accepted from JWT claims.
+      if (req.user) delete req.user.featureScopes;
+      let scopeResolution: Promise<void> | undefined;
+      req.resolveFeatureScopes = () => scopeResolution ??= (async () => {
+        const resolveScopes = req.app?.locals?.resolveGroupScopes;
+        if (resolveScopes !== undefined) {
+          if (typeof resolveScopes !== 'function' || !orgId || !verifiedUserId) {
+            throw new UnauthorizedError('Feature permissions could not be verified');
+          }
+          req.user!.featureScopes = await this.asVerified(orgId, verifiedUserId, 'group-scopes',
+            () => resolveScopes(orgId, verifiedUserId));
+        }
+      })();
       if (orgId) {
         runWithOrgContext(
           makeOrgContext({

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useFormFieldControl } from '../../components/form-field';
 
 interface GroupNameInputProps {
   value: string;
@@ -15,8 +16,10 @@ export function GroupNameInput({
   ariaLabel,
   onChange,
 }: GroupNameInputProps) {
+  const control = useFormFieldControl();
   return (
     <input
+      {...control}
       type="text"
       aria-label={ariaLabel}
       value={value}

@@ -58,7 +58,10 @@ def test_agent_chat_routes_admit_conversation_chat(path) -> None:
 
 
 def _request(user: dict) -> SimpleNamespace:
-    return SimpleNamespace(state=SimpleNamespace(user=user))
+    return SimpleNamespace(
+        state=SimpleNamespace(user=user, group_feature_scopes=None),
+        app=SimpleNamespace(state=SimpleNamespace(graph_provider=None)),
+    )
 
 
 def _oauth(*scopes: str) -> dict:
@@ -80,7 +83,7 @@ class TestNamedAgentsNeedAgentExecute:
     async def test_named_agent_runs_with_agent_execute(self) -> None:
         await agent.require_agent_execute_for_named_agents(_request(_oauth(AGENT)), "agent-1")
 
-    async def test_session_token_is_not_scope_checked(self) -> None:
+    async def test_session_without_group_limits_keeps_native_access(self) -> None:
         await agent.require_agent_execute_for_named_agents(
             _request({"userId": "u-1", "orgId": "org-1"}), "agent-1",
         )

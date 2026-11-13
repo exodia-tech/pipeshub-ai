@@ -6,6 +6,8 @@ import { asAccount, forOrg } from '../../../libs/context/orgContext';
 import { newSystemRoot, runWithRequestContext } from '../../../libs/context/request-context';
 import { getUserRepository } from '../../../libs/repositories/user';
 import { AppConfig } from '../../tokens_manager/config/config';
+import { groupScopeResolver } from '../../../libs/services/group-scope-policy';
+import { OAuthScopeNames } from '../../../libs/enums/oauth-scopes.enum';
 import { AiChatRequest, buildAiChatRequest } from '../utils/ai-chat-payload';
 import { openConversation, completeTurn } from '../utils/non-streaming-chat';
 import { buildUserQueryMessage, extractModelInfo } from '../utils/utils';
@@ -106,6 +108,17 @@ export class ScheduledAgentRuntime {
       }
       return asAccount(schedule.orgId, schedule.userId, 'agent-schedule', async () => {
         const config = this.config();
+        // Scheduled runs use member credentials, never an administrator exemption.
+        const scopeLimit = groupScopeResolver(config, false);
+        const checkScopes = async () => {
+          const scopes = await scopeLimit(schedule.orgId, schedule.userId);
+          const required = [OAuthScopeNames.AGENT_READ, OAuthScopeNames.AGENT_EXECUTE,
+            ...(schedule.projectId ? [OAuthScopeNames.PROJECT_READ] : [])];
+          if (scopes !== null && !required.every((scope) => scopes.includes(scope))) {
+            throw new ForbiddenError('Your access group no longer allows this scheduled action.');
+          }
+        };
+        await checkScopes();
         const auth = new AuthTokenService(config.jwtSecret, config.scopedJwtSecret);
         // A fresh member token for this run; no stored password, PAT or administrator delegation.
         const headers = { Authorization: `Bearer ${auth.generateToken({
@@ -138,6 +151,7 @@ export class ScheduledAgentRuntime {
           project = approved.project;
         }
         const target = { kind: 'agent' as const, agentKey: schedule.agentId };
+        await checkScopes();
         const request = buildAiChatRequest(target, body, { conversationId: conversation._id, previousConversations: [], isNewConversation: true, project });
         if (isProject) constrainProjectScheduleRequest(request, approved!.model, approved!.modelFingerprint);
         const turn = await completeTurn({

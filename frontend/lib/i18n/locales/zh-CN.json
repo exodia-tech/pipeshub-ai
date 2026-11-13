@@ -2433,6 +2433,7 @@
     },
     "pagination": {
       "showing_other": "显示第 {{from}}-{{to}} 项，共 {{count}} 项",
+      "showingRange": "显示 {{from}}-{{to}}",
       "previous": "上一页",
       "next": "下一页"
     },
@@ -6026,6 +6027,7 @@
     "countsHint": "可读人数反映已保存的规则、源系统权限和其他组的限制。— 表示未验证。"
   },
   "accessGroups": {
+    "helpTitle": "关于访问组",
     "title": "访问组",
     "adminOnly": "只有管理员可以管理访问组。",
     "help": "添加成员后，在访问权限中管理其连接器、频道和文件夹访问权限。集合共享权限仍然适用。",
@@ -6247,5 +6249,14 @@
     },
     "nothingNew": "此节点没有更多内容可显示。",
     "tableOnly": "为保持流畅，仅显示表格。"
+  },
+  "groupScopes": {
+    "title": "功能权限",
+    "content": "内容访问",
+    "limit": "限制可用操作",
+    "about": "关于功能权限",
+    "unrestricted": "此群组不额外限制功能。",
+    "selected": "允许的操作：{{count}}",
+    "help": "所有群组的限制均适用。现有角色、令牌权限范围和内容访问权限仍然有效。管理员保留管理权限。"
   }
 }

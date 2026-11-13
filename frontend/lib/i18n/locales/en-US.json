@@ -2451,6 +2451,7 @@
     "pagination": {
       "showing_one": "Showing {{from}}-{{to}} of {{count}} item",
       "showing_other": "Showing {{from}}-{{to}} of {{count}} items",
+      "showingRange": "Showing {{from}}-{{to}}",
       "previous": "Previous",
       "next": "Next"
     },
@@ -6061,6 +6062,7 @@
     "countsHint": "Reader counts reflect saved rules, source permissions and other group restrictions. — means unverified."
   },
   "accessGroups": {
+    "helpTitle": "About access groups",
     "title": "Access groups",
     "adminOnly": "Only administrators can manage access groups.",
     "help": "Add members, then control their connector, channel and folder access in Access permissions. Collection sharing still applies.",
@@ -6282,5 +6284,14 @@
     },
     "nothingNew": "Nothing more to show for this node.",
     "tableOnly": "Showing the table only, to keep things responsive."
+  },
+  "groupScopes": {
+    "title": "Feature permissions",
+    "content": "Content access",
+    "limit": "Limit available actions",
+    "about": "About feature permissions",
+    "unrestricted": "This group adds no feature limits.",
+    "selected": "Allowed actions: {{count}}",
+    "help": "Limits combine across groups. Existing roles, token scopes and content access still apply. Admins retain management access."
   }
 }

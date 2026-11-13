@@ -5,7 +5,6 @@ import useSWR from "swr";
 import { useTranslation } from "react-i18next";
 import {
   Box,
-  Button,
   Callout,
   Flex,
   Heading,
@@ -20,6 +19,7 @@ import {
   EntityPageHeader,
   EntityDataTable,
   EntityFilterBar,
+  EntityPagination,
   AvatarCell,
   WorkspaceRightPanel,
 } from "../components";
@@ -65,6 +65,7 @@ export default function AuditPage() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [cursor, setCursor] = useState("");
+  const [limit, setLimit] = useState(50);
   const [history, setHistory] = useState<string[]>([]);
   const [fromDay, setFromDay] = useState("");
   const [toDay, setToDay] = useState("");
@@ -78,6 +79,7 @@ export default function AuditPage() {
         setSelectedRows(new Set());
         setFilters({});
         setCursor("");
+        setLimit(50);
         setHistory([]);
         setFromDay("");
         setToDay("");
@@ -115,7 +117,7 @@ export default function AuditPage() {
         }
       : {}),
     ...(cursor ? { cursor } : {}),
-    limit: "50",
+    limit: String(limit),
   };
   const { data, error, isLoading } = useSWR(
     isAdmin && validFilters ? ["audit-history", params] : null,
@@ -133,6 +135,12 @@ export default function AuditPage() {
   );
   const actorName = (id: string) =>
     actors?.find((person) => person.userId === id)?.name || id;
+  const resetPagination = () => {
+    setCursor("");
+    setHistory([]);
+    setSelectedRows(new Set());
+    setDetail(null);
+  };
   const setFilter = (key: string, value: string) => {
     setFilters((previous) => {
       const next = { ...previous };
@@ -140,8 +148,7 @@ export default function AuditPage() {
       else delete next[key];
       return next;
     });
-    setCursor("");
-    setHistory([]);
+    resetPagination();
   };
   const exportPage = async () => {
     if (!data || exporting) return;
@@ -279,14 +286,12 @@ export default function AuditPage() {
                     onApply={(day) => {
                       if (filter.key === "from_day") setFromDay(day);
                       else setToDay(day);
-                      setCursor("");
-                      setHistory([]);
+                      resetPagination();
                     }}
                     onClear={() => {
                       if (filter.key === "from_day") setFromDay("");
                       else setToDay("");
-                      setCursor("");
-                      setHistory([]);
+                      resetPagination();
                     }}
                   />
                 );
@@ -395,35 +400,32 @@ export default function AuditPage() {
               {t("audit.empty")}
             </Text>
           )}
-          <Flex
-            gap="2"
-            justify="end"
-            p="3"
-            style={{ borderTop: "1px solid var(--olive-3)" }}
-          >
-            <Button
-              variant="soft"
-              disabled={!history.length}
-              onClick={() => {
+          <EntityPagination
+            page={history.length + 1}
+            limit={limit}
+            itemCount={
+              data && !malformed && validFilters ? data.events.length : 0
+            }
+            hasNextPage={
+              !error && !malformed && validFilters && !!data?.next_cursor
+            }
+            disabled={isLoading}
+            onPageChange={(page) => {
+              setSelectedRows(new Set());
+              setDetail(null);
+              if (page < history.length + 1) {
                 setCursor(history[history.length - 1]);
                 setHistory(history.slice(0, -1));
-              }}
-            >
-              {t("audit.previous")}
-            </Button>
-            <Button
-              variant="soft"
-              disabled={!data?.next_cursor || malformed || !validFilters}
-              onClick={() => {
-                if (data?.next_cursor) {
-                  setHistory([...history, cursor]);
-                  setCursor(data.next_cursor);
-                }
-              }}
-            >
-              {t("audit.next")}
-            </Button>
-          </Flex>
+              } else if (data?.next_cursor) {
+                setHistory([...history, cursor]);
+                setCursor(data.next_cursor);
+              }
+            }}
+            onLimitChange={(value) => {
+              setLimit(value);
+              resetPagination();
+            }}
+          />
         </Flex>
       </Flex>
       <WorkspaceRightPanel
@@ -470,16 +472,18 @@ export default function AuditPage() {
                     ["model", detail.agent_event.model],
                   ]
                 : []),
-            ].filter(([, value]) => value).map(([key, value]) => (
-              <Flex direction="column" gap="1" key={key}>
-                <Text size="1" color="gray">
-                  {t(`audit.${key}`)}
-                </Text>
-                <Text size="2" style={{ overflowWrap: "anywhere" }}>
-                  {value || "—"}
-                </Text>
-              </Flex>
-            ))}
+            ]
+              .filter(([, value]) => value)
+              .map(([key, value]) => (
+                <Flex direction="column" gap="1" key={key}>
+                  <Text size="1" color="gray">
+                    {t(`audit.${key}`)}
+                  </Text>
+                  <Text size="2" style={{ overflowWrap: "anywhere" }}>
+                    {value || "—"}
+                  </Text>
+                </Flex>
+              ))}
             {detail.resource_policy && (
               <Flex direction="column" gap="2">
                 <Text size="2" weight="medium">
@@ -506,6 +510,15 @@ export default function AuditPage() {
                     </Badge>
                   </Flex>
                 ))}
+                {detail.resource_policy.feature_scopes !== undefined && (
+                  <Flex direction="column" gap="1">
+                    <Text size="2" weight="medium">{t("groupScopes.title")}</Text>
+                    <Text size="2" style={{ overflowWrap: "anywhere" }}>
+                      {detail.resource_policy.feature_scopes === null ? t("groupScopes.unrestricted") :
+                        detail.resource_policy.feature_scopes.length ? detail.resource_policy.feature_scopes.join(", ") : t("groupScopes.selected", { count: 0 })}
+                    </Text>
+                  </Flex>
+                )}
               </Flex>
             )}
           </Flex>

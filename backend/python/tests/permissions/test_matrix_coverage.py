@@ -18,7 +18,7 @@ SCENARIOS = load_all()
 
 
 def _connector_dirs() -> set[str]:
-    return {str(p.parent.relative_to(SOURCES)) for p in SOURCES.rglob("connector.py")}
+    return {p.parent.relative_to(SOURCES).as_posix() for p in SOURCES.rglob("connector.py")}
 
 
 def test_every_connector_is_classified() -> None:

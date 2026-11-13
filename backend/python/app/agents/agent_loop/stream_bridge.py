@@ -450,7 +450,7 @@ async def run_agent_loop_stream(
                 stage_timer.mark("factory.create")
             if client_name == "slack" and not clarifying_questions:
                 inbox = get_steering_inbox()
-                await inbox.register(run_id, run_owner)
+                await inbox.register(run_id, run_owner, named_agent=bool(context.agent_key))
                 steering_inbox = inbox
                 async def steering_applied() -> None:
                     from app.agents.agent_loop.protocol.agui import AGUIEventType, frame

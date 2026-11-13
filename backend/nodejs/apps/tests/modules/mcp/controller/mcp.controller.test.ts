@@ -42,6 +42,23 @@ describe('MCP Controller — handleMCPRequest', () => {
   let origPipeshubCore: any
   let origTransport: any
 
+  it('refuses a group-blocked tool without asking for broader OAuth consent', async () => {
+    const original = oauthScopesExports.requiredOAuthScopes
+    oauthScopesExports.requiredOAuthScopes = () => ['semantic:write']
+    try {
+      const req = createMockRequest({ user: { userId: 'group-scope-member', orgId: 'org', isOAuth: true,
+        oauthScopes: ['semantic:write'], featureScopes: ['kb:read'] },
+        body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'pipeshub_search', arguments: { query: 'synthetic' } } } })
+      const res = createMockResponse()
+      const next = createMockNext()
+      await handleMCPRequest(appConfig)(req, res as any, next)
+      expect(res.status.calledWith(403)).to.be.true
+      expect(res.setHeader.calledWith('WWW-Authenticate')).to.be.false
+      expect(next.called).to.be.false
+      expect(req.user.oauthScopes).to.deep.equal(['semantic:write'])
+    } finally { oauthScopesExports.requiredOAuthScopes = original }
+  })
+
   beforeEach(() => {
     appConfig = createMockAppConfig()
 

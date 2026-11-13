@@ -10,8 +10,12 @@ export interface EntityPaginationProps {
   page: number;
   /** Items per page */
   limit: number;
-  /** Total number of items */
-  totalCount: number;
+  /** Exact total, when supplied by the server. */
+  totalCount?: number;
+  /** Current result count for cursor/offset APIs without an exact total. */
+  itemCount?: number;
+  hasNextPage?: boolean;
+  disabled?: boolean;
   /** Called when page changes */
   onPageChange: (page: number) => void;
   /** Called when items per page changes (optional) */
@@ -47,16 +51,23 @@ export function EntityPagination({
   page,
   limit,
   totalCount,
+  itemCount = 0,
+  hasNextPage = false,
+  disabled = false,
   onPageChange,
   onLimitChange,
 }: EntityPaginationProps) {
   const { t } = useTranslation();
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
-  const from = totalCount === 0 ? 0 : (page - 1) * limit + 1;
-  const to = Math.min(page * limit, totalCount);
-  const hasPrev = page > 1;
-  const hasNext = page < totalPages;
+  const knownTotal = totalCount !== undefined;
+  const count = knownTotal ? totalCount : itemCount;
+  const from = count === 0 ? 0 : (page - 1) * limit + 1;
+  const to = knownTotal
+    ? Math.min(page * limit, totalCount)
+    : from + itemCount - 1;
+  const hasPrev = !disabled && page > 1;
+  const hasNext =
+    !disabled && (knownTotal ? page * limit < totalCount : hasNextPage);
 
   return (
     <Flex
@@ -70,22 +81,33 @@ export function EntityPagination({
         borderTop: '1px solid var(--olive-3)',
         flexShrink: 0,
         width: '100%',
+        boxSizing: 'border-box',
         rowGap: 'var(--space-2)',
       }}
     >
       {/* Left: showing count (hidden with no rows; the table's empty state says so) */}
-      {totalCount > 0 ? (
+      {count > 0 ? (
         <Text size="2" style={{ color: 'var(--olive-11)' }}>
-          {t('workspace.pagination.showing', { from, to, count: totalCount })}
+          {knownTotal
+            ? t('workspace.pagination.showing', { from, to, count: totalCount })
+            : t('workspace.pagination.showingRange', { from, to })}
         </Text>
       ) : (
         <span />
       )}
 
       {/* Right: pagination controls */}
-      <Flex gap="2" align="center">
+      <Flex gap="2" align="center" wrap="wrap">
         {/* Previous */}
-        <Button className="touch-hit" variant="ghost" size="2" color="gray" disabled={!hasPrev} onClick={() => onPageChange(page - 1)} style={PAGER_BUTTON}>
+        <Button
+          className="touch-hit"
+          variant="ghost"
+          size="2"
+          color="gray"
+          disabled={!hasPrev}
+          onClick={() => onPageChange(page - 1)}
+          style={PAGER_BUTTON}
+        >
           <MaterialIcon name="chevron_left" size={16} />
           {t('workspace.pagination.previous')}
         </Button>
@@ -98,30 +120,59 @@ export function EntityPagination({
         </Flex>
 
         {/* Next */}
-        <Button className="touch-hit" variant="ghost" size="2" color="gray" disabled={!hasNext} onClick={() => onPageChange(page + 1)} style={PAGER_BUTTON}>
+        <Button
+          className="touch-hit"
+          variant="ghost"
+          size="2"
+          color="gray"
+          disabled={!hasNext}
+          onClick={() => onPageChange(page + 1)}
+          style={PAGER_BUTTON}
+        >
           {t('workspace.pagination.next')}
           <MaterialIcon name="chevron_right" size={16} />
         </Button>
 
         {/* Separator */}
-        <Box style={{ width: '1px', height: '20px', backgroundColor: 'var(--olive-4)' }} />
+        <Box
+          style={{
+            width: '1px',
+            height: '20px',
+            backgroundColor: 'var(--olive-4)',
+          }}
+        />
 
         {/* Limit selector */}
         {onLimitChange && (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
-              <Flex
+              <Button
                 data-testid="page-size-trigger"
-                align="center"
-                gap="1"
                 className="entity-pager-select touch-hit"
-                style={{ ...PAGER_PILL, cursor: 'pointer', gap: 'var(--space-1)' }}
+                variant="ghost"
+                color="gray"
+                disabled={disabled}
+                aria-label={t('common.pagination.perPage', { value: limit })}
+                style={{
+                  ...PAGER_PILL,
+                  margin: 0,
+                  cursor: 'pointer',
+                  gap: 'var(--space-1)',
+                }}
               >
-                <Text size="1" weight="medium" style={{ color: 'var(--olive-12)' }}>
+                <Text
+                  size="1"
+                  weight="medium"
+                  style={{ color: 'var(--olive-12)' }}
+                >
                   {limit}
                 </Text>
-                <MaterialIcon name="expand_less" size={14} color="var(--olive-11)" />
-              </Flex>
+                <MaterialIcon
+                  name="expand_less"
+                  size={14}
+                  color="var(--olive-11)"
+                />
+              </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end" sideOffset={4}>
               {[10, 25, 50, 100].map((value) => (

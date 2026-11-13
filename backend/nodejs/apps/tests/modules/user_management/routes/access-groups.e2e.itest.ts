@@ -16,12 +16,16 @@ import { createAuditRouter } from '../../../../src/modules/audit/audit.routes';
 import { fixtureChat } from './fixture-chat';
 import { getRecordBuffer } from '../../../../src/modules/knowledge_base/controllers/kb_controllers';
 import { AuthenticatedUserRequest } from '../../../../src/libs/middlewares/types';
+import { groupScopeResolver } from '../../../../src/libs/services/group-scope-policy';
+import { requireScopes } from '../../../../src/libs/middlewares/require-scopes.middleware';
+import { OAuthScopeNames } from '../../../../src/libs/enums/oauth-scopes.enum';
 
 describe('access groups across authenticated services', function () {
   let server: Server;
   let base: string;
   let token: string;
   let groupId: string | undefined;
+  let app: ReturnType<typeof express>;
   const org = new mongoose.Types.ObjectId().toHexString();
   const admin = new mongoose.Types.ObjectId().toHexString();
   const member = new mongoose.Types.ObjectId().toHexString();
@@ -85,9 +89,13 @@ describe('access groups across authenticated services', function () {
       connectorBackend: testServer,
       scopedJwtSecret: secret,
     });
-    const app = express();
+    app = express();
+    app.locals.resolveGroupScopes = groupScopeResolver({ connectorBackend: testServer, scopedJwtSecret: secret });
     app.use(express.json());
     app.use(requestContextMiddleware);
+    app.get('/feature-probe', container.get<AuthMiddleware>('AuthMiddleware').authenticate,
+      requireScopes(OAuthScopeNames.AGENT_EXECUTE), (_req, res) => res.json({ allowed: true }));
+    app.get('/identity-probe', container.get<AuthMiddleware>('AuthMiddleware').authenticate, (_req, res) => res.json({ signedIn: true }));
     app.use('/access-groups', createAccessGroupsRouter(container));
     app.use('/audit', createAuditRouter(container));
     app.use(
@@ -142,16 +150,42 @@ describe('access groups across authenticated services', function () {
     const created = await fetch(`${base}/access-groups`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: `Synthetic ${kb}` }),
+      body: JSON.stringify({ name: `Synthetic ${kb}`, description: 'Finance reference material' }),
     });
     assert.equal(created.status, 201);
     groupId = ((await created.json()) as { id: string }).id;
     const listed = await fetch(`${base}/access-groups`, { headers });
-    assert.ok(
-      (
-        (await listed.json()) as { groups: Array<{ _key: string }> }
-      ).groups.some((item) => item._key === groupId),
-    );
+    const group = ((await listed.json()) as { groups: Array<{
+      _key: string; description: string; createdAtTimestamp: number;
+      createdByUser: { userId: string } | null;
+    }> }).groups.find((item) => item._key === groupId);
+    assert.equal(group?.description, 'Finance reference material');
+    assert.equal(group?.createdByUser?.userId, admin);
+    assert.ok(group && group.createdAtTimestamp > 0);
+    const nameOnly = await fetch(`${base}/access-groups/${groupId}`, {
+      method: 'PUT', headers, body: JSON.stringify({ name: `Synthetic ${kb}` }),
+    });
+    assert.equal(nameOnly.status, 200);
+    const preserved = await fetch(`${base}/access-groups`, { headers });
+    assert.equal(((await preserved.json()) as { groups: typeof group[] }).groups.find((item) => item?._key === groupId)?.description, 'Finance reference material');
+    const invalidDescription = await fetch(`${base}/access-groups/${groupId}`, {
+      method: 'PUT', headers, body: JSON.stringify({ name: `Synthetic ${kb}`, description: 'x'.repeat(2001) }),
+    });
+    assert.equal(invalidDescription.status, 400);
+    const foreignList = await fetch(`${base}/access-groups`, { headers: {
+      ...headers, authorization: `Bearer ${jwt.sign({ userId: foreign, orgId: foreignOrg, role: 'admin' }, secret)}`,
+    } });
+    assert.equal(foreignList.status, 401);
+    const updated = await fetch(`${base}/access-groups/${groupId}`, {
+      method: 'PUT', headers,
+      body: JSON.stringify({ name: `Synthetic ${kb}`, description: '' }),
+    });
+    assert.equal(updated.status, 200);
+    const reread = await fetch(`${base}/access-groups`, { headers });
+    const saved = ((await reread.json()) as { groups: typeof group[] }).groups.find((item) => item?._key === groupId);
+    assert.equal(saved?.description, '');
+    assert.equal(saved?.createdAtTimestamp, group.createdAtTimestamp);
+    assert.equal(saved?.createdByUser?.userId, admin);
     await graph('share', { kb, admin, group: groupId });
     assert.deepEqual((await graph('access', { org, member })).ids, []);
     const denied = await fetch(`${base}/access-groups/${groupId}/members/add`, {
@@ -500,6 +534,89 @@ describe('access groups across authenticated services', function () {
       });
       assert.equal(restored.status, 200);
     }
+  });
+  it('persists a native feature scope limit alongside the content policy', async () => {
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const response = await fetch(`${base}/access-groups/${groupId}/access`, { headers });
+    const { policy } = await response.json() as { policy: { revision: number; defaultAllow: boolean; rules: unknown[] } };
+    const saved = await fetch(`${base}/access-groups/${groupId}/access`, {
+      method: 'PUT', headers,
+      body: JSON.stringify({ ...policy, featureScopes: ['agent:read'] }),
+    });
+    assert.equal(saved.status, 200);
+    const reread = await fetch(`${base}/access-groups/${groupId}/access`, { headers });
+    const result = await reread.json() as { policy: { featureScopes: string[]; defaultAllow: boolean; rules: unknown[] } };
+    assert.deepEqual(result.policy.featureScopes, ['agent:read']);
+    assert.equal(result.policy.defaultAllow, policy.defaultAllow);
+    assert.deepEqual(result.policy.rules, policy.rules);
+    const contentOnly = await fetch(`${base}/access-groups/${groupId}/access`, { headers });
+    const { policy: current } = await contentOnly.json() as { policy: Record<string, unknown> };
+    delete current.featureScopes;
+    assert.equal((await fetch(`${base}/access-groups/${groupId}/access`, { method: 'PUT', headers, body: JSON.stringify(current) })).status, 200);
+    const preserved = await fetch(`${base}/access-groups/${groupId}/access`, { headers });
+    assert.deepEqual(((await preserved.json()) as { policy: { featureScopes: string[] } }).policy.featureScopes, ['agent:read']);
+    const audit = await fetch(`${base}/audit?group_id=${groupId}&outcome=success`, { headers });
+    const events = ((await audit.json()) as { events: { resource_policy?: { feature_scopes?: string[] } }[] }).events;
+    assert.ok(events.some((event) => event.resource_policy?.feature_scopes?.includes('agent:read')));
+  });
+  it('uses live group scopes for sessions, prevents forged grants and revokes on the next request', async () => {
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const memberHeaders = { authorization: `Bearer ${jwt.sign({ userId: member, orgId: org, role: 'member', featureScopes: null }, secret)}` };
+    const probe = () => fetch(`${base}/feature-probe`, { headers: memberHeaders });
+    assert.equal((await probe()).status, 200);
+    const added = await fetch(`${base}/access-groups/${groupId}/members/add`, { method: 'POST', headers, body: JSON.stringify({ userIds: [member] }) });
+    assert.equal(added.status, 200);
+    assert.equal((await probe()).status, 403);
+    assert.equal((await fetch(`${base}/feature-probe`, { headers })).status, 200);
+    const response = await fetch(`${base}/access-groups/${groupId}/access`, { headers });
+    const { policy } = await response.json() as { policy: Record<string, unknown> };
+    assert.equal((await fetch(`${base}/access-groups/${groupId}/access`, { method: 'PUT', headers,
+      body: JSON.stringify({ ...policy, featureScopes: ['agent:execute'] }) })).status, 200);
+    assert.equal((await probe()).status, 200);
+    const reread = await fetch(`${base}/access-groups/${groupId}/access`, { headers });
+    const current = await reread.json() as { policy: Record<string, unknown> };
+    assert.equal((await fetch(`${base}/access-groups/${groupId}/access`, { method: 'PUT', headers,
+      body: JSON.stringify({ ...current.policy, featureScopes: [] }) })).status, 200);
+    assert.equal((await probe()).status, 403);
+    assert.equal((await fetch(`${base}/access-groups/${groupId}/members/remove`, { method: 'POST', headers,
+      body: JSON.stringify({ userIds: [member] }) })).status, 200);
+    assert.equal((await probe()).status, 200);
+  });
+  it('keeps all group scope ceilings and rejects unknown or administrative scope grants', async () => {
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const memberHeaders = { authorization: `Bearer ${jwt.sign({ userId: member, orgId: org, role: 'member' }, secret)}` };
+    const catalog = await fetch(`${base}/access-groups/scopes`, { headers });
+    const names = ((await catalog.json()) as { scopes: { name: string }[] }).scopes.map((scope) => scope.name);
+    assert.ok(names.includes('agent:execute') && !names.includes('org:admin') && !names.includes('openid'));
+    const setScopes = async (id: string, scopes: string[]) => {
+      const response = await fetch(`${base}/access-groups/${id}/access`, { headers });
+      const { policy } = await response.json() as { policy: Record<string, unknown> };
+      return fetch(`${base}/access-groups/${id}/access`, { method: 'PUT', headers, body: JSON.stringify({ ...policy, featureScopes: scopes }) });
+    };
+    for (const scopes of [['org:admin'], ['not:a-scope'], ['agent:read', 'agent:read']]) assert.equal((await setScopes(groupId!, scopes)).status, 400);
+    assert.equal((await setScopes(groupId!, ['agent:execute'])).status, 200);
+    const second = await fetch(`${base}/access-groups`, { method: 'POST', headers, body: JSON.stringify({ name: `Scope ceiling ${randomUUID()}` }) });
+    const secondId = ((await second.json()) as { id: string }).id;
+    try {
+      for (const id of [groupId!, secondId]) assert.equal((await fetch(`${base}/access-groups/${id}/members/add`, { method: 'POST', headers, body: JSON.stringify({ userIds: [member] }) })).status, 200);
+      assert.equal((await setScopes(secondId, ['agent:read'])).status, 200);
+      assert.equal((await fetch(`${base}/feature-probe`, { headers: memberHeaders })).status, 403);
+      assert.equal((await fetch(`${base}/access-groups/${secondId}/members/remove`, { method: 'POST', headers, body: JSON.stringify({ userIds: [member] }) })).status, 200);
+      assert.equal((await fetch(`${base}/feature-probe`, { headers: memberHeaders })).status, 200);
+    } finally {
+      await fetch(`${base}/access-groups/${secondId}`, { method: 'DELETE', headers });
+      await fetch(`${base}/access-groups/${groupId}/members/remove`, { method: 'POST', headers, body: JSON.stringify({ userIds: [member] }) });
+    }
+  });
+  it('fails closed on unavailable policy storage while keeping administrator recovery', async () => {
+    const original = app.locals.resolveGroupScopes;
+    app.locals.resolveGroupScopes = groupScopeResolver({ connectorBackend: 'http://127.0.0.1:1', scopedJwtSecret: secret });
+    try {
+      const memberHeaders = { authorization: `Bearer ${jwt.sign({ userId: member, orgId: org, role: 'member' }, secret)}` };
+      assert.equal((await fetch(`${base}/identity-probe`, { headers: memberHeaders })).status, 200);
+      assert.equal((await fetch(`${base}/feature-probe`, { headers: memberHeaders })).status, 503);
+      assert.equal((await fetch(`${base}/feature-probe`, { headers: { authorization: `Bearer ${token}` } })).status, 200);
+    } finally { app.locals.resolveGroupScopes = original; }
   });
   it('accepts exactly one simultaneous save for a policy revision', async () => {
     const demo = (await graph('demo', {})) as {

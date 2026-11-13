@@ -66,6 +66,36 @@ _MIN_NODE_ROUTES = 80
 _MIN_PYTHON_HANDLERS = 40
 
 
+def test_group_admin_wrapper_keeps_middleware_order(tmp_path: Path) -> None:
+    path = _write(tmp_path, "wrapped.ts", """
+        router.put('/:id', auth.authenticate, groupAdminCheck, ValidationMiddleware.validate(schema), handler);
+    """)
+    routes = admin_routes_in_file(path, "/groups")
+    assert len(routes) == 1
+    assert routes[0].before_admin == ("auth.authenticate",)
+    assert routes[0].after_admin == ("ValidationMiddleware.validate",)
+
+
+def test_bounded_route_templates_use_only_the_enclosing_loop(tmp_path: Path) -> None:
+    path = _write(tmp_path, "loops.ts", """
+        for (const part of ['access', 'resources'] as const) {
+          router.get(`/:id/${part}`, userAdminCheck, handler);
+        }
+        for (const part of ['members'] as const) {
+          router.get(`/other/${part}`, userAdminCheck, handler);
+        }
+    """)
+    assert {route.path for route in admin_routes_in_file(path, "/groups")} == {
+        "/groups/:id/access", "/groups/:id/resources", "/groups/other/members",
+    }
+
+
+def test_unresolved_route_template_is_reported(tmp_path: Path) -> None:
+    path = _write(tmp_path, "unknown.ts", "router.get(`/${unknown}`, userAdminCheck, handler);")
+    with pytest.raises(AssertionError, match="Unresolved route template"):
+        admin_routes_in_file(path, "/groups")
+
+
 def test_every_node_admin_route_has_a_row() -> None:
     found = {(r.method, r.path): r.source for r in discover_admin_routes()}
     assert len(found) >= _MIN_NODE_ROUTES, (

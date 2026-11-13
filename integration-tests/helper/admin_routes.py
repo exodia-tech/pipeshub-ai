@@ -32,7 +32,7 @@ PYTHON_APP = REPO / "backend" / "python" / "app"
 
 # Every middleware that refuses a signed-in member for not being an org admin.
 # userAdminOrSelfCheck is left out on purpose: members pass it for their own id.
-ADMIN_MIDDLEWARES = frozenset({"userAdminCheck"})
+ADMIN_MIDDLEWARES = frozenset({"userAdminCheck", "groupAdminCheck"})
 
 _METHODS = ("get", "post", "put", "patch", "delete")
 _ROUTE_CALL = re.compile(r"\brouter\s*\.\s*(get|post|put|patch|delete|use)\s*\(")
@@ -42,6 +42,34 @@ _MOUNT = re.compile(r"\bapp\.use\(\s*(?:'([^']+)'|([A-Z][A-Z0-9_]*))\s*,\s*(crea
 _PATH_CONST = re.compile(r"\b(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*=\s*'([^']+)'\s*;")
 _CONST_ARRAY = re.compile(r"\bconst\s+(\w+)\s*=\s*\[")
 _STRING = re.compile(r"""^\s*(['"`])(.*?)\1\s*$""", re.S)
+_LITERAL_LOOP = re.compile(r"\bfor\s*\(\s*const\s+(\w+)\s+of\s*(\[[^\]]*\])\s*(?:as\s+const\s*)?\)\s*\{")
+_BLOCK_TOKEN = re.compile(r"""'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|[{}]""")
+
+
+def _block_end(text: str, start: int) -> int:
+    depth = 0
+    for token in _BLOCK_TOKEN.finditer(text, start):
+        if token.group() not in ("{", "}"):
+            continue
+        depth += 1 if token.group() == "{" else -1
+        if depth == 0:
+            return token.end()
+    raise AssertionError("Unclosed literal route loop")
+
+
+def _route_paths(text: str, offset: int, path: str) -> list[str]:
+    paths = [path]
+    for name in dict.fromkeys(re.findall(r"\$\{(\w+)\}", path)):
+        bindings = []
+        for loop in _LITERAL_LOOP.finditer(text, 0, offset):
+            if loop.group(1) == name and offset < _block_end(text, loop.end() - 1):
+                values = [_STRING.fullmatch(value) for value in _call_arguments(text, text.index("[", loop.start(), loop.end()))]
+                assert all(values), f"Unresolved route template: {path}"
+                bindings.append([value.group(2) for value in values if value])
+        assert len(bindings) == 1, f"Unresolved route template: {path}"
+        paths = [value.replace("${" + name + "}", choice) for value in paths for choice in bindings[0]]
+    assert all("${" not in value for value in paths), f"Unresolved route template: {path}"
+    return paths
 
 
 @dataclass(frozen=True)
@@ -212,13 +240,14 @@ def admin_routes_in_file(
         )
         # The last argument is the handler itself.
         after = chain[(admin_at + 1 if admin_at is not None else 0):-1]
-        found.append(DiscoveredRoute(
-            method=method.upper(),
-            path=_join(prefix, literal.group(2)),
-            source=_source(path),
-            before_admin=before,
-            after_admin=tuple(_middleware_name(a) for a in after),
-        ))
+        for route_path in _route_paths(text, match.start(), literal.group(2)):
+            found.append(DiscoveredRoute(
+                method=method.upper(),
+                path=_join(prefix, route_path),
+                source=_source(path),
+                before_admin=before,
+                after_admin=tuple(_middleware_name(a) for a in after),
+            ))
     return found
 
 
