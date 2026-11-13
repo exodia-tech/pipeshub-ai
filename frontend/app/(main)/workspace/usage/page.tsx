@@ -54,18 +54,6 @@ const FIELDS = [
   "status",
 ] as const;
 const RATE_FIELDS = ["input", "output", "cache_read", "cache_write"] as const;
-const inputStyle = {
-  background: "var(--color-surface)",
-  color: "var(--gray-12)",
-  border: "1px solid var(--gray-6)",
-  borderRadius: "var(--radius-2)",
-  padding: "0 10px",
-  height: 44,
-  minWidth: 0,
-  boxSizing: "border-box" as const,
-  font: "inherit",
-  width: "100%",
-};
 
 export default function UsagePage() {
   const { t, i18n } = useTranslation();
@@ -416,6 +404,7 @@ export default function UsagePage() {
             {isAdmin && (
               <Flex direction="column" gap="1">
                 <Select.Root
+                  size="1"
                   value={view}
                   onValueChange={(v) => {
                     setView(v);
@@ -425,9 +414,11 @@ export default function UsagePage() {
                   }}
                 >
                   <Select.Trigger
+                    variant="surface"
+                    color="gray"
                     aria-label={label("view")}
                     className="touch-hit"
-                    style={{ height: 28 }}
+                    style={{ height: 28, borderRadius: "var(--radius-2)" }}
                   >
                     {label("view")}: {label(view)}
                   </Select.Trigger>
@@ -445,11 +436,17 @@ export default function UsagePage() {
               </Flex>
             )}
             <Flex direction="column" gap="1">
-              <Select.Root value={interval} onValueChange={setInterval}>
+              <Select.Root
+                size="1"
+                value={interval}
+                onValueChange={setInterval}
+              >
                 <Select.Trigger
+                  variant="surface"
+                  color="gray"
                   aria-label={label("interval")}
                   className="touch-hit"
-                  style={{ height: 28 }}
+                  style={{ height: 28, borderRadius: "var(--radius-2)" }}
                 >
                   {label("interval")}: {label(interval)}
                 </Select.Trigger>
@@ -466,6 +463,7 @@ export default function UsagePage() {
               <>
                 <Flex direction="column" gap="1">
                   <Select.Root
+                    size="1"
                     value={audience}
                     onValueChange={(value) => {
                       setAudience(value);
@@ -474,9 +472,11 @@ export default function UsagePage() {
                     }}
                   >
                     <Select.Trigger
+                      variant="surface"
+                      color="gray"
                       aria-label={label("consumption")}
                       className="touch-hit"
-                      style={{ height: 28 }}
+                      style={{ height: 28, borderRadius: "var(--radius-2)" }}
                     >
                       {label("consumption")}:{" "}
                       {label(
@@ -507,8 +507,10 @@ export default function UsagePage() {
             <Flex direction="column" justify="end">
               <Button
                 className="touch-hit"
-                variant={filtersOpen ? "solid" : "soft"}
-                style={{ height: 28 }}
+                size="1"
+                variant={filtersOpen ? "solid" : "outline"}
+                color={filtersOpen ? undefined : "gray"}
+                style={{ height: 28, borderRadius: "var(--radius-2)" }}
                 aria-expanded={filtersOpen}
                 aria-controls="usage-advanced-filters"
                 onClick={() => setFiltersOpen(!filtersOpen)}
@@ -684,12 +686,13 @@ export default function UsagePage() {
                 >
                   <Heading size="3">{label("overTime")}</Heading>
                   <Select.Root
+                    size="1"
                     value={metric}
                     onValueChange={(v) => setMetric(v as UsageMetric)}
                   >
                     <Select.Trigger
                       aria-label={label("metric")}
-                      style={{ height: 28 }}
+                      style={{ height: 28, borderRadius: "var(--radius-2)" }}
                     />
                     <Select.Content>
                       {["tokens", "cost", "requests"].map((v) => (
@@ -866,7 +869,8 @@ export default function UsagePage() {
                     {label("byMember")}
                   </Heading>
                   <Box style={{ minWidth: 0 }}>
-                    <EntityDataTable<Breakdown> ariaLabel={label("byMember")}
+                    <EntityDataTable<Breakdown>
+                      ariaLabel={label("byMember")}
                       data={data.user_id}
                       getItemId={(row) => row.id ?? "__services__"}
                       columns={[
@@ -922,10 +926,11 @@ export default function UsagePage() {
               minWidth: 0,
               overflow: "hidden",
               border: "1px solid var(--olive-3)",
-              borderRadius: "var(--radius-1)",
+              borderRadius: "var(--radius-3)",
             }}
           >
-            <EntityDataTable<UsageEvent> ariaLabel={label("history")}
+            <EntityDataTable<UsageEvent>
+              ariaLabel={label("history")}
               data={data?.events ?? []}
               getItemId={(event) => event.id}
               isLoading={isLoading}
@@ -1222,10 +1227,7 @@ export default function UsagePage() {
                           setBudgetSubject("");
                         }}
                       >
-                        <Select.Trigger
-                          aria-label={label("scope")}
-                          style={{ height: 28 }}
-                        />
+                        <Select.Trigger aria-label={label("scope")} />
                         <Select.Content>
                           {[
                             "organization",
@@ -1247,7 +1249,6 @@ export default function UsagePage() {
                           <Select.Trigger
                             aria-label={label("target")}
                             placeholder={label("target")}
-                            style={{ height: 28 }}
                           />
                           <Select.Content>
                             {rows(budgetScope)
@@ -1318,7 +1319,7 @@ export default function UsagePage() {
                 <Grid columns={{ initial: "1", md: "2" }} gap="3">
                   <label>
                     <Text size="2">{label("provider")}</Text>
-                    <input
+                    <TextField.Root
                       required
                       maxLength={200}
                       list="usage-provider-list"
@@ -1326,12 +1327,11 @@ export default function UsagePage() {
                       onChange={(e) =>
                         setRate({ ...rate, provider: e.target.value })
                       }
-                      style={inputStyle}
                     />
                   </label>
                   <label>
                     <Text size="2">{label("model")}</Text>
-                    <input
+                    <TextField.Root
                       required
                       maxLength={200}
                       list="usage-model-list"
@@ -1339,7 +1339,6 @@ export default function UsagePage() {
                       onChange={(e) =>
                         setRate({ ...rate, model: e.target.value })
                       }
-                      style={inputStyle}
                     />
                   </label>
                   {RATE_FIELDS.map((field) => (
@@ -1378,7 +1377,8 @@ export default function UsagePage() {
               </form>
             </SettingsSection>
             <Box mt="4" style={{ minWidth: 0 }}>
-              <EntityDataTable<Rate> ariaLabel={label("pricing")}
+              <EntityDataTable<Rate>
+                ariaLabel={label("pricing")}
                 data={rateData?.rates ?? []}
                 getItemId={(row) => `${row.provider}/${row.model}`}
                 columns={[
@@ -1406,8 +1406,20 @@ export default function UsagePage() {
                   })),
                 ]}
                 renderRowActions={(row) => (
-                  <EntityRowActionMenu actions={[{ icon: "restart_alt", label: label("useCatalog"), disabled: saving,
-                    onClick: () => save(() => usageApi.resetRate(row.provider, row.model), refreshRates) }]} />
+                  <EntityRowActionMenu
+                    actions={[
+                      {
+                        icon: "restart_alt",
+                        label: label("useCatalog"),
+                        disabled: saving,
+                        onClick: () =>
+                          save(
+                            () => usageApi.resetRate(row.provider, row.model),
+                            refreshRates,
+                          ),
+                      },
+                    ]}
+                  />
                 )}
               />
             </Box>
