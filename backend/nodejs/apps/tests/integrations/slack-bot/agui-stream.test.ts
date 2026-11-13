@@ -107,3 +107,40 @@ describe('slack-bot/utils/agui-stream', () => {
     });
   });
 });
+
+describe('Contextual steering progress replies', () => {
+  it('uses the next root narration only after the agent has consumed steering', () => {
+    const reply = sinon.stub();
+    const handle = createSlackAGUIEventHandler({ onSteeringNarration: reply });
+    handle({ event: 'RUN_STARTED', data: { type: 'RUN_STARTED', runId: 'root' } });
+    const narrate = (text: string) => {
+      handle({ event: 'TEXT_MESSAGE_CONTENT', data: { type: 'TEXT_MESSAGE_CONTENT', runId: 'root', delta: text } });
+      handle({ event: 'TOOL_CALL_START', data: { type: 'TOOL_CALL_START', runId: 'root', toolCallId: text, toolCallName: 'image_generator' } });
+    };
+    narrate('Old plan before the update.');
+    expect(reply.called).to.equal(false);
+    handle({ event: 'CUSTOM', data: { type: 'CUSTOM', runId: 'root', name: 'steering_applied' } });
+    handle({ event: 'REASONING_MESSAGE_CONTENT', data: { type: 'REASONING_MESSAGE_CONTENT', runId: 'root', delta: 'private reasoning' } });
+    narrate('I’ll soften the mark and move away from the mask shape.');
+    narrate('More progress, not another acknowledgment.');
+    expect(reply.args).to.deep.equal([['I’ll soften the mark and move away from the mask shape.']]);
+  });
+  it('ignores child steering signals and never promotes discarded text', () => {
+    const reply = sinon.stub();
+    const handle = createSlackAGUIEventHandler({ onSteeringNarration: reply });
+    const event = (type: string, fields: Record<string, unknown>) => handle({ event: type, data: { type, ...fields } });
+    event('RUN_STARTED', { runId: 'root' });
+    event('RUN_STARTED', { runId: 'child', parentRunId: 'root' });
+    event('CUSTOM', { runId: 'child', name: 'steering_applied' });
+    event('TEXT_MESSAGE_CONTENT', { runId: 'root', delta: 'Old response' });
+    event('TOOL_CALL_START', { runId: 'root', toolCallName: 'search', toolCallId: 'old' });
+    expect(reply.called).to.equal(false);
+    event('TEXT_MESSAGE_CONTENT', { runId: 'root', delta: 'Discard this stale text' });
+    event('CUSTOM', { runId: 'root', name: 'steering_applied' });
+    event('CUSTOM', { runId: 'root', name: 'message_discarded' });
+    event('TEXT_MESSAGE_CONTENT', { runId: 'child', delta: 'Child private response' });
+    event('TEXT_MESSAGE_CONTENT', { runId: 'root', delta: 'I’ll focus on the revised design.' });
+    event('TOOL_CALL_START', { runId: 'root', toolCallName: 'image_generator', toolCallId: 'new' });
+    expect(reply.args).to.deep.equal([['I’ll focus on the revised design.']]);
+  });
+});

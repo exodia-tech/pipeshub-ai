@@ -1,6 +1,6 @@
 # Slack follow-ups during a run
 
-Reply in the same bot thread to clarify your request while the agent is working. Steering is silent: the bot restores native thinking rotation and the running agent reads the update at its next safe step. An in-flight model or tool call is not forcibly interrupted. A stale tool selection is denied until the agent has read the update; streamed text superseded by an update is discarded.
+Reply in the same bot thread to clarify your request while the agent is working. The bot restores native thinking rotation and the running agent reads the update at its next safe step. Its next genuine user-facing progress sentence can acknowledge the specific change naturally; no separate acknowledgment model call or canned phrase is used. An in-flight model or tool call is not forcibly interrupted. A stale tool selection is denied until the agent has read the update; streamed text superseded by an update is discarded.
 
 The route matches workspace, bot, channel, thread and Slack requester. The scoped internal token is resolved to the requesting PipesHub user, the Node API verifies conversation access, and the query service separately verifies the run's exact user, organization and conversation. Steering changes no principal, membership or source permission. Another thread participant must address the bot to start their own authorized conversation.
 
@@ -17,3 +17,5 @@ Slack audio requests use a complete native transcript (including VTT captions) w
 Generated images, audio, video and PDFs up to 20 MiB can be uploaded into the original Slack reply thread, retaining the Brain link. The private preview transport verifies conversation access, artifact access and exact conversation provenance; it accepts record IDs only. STAGING artifacts and unsupported/oversized media retain their links. Slack uploads require the bot's existing `files:write` authorization; missing permission or upload failure falls back to the authenticated Brain link. A preview is a Slack file copy governed by the destination channel or DM membership, independently of later Brain record revocation. The transport never creates a Brain record access grant or public URL.
 
 Native status requests are ordered. Completion fences late status refreshes and clears after any in-flight update, so steering cannot leave a finished run showing as active.
+
+Only narration generated after the root run consumes steering is promoted to a persistent Slack reply. Stale narration, child-run output and private reasoning are excluded. Posting the contextual reply restores native progress; a direct final answer already serves as the relevant response.

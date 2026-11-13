@@ -10,7 +10,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Awaitable, Callable
 
     from app.agent_loop_lib.agent import Agent
     from app.agent_loop_lib.core.types import Goal
@@ -143,7 +143,8 @@ def get_steering_inbox() -> SteeringInbox:
 
 
 def install_steering(
-    agent: Agent, runtime: AgentRuntime, goal: Goal, inbox: SteeringInbox, run_id: str
+    agent: Agent, runtime: AgentRuntime, goal: Goal, inbox: SteeringInbox, run_id: str,
+    on_applied: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     """Use existing loop hooks; never replace a user update with an agent context note."""
     from app.agent_loop_lib.core.messages import UserMessage
@@ -152,9 +153,27 @@ def install_steering(
     from app.agent_loop_lib.hooks.middleware.decisions import PreDecision
     from app.agent_loop_lib.tools.tags import TAG_LIFECYCLE_TERMINAL
 
+    acknowledgment_guidance_added = False
+
     async def apply(
         messages: list[str], *, recovery: ModelResponseContext | None = None
     ) -> None:
+        nonlocal acknowledgment_guidance_added
+        if not messages:
+            return
+        if not acknowledgment_guidance_added:
+            await agent.context.add(UserMessage(
+                content=(
+                    "Runtime guidance for Slack follow-ups: When you read a new requester update, "
+                    "briefly acknowledge the specific change in your own words in your next user-facing "
+                    "progress sentence before continuing tools. Do not use a stock confirmation or reveal "
+                    "private reasoning. If you can answer immediately, incorporate the update directly "
+                    "in your answer instead of adding an extra acknowledgment. Preserve the original "
+                    "task except where the requester changes it; a courtesy alone does not cancel work."
+                ),
+                injected=True, pinned=True,
+            ))
+            acknowledgment_guidance_added = True
         for index, text in enumerate(messages):
             goal.user_message = text
             message = UserMessage(content=text, pinned=True)
@@ -162,6 +181,8 @@ def install_steering(
                 recovery.recovery_message = message
             else:
                 await agent.context.add(message)
+        if on_applied is not None:
+            await on_applied()
 
     async def before_turn(ctx: TurnContext, next_fn: Next) -> None:
         if ctx.scope is None or str(ctx.scope.run.identity.run_id) != str(run_id):
