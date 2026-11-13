@@ -553,7 +553,7 @@ export function DateRangePicker({
             width: 26,
             margin: 0,
             borderLeft: '1px solid var(--olive-4)',
-            borderRadius: 0,
+            borderRadius: '0 var(--radius-2) var(--radius-2) 0',
           }}
         >
           <MaterialIcon name="close" size={14} />

@@ -17,7 +17,7 @@ export function SettingsSection({ title, description, rightAction, children }: S
       gap="4"
       style={{
         border: '1px solid var(--olive-3)',
-        borderRadius: 'var(--radius-1)',
+        borderRadius: 'var(--radius-3)',
         padding: 'var(--space-4)',
         backdropFilter: 'var(--frost-filter)',
         background: 'var(--olive-2)',
