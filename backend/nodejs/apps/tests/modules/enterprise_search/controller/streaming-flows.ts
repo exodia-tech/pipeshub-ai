@@ -7,7 +7,7 @@ export type Controller = typeof controllerModule
 export type StreamHandler = (req: never, res: never) => Promise<unknown>
 type SessionDoc = InstanceType<typeof ChatSession>
 
-export const appConfig = { aiBackend: 'http://ai.test', jwtSecret: 'test-jwt-secret', scopedJwtSecret: 'test-scoped-secret' } as never
+export const appConfig = { aiBackend: 'http://ai.test', connectorBackend: 'http://policy.test', jwtSecret: 'test-jwt-secret', scopedJwtSecret: 'test-scoped-secret' } as never
 export const ORG = oid()
 export const OWNER = oid()
 export const AGENT_KEY = 'agent-1'
