@@ -4,6 +4,7 @@ config({ quiet: true }); // Load environment variables first
 applyStoreUmbrella(); // PIPESHUB_STORE=postgres fills in the per-store settings
 
 import { transcribeSlackAudio } from './audio';
+import { uploadSlackArtifactPreview } from './artifact-previews';
 import { isSlackAudio } from './helpers';
 import { json, urlencoded, Request, Response } from "express";
 import { connect, dropLegacyThreadBotIndex } from "./utils/db";
@@ -888,6 +889,7 @@ async function processSlackMessage(
       const text = `*Artifact:* <${link}|${fileName}>`;
       queuedStreamAppend = queuedStreamAppend
         .then(async () => {
+          await uploadSlackArtifactPreview(typedClient, accessToken, conversation, currentAgentId, recordId, fileName, typedMessage.channel!, threadId);
           await typedClient.chat.postMessage({
             channel: typedMessage.channel!,
             thread_ts: threadId,
@@ -970,10 +972,12 @@ async function processSlackMessage(
       onAskUserQuestion: handleAskUserQuestion,
       onArtifact: handleArtifact,
       onConversationCreated: (conversationId) => {
+        conversation = conversationId;
         activeRun?.conversationCreated(conversationId);
         conversationPersistPromise = persistConversationId(conversationId);
       },
       onComplete: (conv) => {
+        conversation = conv._id;
         completionConversation = conv as ConversationData["conversation"];
       },
       onError: (message) => {
@@ -1363,6 +1367,7 @@ async function processSlackMessage(
       }
       postedArtifactKeys.add(dedupeKey);
       postedArtifactKeys.add(link);
+      await uploadSlackArtifactPreview(typedClient, accessToken, conversation, currentAgentId, artifact.recordId || '', artifact.fileName, typedMessage.channel!, threadId);
       await typedClient.chat.postMessage({
         channel: typedMessage.channel!,
         thread_ts: threadId,
