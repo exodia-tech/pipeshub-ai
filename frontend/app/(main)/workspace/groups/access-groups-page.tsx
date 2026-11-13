@@ -38,6 +38,9 @@ import { GroupNameInput } from "./components/group-name-input";
 import { ConfirmationDialog } from "../components/confirmation-dialog";
 import { useWorkspaceDrawerNestedModalHost } from "../components/workspace-right-panel";
 
+// The existing membership API accepts at most 500 IDs per request.
+const MEMBER_BATCH_LIMIT = 500;
+
 export default function AccessGroupsPage() {
   const { t } = useTranslation();
   const isAdmin = useUserStore(selectIsAdmin);
@@ -164,23 +167,28 @@ export default function AccessGroupsPage() {
           if (!isCurrent()) return;
           await mutate();
         }
-        if (!isCurrent()) return;
-        if (pendingRemovals.length) {
-          await AccessGroupsApi.changeMembers(
-            selected,
-            "remove",
-            pendingRemovals,
-          );
-          if (!isCurrent()) return;
-          setPendingRemovals([]);
-          await refreshMembers();
-        }
-        if (!isCurrent()) return;
-        if (pendingMembers.length) {
-          await AccessGroupsApi.changeMembers(selected, "add", pendingMembers);
-          if (!isCurrent()) return;
-          setPendingMembers([]);
-          await refreshMembers();
+        for (const [operation, ids, clearPending] of [
+          ["remove", pendingRemovals, setPendingRemovals],
+          ["add", pendingMembers, setPendingMembers],
+        ] as const) {
+          try {
+            for (
+              let offset = 0;
+              offset < ids.length;
+              offset += MEMBER_BATCH_LIMIT
+            ) {
+              if (!isCurrent()) return;
+              const batch = ids.slice(offset, offset + MEMBER_BATCH_LIMIT);
+              await AccessGroupsApi.changeMembers(selected, operation, batch);
+              if (!isCurrent()) return;
+              const saved = new Set(batch);
+              clearPending((previous) =>
+                previous.filter((id) => !saved.has(id)),
+              );
+            }
+          } finally {
+            if (ids.length && isCurrent()) await refreshMembers();
+          }
         }
       },
       async () => {
@@ -288,8 +296,8 @@ export default function AccessGroupsPage() {
           page={Math.floor(skip / limit) + 1}
           limit={limit}
           itemCount={shown.length}
-          hasNextPage={groupPage?.hasMore ?? false}
-          disabled={groupsLoading || !!error}
+          hasNextPage={!error && (groupPage?.hasMore ?? false)}
+          disabled={groupsLoading}
           onPageChange={(page) => {
             setSkip((page - 1) * limit);
             setSelectedRows(new Set());

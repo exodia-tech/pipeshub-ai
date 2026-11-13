@@ -167,6 +167,42 @@ describe("audit history", () => {
     ).toHaveProperty("disabled", true);
   });
 
+  it("lets an administrator return to the previous page after a cursor request fails", async () => {
+    state.admin = true;
+    const page = {
+      events: [
+        {
+          id: "recover",
+          operation_id: "op",
+          actor_id: "actor-a",
+          action: "audit.read",
+          outcome: "success",
+          group_ids: [],
+          member_ids: [],
+          recorded_at: "2026-11-08T12:00:00Z",
+        },
+      ],
+      next_cursor: "next-page",
+    };
+    vi.mocked(auditApi.list)
+      .mockResolvedValue(page)
+      .mockResolvedValueOnce(page)
+      .mockRejectedValueOnce(new Error("Fixture page failure"));
+    showPage();
+    await screen.findByText("actor-a");
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.next" }),
+    );
+    await screen.findByText("audit.error");
+    expect(
+      screen.getByRole("button", { name: "workspace.pagination.previous" }),
+    ).toHaveProperty("disabled", false);
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.previous" }),
+    );
+    await screen.findByText("actor-a");
+  });
+
   it("shows agent and tool correlation in the existing event details", async () => {
     state.admin = true;
     vi.mocked(auditApi.list).mockResolvedValue({

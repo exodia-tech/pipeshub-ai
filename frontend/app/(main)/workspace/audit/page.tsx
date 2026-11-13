@@ -406,8 +406,10 @@ export default function AuditPage() {
             itemCount={
               data && !malformed && validFilters ? data.events.length : 0
             }
-            hasNextPage={!!data?.next_cursor}
-            disabled={isLoading || !!error || malformed || !validFilters}
+            hasNextPage={
+              !error && !malformed && validFilters && !!data?.next_cursor
+            }
+            disabled={isLoading}
             onPageChange={(page) => {
               setSelectedRows(new Set());
               setDetail(null);

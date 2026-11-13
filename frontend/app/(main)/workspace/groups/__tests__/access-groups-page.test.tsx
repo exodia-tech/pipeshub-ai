@@ -272,6 +272,93 @@ describe("access groups", () => {
     expect(AccessGroupsApi.list).toHaveBeenCalledWith(0, 100);
   });
 
+  it("keeps the previous group page available after a page request fails", async () => {
+    const groups = Array.from({ length: 101 }, (_, index) => ({
+      _key: `g${index}`,
+      name: `Group ${index + 1}`,
+    }));
+    vi.mocked(AccessGroupsApi.list).mockImplementation(
+      async (skip = 0, limit = 100) => {
+        if (skip === 100 && limit === 100)
+          throw new Error("Fixture page failure");
+        return groups.slice(skip, skip + limit);
+      },
+    );
+    show();
+    await screen.findByText("Group 1");
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.next" }),
+    );
+    await screen.findByText("accessGroups.error");
+    expect(
+      screen.getByRole("button", { name: "workspace.pagination.previous" }),
+    ).toHaveProperty("disabled", false);
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.pagination.previous" }),
+    );
+    await screen.findByText("Group 1");
+  });
+
+  it("saves more than 500 removals in bounded requests and retries only an unconfirmed batch", async () => {
+    const members = Array.from({ length: 501 }, (_, index) => ({
+      userId: `member-${index}`,
+      userName: `Batch member ${index}`,
+    }));
+    vi.mocked(AccessGroupsApi.members).mockResolvedValue(members);
+    vi.mocked(AccessGroupsApi.changeMembers)
+      .mockResolvedValue(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Second batch failed"));
+    show();
+    fireEvent.click(await screen.findByText("Finance"));
+    await screen.findByText("Batch member 0");
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.edit" }),
+    );
+    for (let index = 25; index < 501; index += 25) {
+      fireEvent.scroll(
+        screen.getByRole("region", {
+          name: "workspace.groups.detail.searchUsers",
+        }),
+      );
+      await screen.findByText(`Batch member ${Math.min(index + 24, 500)}`);
+    }
+    act(() => {
+      for (const button of screen.getAllByRole("button", {
+        name: "accessGroups.remove",
+      }))
+        fireEvent.click(button);
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(AccessGroupsApi.changeMembers).mock.calls[0]?.[2].length,
+      ).toBe(500),
+    );
+    await screen.findAllByText("accessGroups.error");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+      ).toHaveProperty("disabled", false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "workspace.groups.edit.save" }),
+    );
+    await waitFor(() =>
+      expect(AccessGroupsApi.changeMembers).toHaveBeenCalledTimes(3),
+    );
+    expect(
+      vi
+        .mocked(AccessGroupsApi.changeMembers)
+        .mock.calls.map((call) => call[2].length),
+    ).toEqual([500, 1, 1]);
+    expect(vi.mocked(AccessGroupsApi.changeMembers).mock.calls[2][2]).toEqual([
+      "member-500",
+    ]);
+  }, 30000);
+
   it("does not replay a confirmed removal when a later addition fails", async () => {
     vi.mocked(UsersApi.fetchMergedUsers).mockResolvedValue({
       users: [
