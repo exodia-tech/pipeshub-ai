@@ -12,9 +12,11 @@ import locale from "@/lib/i18n/locales/en-US.json";
 import UsagePage from "../page";
 import { usageApi, type UsageReport } from "../api";
 
-const fixture: { admin: boolean; report: UsageReport | null } = vi.hoisted(
-  () => ({ admin: false, report: null }),
-);
+const fixture: {
+  admin: boolean;
+  report: UsageReport | null;
+  params?: Record<string, unknown>;
+} = vi.hoisted(() => ({ admin: false, report: null }));
 const translations: Record<string, string> = locale.usage;
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -45,19 +47,24 @@ vi.mock("../api", () => ({
   },
 }));
 vi.mock("swr", () => ({
-  default: (key: unknown) => ({
-    data:
-      Array.isArray(key) && key[0] === "usage-report"
-        ? fixture.report
-        : undefined,
-    error: undefined,
-    isLoading: false,
-    mutate: vi.fn(),
-  }),
+  default: (key: unknown) => {
+    if (Array.isArray(key) && key[0] === "usage-report")
+      fixture.params = key[1];
+    return {
+      data:
+        Array.isArray(key) && key[0] === "usage-report"
+          ? fixture.report
+          : undefined,
+      error: undefined,
+      isLoading: false,
+      mutate: vi.fn(),
+    };
+  },
 }));
 
 describe("usage dashboard", () => {
   beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -151,6 +158,53 @@ describe("usage dashboard", () => {
       screen.queryByRole("combobox", { name: "Member", exact: true }),
     ).toBeNull();
     expect(screen.queryByRole("tab", { name: /^Model pricing/ })).toBeNull();
+  });
+  it("shows an admin the audience and member controls without opening advanced filters", async () => {
+    fixture.admin = true;
+    show();
+    fireEvent.keyDown(
+      screen.getByRole("combobox", { name: "View", exact: true }),
+      { key: "Enter" },
+    );
+    fireEvent.click(
+      await screen.findByRole("option", { name: "Organization", exact: true }),
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Consumption", exact: true }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("combobox", { name: "Member", exact: true }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("table", { name: "Usage by member", exact: true }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Filters" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    fireEvent.keyDown(
+      screen.getByRole("combobox", { name: "Consumption", exact: true }),
+      { key: "Enter" },
+    );
+    fireEvent.click(
+      await screen.findByRole("option", { name: "All users", exact: true }),
+    );
+    expect(fixture.params?.audience).toBe("users");
+    fireEvent.keyDown(
+      screen.getByRole("combobox", { name: "Consumption", exact: true }),
+      { key: "Enter" },
+    );
+    fireEvent.click(
+      await screen.findByRole("option", {
+        name: "Background services",
+        exact: true,
+      }),
+    );
+    expect(fixture.params?.audience).toBe("services");
+    expect(
+      screen.queryByRole("combobox", { name: "Member", exact: true }),
+    ).toBeNull();
   });
   it("keeps secondary filters collapsed and makes chart values accessible without an extra dropdown", () => {
     fixture.report!.timeline = [

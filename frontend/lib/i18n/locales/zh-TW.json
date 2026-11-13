@@ -5855,6 +5855,9 @@
   },
   "_exodiaModificationNotice": "Modified by EXODIA: customer-facing branding; attribution retained.",
   "usage": {
+    "consumption": "用量",
+    "organizationTotal": "組織總計（使用者 + 服務）",
+    "allUsers": "所有使用者",
     "title": "用量與費用",
     "subtitle": "追蹤模型呼叫、Token 與預估支出。",
     "refresh": "重新整理",

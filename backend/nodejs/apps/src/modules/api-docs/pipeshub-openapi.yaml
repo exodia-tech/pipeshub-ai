@@ -25906,6 +25906,7 @@ paths:
         Breakdowns return the 100 most active groups. Tracking begins when enabled; no fabricated historical backfill.
       parameters:
         - { name: view, in: query, schema: { type: string, enum: [personal, organization], default: personal } }
+        - { name: audience, in: query, description: "Organization view only for users/services; all includes people and background services. Personal view always uses the authenticated user.", schema: { type: string, enum: [all, users, services], default: all } }
         - { name: from, in: query, schema: { type: string, format: date-time } }
         - { name: to, in: query, schema: { type: string, format: date-time } }
         - { name: interval, in: query, schema: { type: string, enum: [hour, day, week, month], default: day } }
