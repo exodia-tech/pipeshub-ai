@@ -22,7 +22,7 @@ info:
 
     **Request size.** On every route with a request validator, the body, query and path values are measured before the schema runs. An array over 10,000 items (`<path> can have at most 10000 items.`), an object over 10,000 keys (`<path> can have at most 10000 fields.`), more than 100,000 array items and object keys in the whole request (`The request holds too many items in total (the limit is 100000); the limit is reached at <path>.`) or nesting deeper than 64 levels (`<path> is nested more than 64 levels deep.`) is refused with `400 VALIDATION_ERROR` (detail code `TOO_BIG`, or `TOO_DEEP` for nesting; the path reads like `body.items`). The deployment can change the first three limits with `VALIDATION_MAX_ARRAY_LENGTH`, `VALIDATION_MAX_OBJECT_KEYS` and `VALIDATION_MAX_TOTAL_ITEMS`.
 
-    **OAuth scopes.** On an operation whose `security` names `oauth2` scopes, an OAuth access token holding none of them gets `403 HTTP_FORBIDDEN` ("Insufficient scope. Required: ...") right after authentication. Session tokens are never scope-checked.
+    **OAuth scopes.** On an operation whose `security` names `oauth2` scopes, an OAuth access token holding none of them gets `403 HTTP_FORBIDDEN` ("Insufficient scope. Required: ...") right after authentication. Sessions have no OAuth grant ceiling; configured group feature limits still apply.
 
     **No such route.** A method and path that no route handles get Express's own `404` page, `text/html`, reading `Cannot <METHOD> <path>`. Such pairs are not listed as operations.
 
@@ -25226,7 +25226,7 @@ components:
       description: >-
         The bearer token is an OAuth access token without the scope this route requires
         (`HTTP_FORBIDDEN`, "Insufficient scope. Required: <scope>"). Checked right after authentication;
-        session tokens are never scope-checked.
+        sessions have no OAuth grant ceiling; configured group feature limits still apply.
       content:
         application/json:
           schema:
@@ -26256,7 +26256,7 @@ paths:
           description: |
             The caller is not an admin of this organization (`userAdminCheck`).
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -26323,7 +26323,7 @@ paths:
           description: |
             Missing config:read
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -26383,7 +26383,7 @@ paths:
           description: |
             Missing config:read
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -58585,7 +58585,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -58693,7 +58693,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -58846,7 +58846,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -58928,7 +58928,7 @@ paths:
             Only for the ids `oauth-configs`, `instances` and `agents`, the three that reach a backend
             handler: the caller's OAuth access token does not carry the scope that handler requires,
             `toolset:read` (`agent:read` for the id `agents`); the message is `Insufficient scope.
-            Required: <scope>`. Session tokens are not scope-checked.
+            Required: <scope>`. Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -59019,7 +59019,7 @@ paths:
             Only for the ids `oauth-configs`, `instances` and `agents`, the three that reach a backend
             handler: the caller's OAuth access token does not carry the scope that handler requires,
             `toolset:read` (`agent:read` for the id `agents`); the message is `Insufficient scope.
-            Required: <scope>`. Session tokens are not scope-checked.
+            Required: <scope>`. Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -59534,7 +59534,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:write` scope (`Insufficient scope.
-            Required: toolset:write`). Session tokens are not scope-checked.
+            Required: toolset:write`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -59646,7 +59646,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -59767,7 +59767,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `agent:read` scope (`Insufficient scope.
-            Required: agent:read`). Session tokens are not scope-checked.
+            Required: agent:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -60318,7 +60318,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -60460,7 +60460,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:write` scope (`Insufficient scope.
-            Required: toolset:write`). Session tokens are not scope-checked. Not being an administrator
+            Required: toolset:write`). Sessions have no OAuth grant ceiling; configured group feature limits still apply. Not being an administrator
             is not refused: the instance is created as personal.
           content:
             application/json:
@@ -60562,7 +60562,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -60696,7 +60696,7 @@ paths:
             (`Only administrators can update toolset instances.`, checked before the organization instance
             is looked up, so an unknown id or another user's personal instance also gets 403), or the
             caller's OAuth access token does not carry the `toolset:write` scope (`Insufficient scope.
-            Required: toolset:write`). Session tokens are not scope-checked.
+            Required: toolset:write`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -60795,7 +60795,7 @@ paths:
             (`Only administrators can delete toolset instances.`, checked before the organization instance
             is looked up, so an unknown id or another user's personal instance also gets 403), or the
             caller's OAuth access token does not carry the `toolset:delete` scope (`Insufficient scope.
-            Required: toolset:delete`). Session tokens are not scope-checked.
+            Required: toolset:delete`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -60905,7 +60905,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:write` scope (`Insufficient scope.
-            Required: toolset:write`). Session tokens are not scope-checked.
+            Required: toolset:write`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -61006,7 +61006,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:write` scope (`Insufficient scope.
-            Required: toolset:write`). Session tokens are not scope-checked.
+            Required: toolset:write`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -61074,7 +61074,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:delete` scope (`Insufficient scope.
-            Required: toolset:delete`). Session tokens are not scope-checked.
+            Required: toolset:delete`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -61142,7 +61142,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:write` scope (`Insufficient scope.
-            Required: toolset:write`). Session tokens are not scope-checked.
+            Required: toolset:write`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -61233,7 +61233,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -61320,7 +61320,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -61391,7 +61391,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -61554,7 +61554,7 @@ paths:
         '403':
           description: |-
             The caller's OAuth access token does not carry the `toolset:read` scope (`Insufficient scope.
-            Required: toolset:read`). Session tokens are not scope-checked.
+            Required: toolset:read`). Sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68091,7 +68091,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68424,7 +68424,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68545,7 +68545,7 @@ paths:
           description: |
             Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68597,7 +68597,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68648,7 +68648,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68716,7 +68716,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68840,7 +68840,7 @@ paths:
           description: |
             Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68890,7 +68890,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -68961,7 +68961,7 @@ paths:
           description: |
             Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -69010,7 +69010,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -69076,7 +69076,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -69389,7 +69389,7 @@ paths:
           description: |
             Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -69500,7 +69500,7 @@ paths:
           description: |
             Forbidden.
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -69572,7 +69572,7 @@ paths:
           description: |
             Forbidden.
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -69858,7 +69858,7 @@ paths:
           description: |
             Admin access required, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -69946,7 +69946,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -70073,7 +70073,7 @@ paths:
           description: |
             Admin access required, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -70209,7 +70209,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71078,7 +71078,7 @@ paths:
           description: |
             Admin access required, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71130,7 +71130,7 @@ paths:
           description: |
             The OAuth token does not carry `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71278,7 +71278,7 @@ paths:
           description: |
             Admin access required, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71330,7 +71330,7 @@ paths:
           description: |
             The OAuth token does not carry `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71457,7 +71457,7 @@ paths:
           description: |
             Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71507,7 +71507,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71561,7 +71561,7 @@ paths:
           description: |
             Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71777,7 +71777,7 @@ paths:
           description: |
             Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71823,7 +71823,7 @@ paths:
           description: |
             The caller is not an admin of this organization
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71885,7 +71885,7 @@ paths:
           description: |
             Forbidden - Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -71982,7 +71982,7 @@ paths:
           description: |
             Forbidden - Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72372,7 +72372,7 @@ paths:
           description: |
             Forbidden - Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72461,7 +72461,7 @@ paths:
           description: |
             Forbidden - Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72512,7 +72512,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72582,7 +72582,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72637,7 +72637,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72690,7 +72690,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72789,7 +72789,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token does not carry `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72865,7 +72865,7 @@ paths:
           description: |
             Forbidden - Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -72941,7 +72941,7 @@ paths:
           description: |
             Forbidden - Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -73044,7 +73044,7 @@ paths:
           description: |
             Forbidden - Admin access required
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -76570,7 +76570,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -76646,7 +76646,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -76699,7 +76699,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -76772,7 +76772,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -76825,7 +76825,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -76898,7 +76898,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -76949,7 +76949,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -77057,7 +77057,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -77121,7 +77121,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:read`
 
-            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:read` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:read"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
@@ -77321,7 +77321,7 @@ paths:
           description: |
             The caller is not an admin of this organization, or the OAuth token lacks `config:write`
 
-            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; session tokens are never scope-checked.
+            Also returned when the bearer token is an OAuth access token without the `config:write` scope (`HTTP_FORBIDDEN`, "Insufficient scope. Required: config:write"), checked right after authentication; sessions have no OAuth grant ceiling; configured group feature limits still apply.
           content:
             application/json:
               schema:
