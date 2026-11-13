@@ -1,0 +1,17 @@
+{
+  "name": "Alessio · Finance",
+  "description": "Assistente IA riservato per budget, costi di progetto e scadenze finanziarie documentate.",
+  "startMessage": "Ciao, sono Alessio. Posso aiutarti a esaminare budget e scadenze usando soltanto i dati che mi sono stati autorizzati.",
+  "systemPromptFile": "persona-it.md",
+  "tags": ["finance", "budget", "EXODIA"],
+  "models": [],
+  "shareWithOrg": false,
+  "isServiceAccount": false,
+  "knowledge": [],
+  "toolsets": [],
+  "mcpServers": [],
+  "apiToolsetTools": [],
+  "skills": [],
+  "webSearch": null,
+  "sendUserContext": false
+}
