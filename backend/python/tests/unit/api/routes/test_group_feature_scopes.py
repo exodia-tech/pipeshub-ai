@@ -1,5 +1,6 @@
 """Native user-facing scope dependencies apply live group limits, including sessions."""
 import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
@@ -91,6 +92,13 @@ def test_named_agents_cannot_use_the_generic_chat_scope(service: bool, token: li
 
 def test_actor_service_tokens_cannot_bypass_group_limits() -> None:
     assert request_action([], service=True) == 403
+
+
+async def test_org_only_indexing_tokens_keep_the_native_service_policy() -> None:
+    request = SimpleNamespace(state=SimpleNamespace(user={
+        "token_type": "scoped", "orgId": "org", "scopes": ["connector:signedUrl"],
+    }))
+    await require_scopes("connector:read", service_scopes=(TokenScopes.CONNECTOR_SIGNED_URL,))(request)
 
 
 def test_universal_chat_keeps_its_native_chat_scope() -> None:

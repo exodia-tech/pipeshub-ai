@@ -432,6 +432,8 @@ def require_scopes(
             if not has_service_scope(user, *admitted_service_scopes):
                 raise AuthRejected(status.HTTP_403_FORBIDDEN, "This route does not accept service tokens",
                                    reason="service_token_not_allowed")
+            if not has_service_scope(user, TokenScopes.CONVERSATION_CREATE):
+                return
 
         limits = None
         if any(":" in scope for scope in required_scopes) and not is_request_admin(request):

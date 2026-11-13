@@ -25469,6 +25469,39 @@ paths:
         '403': { description: Administrator access required }
         '404': { description: Group not found }
         '503': { description: Outcome may be unknown; check the group before retrying }
+  /entity/access-groups/effective-scopes:
+    get:
+      tags: [Administration]
+      summary: Resolve a user’s live group feature ceiling (Internal)
+      description: |
+        Connector-service endpoint, not a public Node gateway route. Requires a scoped
+        service JWT containing access-group:manage and verified orgId and userId claims.
+        Sessions and OAuth/PAT tokens are refused. Reads active organization-bound
+        membership. Null means no group feature restriction; an empty list denies all
+        scoped actions. Intersects every applicable group's configured allowlist.
+      servers:
+        - url: "{connector_url}/api/v1"
+          variables:
+            connector_url:
+              default: http://localhost:8088
+      security:
+        - scopedToken: []
+      responses:
+        '200':
+          description: Effective live scope ceiling
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [scopes]
+                properties:
+                  scopes:
+                    type: array
+                    nullable: true
+                    items: { type: string }
+        '401': { description: Invalid token or missing organization/user identity }
+        '403': { description: Required service-token scope missing }
+        '500': { description: Live membership or policy could not be verified; callers must fail closed }
   /access-groups/scopes:
     get:
       tags: [Administration]
