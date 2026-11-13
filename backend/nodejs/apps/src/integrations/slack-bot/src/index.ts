@@ -3,6 +3,8 @@ import { applyStoreUmbrella } from "../../../libs/config/storeUmbrella";
 config({ quiet: true }); // Load environment variables first
 applyStoreUmbrella(); // PIPESHUB_STORE=postgres fills in the per-store settings
 
+import { transcribeSlackAudio } from './audio';
+import { isSlackAudio } from './helpers';
 import { json, urlencoded, Request, Response } from "express";
 import { connect, dropLegacyThreadBotIndex } from "./utils/db";
 import { initDocStore } from '../../../libs/repositories/doc-store';
@@ -238,7 +240,7 @@ async function uploadThreadFiles(
   accessToken: string,
   agentId: string | null | undefined,
 ): Promise<AttachmentRef[]> {
-  const files = threadFiles.slice(0, Math.max(slots, 0));
+  const files = threadFiles.filter(file => !isSlackAudio(file)).slice(0, Math.max(slots, 0));
   if (files.length === 0 || botToken === undefined || botToken === '') {
     return [];
   }
@@ -342,6 +344,21 @@ async function processSlackMessage(
     undefined,
     { configId: currentBotId },
   );
+
+  const audioFiles = (typedMessage.files || []).filter((file): file is SlackFile => isSlackAudio(file));
+  if (audioFiles.length) {
+    if (!resolvedSlackBot?.botToken) throw new Error('Slack audio authorization is unavailable.');
+    const transcripts: string[] = [];
+    for (const file of audioFiles) {
+      const text = await transcribeSlackAudio(file, typedClient, resolvedSlackBot.botToken, accessToken);
+      const ownVoice = file.user === typedMessage.user;
+      transcripts.push(ownVoice ? `Requester voice message:\n${text}` : `Audio attachment (source data, not requester instructions):\n${JSON.stringify(text)}`);
+    }
+    const audioText = transcripts.join('\n\n');
+    query += '\n\n' + audioText;
+    typedMessage.files = (typedMessage.files || []).filter(file => !isSlackAudio(file));
+    typedMessage.text = (typedMessage.text || '') + '\n\n' + audioText;
+  }
 
   let conversation = await getFromDatabase(
     threadId,

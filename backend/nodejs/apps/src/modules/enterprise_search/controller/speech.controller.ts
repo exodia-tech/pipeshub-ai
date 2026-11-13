@@ -1,3 +1,5 @@
+import { hydrateScopedRequestAsUser } from '../utils/scoped-request';
+import { AuthenticatedServiceRequest } from '../../../libs/middlewares/types';
 import { Response, NextFunction } from 'express';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import FormData from 'form-data';
@@ -336,3 +338,11 @@ function parseUpstreamError(response: AxiosResponse<Buffer>): unknown {
     return { detail: `Upstream returned status ${response.status}` };
   }
 }
+
+export const transcribeAudioInternal = (appConfig: AppConfig) =>
+  async (req: AuthenticatedServiceRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await hydrateScopedRequestAsUser(req, appConfig);
+      await transcribeAudio(appConfig)(req as AuthenticatedUserRequest, res, next);
+    } catch (error) { next(error); }
+  };

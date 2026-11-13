@@ -97,6 +97,7 @@ import {
   getSpeechCapabilities,
   synthesizeSpeech,
   transcribeAudio,
+  transcribeAudioInternal,
 } from '../controller/speech.controller';
 import { ValidationMiddleware } from '../../../libs/middlewares/validation.middleware';
 import {
@@ -1219,6 +1220,10 @@ export function createChatSpeechRouter(container: Container): Router {
     requireScopes(OAuthScopeNames.CONVERSATION_CHAT),
     synthesizeSpeech(appConfig),
   );
+
+  router.post('/internal/transcribe',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE),
+    audioUpload.single('file'), transcribeAudioInternal(appConfig));
 
   router.post(
     '/transcribe',

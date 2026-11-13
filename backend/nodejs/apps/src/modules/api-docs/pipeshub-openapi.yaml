@@ -50025,6 +50025,37 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   # -------------------- Conversational Speech --------------------
+  /chat/internal/transcribe:
+    post:
+      tags: [Conversational Speech]
+      summary: Transcribe Slack audio as the verified requester
+      description: Internal scoped-token endpoint. Resolves the caller from the signed Slack identity, then uses the configured Speech-to-Text provider and caller usage attribution. Does not grant record access. Maximum audio size is 25 MiB; Slack bot intake separately caps downloads at 5 MiB.
+      operationId: transcribeInternalChatAudio
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Transcript from the configured provider.
+        '401':
+          description: Invalid scoped authorization.
+        '409':
+          description: Speech-to-Text provider is not configured.
+        '413':
+          description: Audio exceeds the upload limit.
+        '502':
+          description: Transcription provider failed.
+
   /chat/transcribe:
     post:
       tags:
