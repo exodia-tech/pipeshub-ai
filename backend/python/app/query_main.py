@@ -18,6 +18,7 @@ from app.api.middlewares.request_log import (
     mark_request_failure,
 )
 from app.api.routes.chatbot import warm_up_entity_vector_store
+from app.api.routes.steering import router as steering_router
 from app.api.routes.records import router as records_router
 from app.api.routes.usage import router as usage_router
 from app.core.envelope import configure_from_config as configure_envelope
@@ -596,6 +597,7 @@ app.include_router(knowledge_search_router, prefix="/api/v1")
 app.include_router(records_router, prefix="/api/v1")
 app.include_router(usage_router, prefix="/api/v1")
 app.include_router(chatbot_router, prefix="/api/v1")
+app.include_router(steering_router, prefix="/api/v1")
 app.include_router(speech_router, prefix="/api/v1")
 app.include_router(agent_router, prefix="/api/v1/agent")
 app.include_router(skills_router, prefix="/api/v1/skills")

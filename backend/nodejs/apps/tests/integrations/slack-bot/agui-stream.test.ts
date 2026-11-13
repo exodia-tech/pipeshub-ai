@@ -12,6 +12,13 @@ function snapshot(fields: Record<string, unknown>) {
 }
 
 describe('slack-bot/utils/agui-stream', () => {
+  it('announces only root run readiness for live steering', () => {
+    const onRunStarted = sinon.stub();
+    const handle = createSlackAGUIEventHandler({onRunStarted});
+    handle({event:'RUN_STARTED',data:{type:'RUN_STARTED',runId:'root'}});
+    handle({event:'RUN_STARTED',data:{type:'RUN_STARTED',runId:'child',parentRunId:'root'}});
+    expect(onRunStarted.args).to.deep.equal([['root']]);
+  });
   it('shows a running action once and preserves real progress', () => {
     const activity = new SlackActivityBuilder();
     activity.startTool('web_search', 'Using Web Search');

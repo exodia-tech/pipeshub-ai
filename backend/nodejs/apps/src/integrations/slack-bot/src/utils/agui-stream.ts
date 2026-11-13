@@ -80,6 +80,7 @@ export interface SlackAGUICallbacks {
   onAskUserQuestion?: (payload: AskUserQuestionEvent) => void;
   onArtifact?: (artifact: SlackArtifactPayload) => void;
   onConversationCreated?: (conversationId: string) => void;
+  onRunStarted?: (runId: string) => void;
   onComplete?: (conversation: SlackConversationComplete) => void;
   onError?: (message: string) => void;
 }
@@ -268,6 +269,7 @@ export function createSlackAGUIEventHandler(
         const parentRunId =
           typeof data?.parentRunId === "string" ? data.parentRunId : undefined;
         const role = runs.handleRunStarted(runId, parentRunId);
+        if (runId && !parentRunId) callbacks.onRunStarted?.(runId);
         if (role) {
           callbacks.onSubAgent?.(role, "started");
           callbacks.onStatus?.(`Delegating to ${role}...`);

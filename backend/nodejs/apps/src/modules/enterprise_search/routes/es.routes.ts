@@ -64,6 +64,7 @@ import {
   getModelUsage,
   regenerateAgentAnswers,
   cancelConversationStream,
+  steerConversationStreamInternal,
   cancelAgentConversationStream,
   streamChatInternal,
   addMessageStreamInternal,
@@ -122,6 +123,8 @@ import {
   compareListParamsSchema,
   compareChooseParamsSchema,
   cancelConversationStreamParamsSchema,
+  steerConversationStreamParamsSchema,
+  steerAgentConversationStreamParamsSchema,
   cancelAgentConversationStreamParamsSchema,
   updateFeedbackParamsSchema,
   searchShareParamsSchema,
@@ -539,6 +542,10 @@ export function createConversationalRouter(container: Container): Router {
    * @param {string} conversationId - Conversation ID
    * @body { runId: string (UUID) }
    */
+  router.post('/internal/:conversationId/steer',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE),
+    ValidationMiddleware.validate(steerConversationStreamParamsSchema), steerConversationStreamInternal(appConfig));
+
   router.post(
     '/:conversationId/cancel',
     authMiddleware.authenticate,
@@ -961,6 +968,10 @@ export function createAgentConversationalRouter(container: Container): Router {
    * @param {string} conversationId - Conversation ID
    * @body { runId: string (UUID) }
    */
+  router.post('/:agentKey/conversations/internal/:conversationId/steer',
+    authMiddleware.scopedTokenValidator(TokenScopes.CONVERSATION_CREATE),
+    ValidationMiddleware.validate(steerAgentConversationStreamParamsSchema), steerConversationStreamInternal(appConfig, true, keyValueStoreService));
+
   router.post(
     '/:agentKey/conversations/:conversationId/cancel',
     authMiddleware.authenticate,

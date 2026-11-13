@@ -48088,6 +48088,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /conversations/internal/{conversationId}/steer:
+    post:
+      tags: [Conversations]
+      operationId: steerConversationStreamInternal
+      summary: Send a user update to an active Slack run
+      description: Scoped token is resolved to its user before conversation and run ownership checks. Updates apply at the next safe step; finished runs return queued false. No permissions change.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId, messageId, text]
+              properties:
+                runId: { type: string, format: uuid }
+                messageId: { type: string, minLength: 1, maxLength: 100 }
+                text: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        '200':
+          description: Delivery acknowledgement; duplicate updates are not appended again.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queued, duplicate]
+                properties:
+                  queued: { type: boolean }
+                  duplicate: { type: boolean }
+        '400': { description: Invalid steering message }
+        '401': { description: Invalid scoped authentication }
+        '403': { description: Run belongs to a different user or conversation }
+        '404': { description: Conversation unavailable to caller }
+        '429': { description: Run update limit reached }
+        '503': { description: Steering storage unavailable }
+
+  /agents/{agentKey}/conversations/internal/{conversationId}/steer:
+    post:
+      tags: [Conversations]
+      operationId: steerAgentConversationStreamInternal
+      summary: Send a user update to an active Slack run
+      description: Scoped token is resolved to its user before conversation and run ownership checks. Updates apply at the next safe step; finished runs return queued false. No permissions change.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+        - { name: agentKey, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId, messageId, text]
+              properties:
+                runId: { type: string, format: uuid }
+                messageId: { type: string, minLength: 1, maxLength: 100 }
+                text: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        '200':
+          description: Delivery acknowledgement; duplicate updates are not appended again.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queued, duplicate]
+                properties:
+                  queued: { type: boolean }
+                  duplicate: { type: boolean }
+        '400': { description: Invalid steering message }
+        '401': { description: Invalid scoped authentication }
+        '403': { description: Run belongs to a different user or conversation }
+        '404': { description: Conversation unavailable to caller }
+        '429': { description: Run update limit reached }
+        '503': { description: Steering storage unavailable }
+
   /conversations/{conversationId}/cancel:
     post:
       tags:
