@@ -946,10 +946,10 @@ async function processSlackMessage(
         if (!useNativeStatus) return; // The message fallback already displays this narration.
         queuedStreamAppend = queuedStreamAppend.then(async () => {
           try {
-            await typedClient.chat.postMessage({
-              channel: typedMessage.channel!, thread_ts: threadId,
-              text: truncateForSlack(markdownToSlackMrkdwn(text)), ...NO_UNFURL_OPTIONS,
+            await replyStream.call('chat.stopStream', {
+              markdown_text: truncateForSlack(markdownToSlackMrkdwn(text)),
             });
+            await replyStream.reset();
           } finally {
             if (await nativeStatus.start()) useNativeStatus = true;
             if (!nativeStatus.isClosed) await updateActivityMessage(activityBuilder.format());

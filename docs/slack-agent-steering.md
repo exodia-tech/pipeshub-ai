@@ -18,4 +18,4 @@ Generated images, audio, video and PDFs up to 20 MiB can be uploaded into the or
 
 Native status requests are ordered. Completion fences late status refreshes and clears after any in-flight update, so steering cannot leave a finished run showing as active.
 
-Only narration generated after the root run consumes steering is promoted to a persistent Slack reply. Stale narration, child-run output and private reasoning are excluded. Posting the contextual reply restores native progress; a direct final answer already serves as the relevant response.
+Only narration generated after the root run consumes steering updates the existing Slack reply, which later becomes the final answer. Stale narration, child-run output and private reasoning are excluded. Posting the contextual reply restores native progress; a direct final answer already serves as the relevant response.
