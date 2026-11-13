@@ -31,7 +31,7 @@ Project context uses effective scopes rather than raw token scopes. Internal bot
 - Existing in-flight streams are not cancelled retroactively; subsequent requests and scheduled dispatches recheck live policy.
 - Virtual service-account bots are not authenticated human group members. Their native configured-agent authorization remains unchanged; do not present that mode as personal authorization.
 - Local fixture checks use synthetic identities, connectors and a deterministic responder. No company data or external model is used.
-- Roll out matching Node and Python builds together. A rollback to code that predates these guards ignores saved feature limits; treat that as an authorization change, not a transparent rollback. This draft has not been combined with newer main or tested live.
+- Roll out matching Node and Python builds together. A rollback to code that predates these guards ignores saved feature limits; treat that as an authorization change, not a transparent rollback. The original fixture candidate was not tested live; see the separate release validation below.
 
 The original application/build source was `f0be6f0d3`; the following results describe that candidate. Release validation against newer main is recorded separately below. Deployment must be confirmed from the running application's build metadata.
 
@@ -93,3 +93,5 @@ Regression tests reproduced the named-agent steering bypass before the fix. Focu
 Release checks also repaired the OpenAPI validation errors without changing existing operation IDs or SDK export selections, refreshed stale permission-matrix source anchors, and expanded the admin-route inventory for the audited group middleware and literal loop routes. Pinned Spectral 6.17.0 reported zero errors; permission-matrix checks passed (8, with one existing expected failure); the integration guard suite passed (82, with one existing skip).
 
 Other observed GitHub failures are not evidence of a successful check: PostgreSQL store/migration jobs fail during setup; Dependency Review reports unavailable Dependency Graph support; connector oracle checks include five existing Linear synthetic-folder classification failures. The self-hosted core workflows on this draft were queued. No CI gate, coverage threshold or runner access policy was weakened.
+
+The combined candidate also passes seven authenticated Mongo/Neo4j scenarios and 253 agent-route/stream tests. The agent test stand-in now implements active-user mapping and edge reads and supplies its graph to the real scope dependency; missing/foreign human identities are refused before model dispatch. The existing virtual bot test explicitly represents a scoped service token. The broader Windows run also exposed missing optional Opik/Docker dependencies, a CSV newline difference and unavailable Windows timezone data; those are not presented as passing checks.

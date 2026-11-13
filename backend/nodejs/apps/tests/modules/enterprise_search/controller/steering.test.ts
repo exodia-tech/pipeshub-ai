@@ -4,7 +4,16 @@ import sinon from 'sinon';
 import * as repo from '../../../../src/libs/repositories/conversation';
 import * as utils from '../../../../src/modules/enterprise_search/utils/utils';
 import { AIServiceCommand } from '../../../../src/libs/commands/ai_service/ai.service.command';
-import { steerConversationStream, steerConversationStreamInternal } from '../../../../src/modules/enterprise_search/controller/es_controller';
+import { steerConversationStream as createSteeringHandler, steerConversationStreamInternal } from '../../../../src/modules/enterprise_search/controller/es_controller';
+import { makeOrgContext, runWithOrgContext } from '../../../../src/libs/context/orgContext';
+
+function steerConversationStream(...args: Parameters<typeof createSteeringHandler>) {
+  const handler = createSteeringHandler(...args);
+  return (...request: Parameters<typeof handler>) => runWithOrgContext(
+    makeOrgContext({orgId: 'org-a', userId: 'alice', kind: 'user', source: 'jwt'}),
+    () => handler(...request),
+  );
+}
 
 describe('Steering conversation ownership and history', () => {
   afterEach(() => sinon.restore());

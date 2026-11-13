@@ -43,6 +43,7 @@ const ROUTES_WITHOUT_VALIDATION = new Set<string>([
   'createConfigurationManagerRouter POST /connectors/googleWorkspaceCredentials',
   'createConfigurationManagerRouter POST /internal/connectors/googleWorkspaceCredentials',
   'createChatSpeechRouter POST /transcribe',
+  'createChatSpeechRouter POST /internal/transcribe',
   'createOrgRouter PUT /logo',
   'createUserRouter PUT /dp',
   'createUserRouter POST /bulk/invite/upload',

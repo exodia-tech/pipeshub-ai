@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { currentOrgContext } from '../../../libs/context/orgContext';
 import { effectiveScopes } from '../../../libs/middlewares/require-scopes.middleware';
 import { OAuthScopeNames } from '../../../libs/enums/oauth-scopes.enum';
 import {
@@ -9089,7 +9090,7 @@ export const steerConversationStream = (appConfig: AppConfig, agent = false) =>
       const { runId, text, messageId } = req.body;
       const conversation = await convRepo().findForTurn(
         agent ? agentScope(agentKey) : CHAT_SCOPE,
-        conversationId as string, actorOf(req.user?.orgId, req.user?.userId),
+        conversationId as string, actorOf(currentOrgContext().orgId, req.user?.userId),
       );
       if (!conversation) throw new NotFoundError('Conversation not found or unauthorized');
       const result = await new AIServiceCommand({
