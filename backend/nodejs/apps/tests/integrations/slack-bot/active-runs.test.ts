@@ -44,7 +44,7 @@ describe('Slack active run routing', () => {
     failed.finish();
     expect(await failed.ready).to.equal(null);
   });
-  it('sends text to the existing scoped agent run and acknowledges only once', async () => {
+  it('steers silently and refreshes thinking only for a newly accepted update', async () => {
     const post = sinon
       .stub(axios, 'post')
       .resolves({ data: { queued: true, duplicate: false } });
@@ -52,7 +52,8 @@ describe('Slack active run routing', () => {
     const client = {
       chat: { postMessage: ack },
     } as unknown as TypedSlackClient;
-    const run = new SlackActiveRun('1.1', 'chat-a');
+    const resumed = sinon.stub().resolves();
+    const run = new SlackActiveRun('1.1', 'chat-a', resumed);
     run.runStarted(run.runId);
     expect(
       await trySteerSlackRun(
@@ -72,10 +73,8 @@ describe('Slack active run routing', () => {
       messageId: '2.2',
     });
     expect(post.firstCall.args[2]).to.include({ maxRedirects: 0 });
-    expect(ack.firstCall.args[0]).to.include({
-      channel: 'C1',
-      thread_ts: '1.1',
-    });
+    expect(ack.called).to.equal(false);
+    expect(resumed.callCount).to.equal(1);
     post.resolves({ data: { queued: true, duplicate: true } });
     expect(
       await trySteerSlackRun(
@@ -86,7 +85,8 @@ describe('Slack active run routing', () => {
         'agent-a',
       ),
     ).to.equal(true);
-    expect(ack.callCount).to.equal(1);
+    expect(ack.called).to.equal(false);
+    expect(resumed.callCount).to.equal(1);
   });
   it('leaves finished runs and attachments for the next normal turn', async () => {
     const post = sinon
