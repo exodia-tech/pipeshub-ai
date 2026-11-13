@@ -85,6 +85,9 @@ export interface SlackUserRecord {
 }
 
 export interface TypedSlackClient {
+  files?: {
+    uploadV2: (params: { channel_id: string; thread_ts: string; file: Buffer; filename: string; title: string }) => Promise<unknown>;
+  };
   botUserId?: string;
   users: {
     info: (params: { user: string }) => Promise<{
