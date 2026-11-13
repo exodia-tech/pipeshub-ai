@@ -32,6 +32,7 @@ import {
   SERVICE_TOKEN_APP_CLIENT_ID_PREFIX,
 } from '../../oauth_provider/constants/constants';
 import { OAuthScopeNames } from '../../../libs/enums/oauth-scopes.enum';
+import { effectiveScopes } from '../../../libs/middlewares/require-scopes.middleware';
 import {
   CODE_GRAPH_INSTRUCTIONS,
   CODE_GRAPH_TOOL_NAMES,
@@ -145,9 +146,8 @@ function callsATool(body: unknown): boolean {
 
 /** Session users pass, as in requireScopes; an OAuth token or PAT needs code:read. */
 function mayReadCode(user: Record<string, unknown> | undefined): boolean {
-  if (!user?.isOAuth) return true;
-  const scopes: unknown = user.oauthScopes;
-  return Array.isArray(scopes) && scopes.includes(OAuthScopeNames.CODE_READ);
+  const scopes = effectiveScopes(user ?? {});
+  return scopes === undefined || scopes.includes(OAuthScopeNames.CODE_READ);
 }
 
 /**
@@ -161,9 +161,8 @@ function mayReadCode(user: Record<string, unknown> | undefined): boolean {
 export function mcpToolScopes(
   user: Record<string, unknown> | undefined,
 ): Array<'read' | 'write'> | undefined {
-  if (!user?.isOAuth) return undefined;
-  const scopes: unknown = user.oauthScopes;
-  const held = Array.isArray(scopes) ? scopes : [];
+  const held = effectiveScopes(user ?? {});
+  if (held === undefined) return undefined;
   const holds = (...wanted: OAuthScopeNames[]): boolean =>
     wanted.every((scope) => held.includes(scope));
   if (!holds(OAuthScopeNames.KB_WRITE, OAuthScopeNames.KB_UPLOAD))
@@ -177,11 +176,7 @@ export function mcpToolScopes(
 function heldOAuthScopes(
   user: Record<string, unknown> | undefined,
 ): string[] | undefined {
-  if (user?.isOAuth !== true) return undefined;
-  const scopes: unknown = user.oauthScopes;
-  return Array.isArray(scopes)
-    ? scopes.filter((s): s is string => typeof s === 'string')
-    : [];
+  return effectiveScopes(user ?? {});
 }
 
 /**
@@ -244,6 +239,10 @@ export const handleMCPRequest = (appConfig: AppConfig) => {
       const { PipeshubCore } = await coreModule;
       const { HTTPClient } = await httpModule;
       const { requiredOAuthScopes } = await oauthScopesModule;
+      if (Array.isArray(req.user?.featureScopes) && missingToolScopes(req.body, req.user.featureScopes, requiredOAuthScopes).length > 0) {
+        sendMcpError(res, 403, 'Your access group does not allow this action. Ask an administrator to review your feature permissions.');
+        return;
+      }
 
       const held = heldOAuthScopes(req.user);
       if (held) {

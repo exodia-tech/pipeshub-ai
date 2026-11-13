@@ -6428,5 +6428,14 @@
     },
     "nothingNew": "U tohoto uzlu není co dalšího zobrazit.",
     "tableOnly": "Zobrazuje se jen tabulka, aby vše zůstalo plynulé."
+  },
+  "groupScopes": {
+    "title": "Oprávnění funkcí",
+    "content": "Přístup k obsahu",
+    "limit": "Omezit dostupné akce",
+    "about": "O oprávněních funkcí",
+    "unrestricted": "Tato skupina nepřidává žádná omezení funkcí.",
+    "selected": "Povolené akce: {{count}}",
+    "help": "Platí omezení všech skupin. Nadále platí role, oprávnění tokenů a přístup k obsahu. Správci si zachovají přístup ke správě."
   }
 }

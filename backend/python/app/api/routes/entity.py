@@ -69,6 +69,16 @@ class AccessGroupMembersRequest(BaseModel):
     userIds: list[str] = Field(min_length=1, max_length=500)
 
 
+@router.get("/access-groups/effective-scopes", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
+async def effective_group_scopes(request: Request) -> JSONResponse:
+    org_id, user_id = request.state.user.get("orgId"), request.state.user.get("userId")
+    if not org_id or not user_id:
+        raise HTTPException(status_code=401, detail="Service token missing identity")
+    graph = (await get_services(request))["graph_provider"]
+    scopes = await GroupResourceAccess(graph).feature_scopes_for_user(org_id, user_id)
+    return JSONResponse(content={"scopes": scopes})
+
+
 @router.get("/access-groups/{group_id}/access", dependencies=[Depends(require_service_token(TokenScopes.ACCESS_GROUP_MANAGE))])
 async def get_group_resource_access(request: Request, group_id: uuid.UUID) -> JSONResponse:
     org_id = request.state.user.get("orgId")

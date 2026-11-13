@@ -50,6 +50,17 @@ class ResourcePolicy(BaseModel):
     defaultAllow: StrictBool = True
     revision: int = Field(default=0, ge=0, strict=True)
     rules: list[ResourceRule] = Field(default_factory=list, max_length=1000)
+    featureScopes: list[str] | None = Field(default=None, max_length=100)
+
+    @field_validator("featureScopes")
+    @classmethod
+    def valid_feature_scopes(cls, scopes: list[str] | None) -> list[str] | None:
+        if scopes is not None and (
+            len(set(scopes)) != len(scopes)
+            or any(not re.fullmatch(r"[a-z][a-z0-9]*:[a-z][a-z0-9]*", scope) for scope in scopes)
+        ):
+            raise ValueError("Invalid feature scopes")
+        return scopes
 
     @field_validator("rules")
     @classmethod
@@ -100,6 +111,9 @@ class GroupResourceAccess:
 
     async def save(self, org_id: str, group_id: str, policy: ResourcePolicy) -> None:
         await self.group(org_id, group_id)
+        if "featureScopes" not in policy.model_fields_set:
+            previous = await self.read(org_id, group_id)
+            policy = policy.model_copy(update={"featureScopes": previous.featureScopes})
         for rule in policy.rules:
             collection, key = split_ref(rule.ref)
             doc = await self.graph.get_document(key, collection, raise_on_error=True)
@@ -117,6 +131,30 @@ class GroupResourceAccess:
                 "The group policy changed; reload before saving"
             )
         await notify_principals_changed(org_id)
+
+    async def feature_scopes_for_user(self, org_id: str, user_id: str) -> list[str] | None:
+        mapping = await self.graph.get_graph_user_keys_by_mongo_user_ids(
+            [user_id], org_id=org_id, chunk_size=500
+        )
+        user_key = mapping[user_id]
+        user = await self.graph.get_document(user_key, CollectionNames.USERS.value, raise_on_error=True)
+        if not user or user.get("orgId") != org_id or user.get("isActive") is not True:
+            raise ValueError("Active user not found")
+        edges = await self.graph.get_edges_from_node(
+            f"users/{user_key}", CollectionNames.PERMISSION.value, raise_on_error=True
+        )
+        allowed: set[str] | None = None
+        for ref in {self.edge_ref(edge, "to") for edge in edges}:
+            if not ref or not ref.startswith("teams/"):
+                continue
+            group = await self.graph.get_document(ref.split("/", 1)[1], CollectionNames.TEAMS.value, raise_on_error=True)
+            if not group or group.get("orgId") != org_id or group.get("exodiaAccessGroup") is not True:
+                continue
+            policy = ResourcePolicy.model_validate_json(group["exodiaResourcePolicy"]) if group.get("exodiaResourcePolicy") else ResourcePolicy()
+            if policy.featureScopes is not None:
+                scopes = set(policy.featureScopes)
+                allowed = scopes if allowed is None else allowed & scopes
+        return sorted(allowed) if allowed is not None else None
 
     @staticmethod
     def edge_ref(edge: dict, side: str) -> str | None:

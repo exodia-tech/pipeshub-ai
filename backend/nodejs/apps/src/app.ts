@@ -18,6 +18,7 @@ import { createGraphViewRouter } from './modules/enterprise_search/routes/graph-
 import { ErrorMiddleware } from './libs/middlewares/error.middleware';
 import { OAuthTokenService } from './modules/oauth_provider/services/oauth_token.service';
 import { registerOAuthTokenService } from './libs/services/oauth-token-service.provider';
+import { groupScopeResolver } from './libs/services/group-scope-policy';
 import { requestContextMiddleware } from './libs/middlewares/request.context';
 import { accessLog } from './libs/middlewares/access-log.middleware';
 import {
@@ -489,6 +490,7 @@ export class Application {
   }
 
   private configureMiddleware(appConfig: AppConfig): void {
+    this.app.locals.resolveGroupScopes = groupScopeResolver(appConfig);
     // Unset means trust no proxy: req.ip is the socket address.
     if (appConfig.trustProxy.warning) {
       this.logger.warn(appConfig.trustProxy.warning);

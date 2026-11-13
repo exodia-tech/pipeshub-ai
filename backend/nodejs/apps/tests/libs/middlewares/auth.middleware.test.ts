@@ -180,6 +180,17 @@ describe('AuthMiddleware', () => {
       const userQuery = createMockQuery({ _id: 'user1', orgId: 'org1', isDeleted: false })
       sinon.stub(Users, 'findOne').returns(userQuery)
     })
+    it('replaces token-claimed feature grants with the live request policy', async () => {
+      tokenService.verifyToken.resolves({ userId: 'user1', orgId: 'org1', role: 'member', iat: Math.floor(Date.now() / 1000), featureScopes: ['org:admin'] })
+      sinon.stub(UserActivities, 'findOne').returns(createMockQuery(null))
+      const resolver = sinon.stub().resolves([])
+      const req = createMockRequest({ headers: { authorization: `Bearer ${validToken}` }, app: { locals: { resolveGroupScopes: resolver } } })
+      const next = createMockNext()
+      await authMiddleware.authenticate(req, createMockResponse(), next)
+      expect(next.calledOnceWithExactly()).to.be.true
+      expect(req.user.featureScopes).to.deep.equal([])
+      expect(resolver.calledOnceWithExactly('org1', 'user1')).to.be.true
+    })
 
     it('should authenticate and call next() on valid regular token with no logout/password activity', async () => {
       const decoded = {

@@ -6353,5 +6353,14 @@
     },
     "nothingNew": "No hay nada más que mostrar para este nodo.",
     "tableOnly": "Se muestra solo la tabla para mantener la fluidez."
+  },
+  "groupScopes": {
+    "title": "Permisos de funciones",
+    "content": "Acceso al contenido",
+    "limit": "Limitar las acciones disponibles",
+    "about": "Acerca de los permisos de funciones",
+    "unrestricted": "Este grupo no añade límites a las funciones.",
+    "selected": "Acciones permitidas: {{count}}",
+    "help": "Se aplican los límites de todos los grupos. Los roles, los permisos de los tokens y el acceso al contenido siguen vigentes. Los administradores conservan el acceso de gestión."
   }
 }

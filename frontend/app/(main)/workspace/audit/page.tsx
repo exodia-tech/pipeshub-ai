@@ -510,6 +510,15 @@ export default function AuditPage() {
                     </Badge>
                   </Flex>
                 ))}
+                {detail.resource_policy.feature_scopes !== undefined && (
+                  <Flex direction="column" gap="1">
+                    <Text size="2" weight="medium">{t("groupScopes.title")}</Text>
+                    <Text size="2" style={{ overflowWrap: "anywhere" }}>
+                      {detail.resource_policy.feature_scopes === null ? t("groupScopes.unrestricted") :
+                        detail.resource_policy.feature_scopes.length ? detail.resource_policy.feature_scopes.join(", ") : t("groupScopes.selected", { count: 0 })}
+                    </Text>
+                  </Flex>
+                )}
               </Flex>
             )}
           </Flex>

@@ -17,6 +17,7 @@ export interface AccessGroupMember {
 export interface ResourcePolicy {
   defaultAllow: boolean;
   revision?: number;
+  featureScopes?: string[] | null;
   rules: { ref: string; allow: boolean }[];
 }
 export interface GroupResource {
@@ -32,6 +33,10 @@ export interface GroupResource {
 }
 
 export const AccessGroupsApi = {
+  async scopes(): Promise<{ name: string; description: string; category: string }[]> {
+    const { data } = await apiClient.get<{ scopes: { name: string; description: string; category: string }[] }>('/api/v1/access-groups/scopes');
+    return data.scopes;
+  },
   async policy(id: string): Promise<ResourcePolicy> {
     const { data } = await apiClient.get<{ policy: ResourcePolicy }>(
       `/api/v1/access-groups/${id}/access`,

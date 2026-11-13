@@ -54,7 +54,7 @@ def test_admin_can_restrict_a_group_to_one_channel_without_cross_tenant_grants()
         assert client.put(path, headers=headers, json={"defaultAllow": False, "rules": [{"ref": "recordGroups/finance", "allow": True}]}).status_code == 200
         saved = client.get(path, headers=headers)
         assert saved.status_code == 200
-        assert saved.json()["policy"] == {"defaultAllow": False, "revision": 1, "rules": [{"ref": "recordGroups/finance", "allow": True}]}
+        assert saved.json()["policy"] == {"defaultAllow": False, "revision": 1, "rules": [{"ref": "recordGroups/finance", "allow": True}], "featureScopes": None}
         assert client.put(path, headers=headers, json={"defaultAllow": True, "revision": 0, "rules": []}).status_code == 409
         assert client.put(path, headers=headers, json={"defaultAllow": True, "rules": [{"ref": "recordGroups/foreign", "allow": True}]}).status_code == 404
     assert json.loads(docs["teams", GROUP]["exodiaResourcePolicy"])["defaultAllow"] is False

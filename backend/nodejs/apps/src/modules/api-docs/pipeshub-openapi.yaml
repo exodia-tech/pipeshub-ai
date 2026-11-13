@@ -25469,12 +25469,37 @@ paths:
         '403': { description: Administrator access required }
         '404': { description: Group not found }
         '503': { description: Outcome may be unknown; check the group before retrying }
+  /access-groups/scopes:
+    get:
+      tags: [Administration]
+      summary: List native action scopes available for group limits
+      description: Uses the platform OAuth catalogue. Identity, refresh-token and administrator-only scopes are excluded. Groups do not grant admin rights.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Native scope names, descriptions and categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scopes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        description: { type: string }
+                        category: { type: string }
+        '403': { description: Administrator required }
+        '503': { description: Permissions unavailable }
   /access-groups/{id}/access:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
     get:
       tags: [Administration]
-      summary: Read group restrictions on source resources
+      summary: Read content and native feature-scope restrictions
       responses:
         '200': { description: Saved policy; source permissions remain authoritative }
         '403': { description: Administrator required }
@@ -25482,7 +25507,7 @@ paths:
         '503': { description: Policy storage unavailable }
     put:
       tags: [Administration]
-      summary: Save audited group restrictions on source resources with revision checking
+      summary: Save audited content and feature-scope restrictions with revision checking
       requestBody:
         required: true
         content:
@@ -25493,6 +25518,13 @@ paths:
               properties:
                 defaultAllow: { type: boolean }
                 revision: { type: integer, minimum: 0, description: Revision returned by the preceding read }
+                featureScopes:
+                  type: array
+                  nullable: true
+                  maxItems: 100
+                  uniqueItems: true
+                  description: Native member-eligible action scopes from /access-groups/scopes. Null removes this group ceiling; an empty array denies scoped actions. Omit to preserve the saved ceiling. Existing admin roles and token grants still apply.
+                  items: { type: string }
                 rules:
                   type: array
                   maxItems: 1000

@@ -433,11 +433,19 @@ def require_scopes(
             raise AuthRejected(status.HTTP_403_FORBIDDEN, "This route does not accept service tokens",
                                reason="service_token_not_allowed")
 
-        if not user.get("isOAuth", False):
-            return
+        limits = None
+        if any(":" in scope for scope in required_scopes) and not is_request_admin(request):
+            from app.services.group_resource_policy import GroupResourceAccess
 
-        token_scopes = user.get("oauthScopes", [])
-        if not any(scope in token_scopes for scope in required_scopes):
+            try:
+                graph = request.app.state.graph_provider
+                limits = await GroupResourceAccess(graph).feature_scopes_for_user(user["orgId"], user["userId"])
+            except Exception as exc:
+                raise AuthRejected(status.HTTP_503_SERVICE_UNAVAILABLE, "Feature permissions could not be verified",
+                                   reason="feature_permissions_unavailable") from exc
+        token_scopes = user.get("oauthScopes", []) if user.get("isOAuth", False) else None
+        if not any((token_scopes is None or scope in token_scopes) and (limits is None or scope in limits)
+                   for scope in required_scopes):
             raise AuthRejected(status.HTTP_403_FORBIDDEN, f"Insufficient scope. Required: {' or '.join(required_scopes)}",
                                reason="insufficient_scope")
 

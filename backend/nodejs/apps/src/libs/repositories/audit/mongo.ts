@@ -59,6 +59,7 @@ interface AuditRow {
   resource_policy?: {
     default_allow: boolean;
     revision: number;
+    feature_scopes?: string[] | null;
     rules: { resource_ref: string; allow: boolean }[];
   };
 }
@@ -103,6 +104,7 @@ const schema = new Schema<AuditRow>(
         {
           default_allow: Boolean,
           revision: Number,
+          feature_scopes: { type: [String], default: undefined },
           rules: [
             new Schema(
               {

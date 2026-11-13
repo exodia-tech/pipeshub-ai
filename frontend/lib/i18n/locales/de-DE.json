@@ -6278,5 +6278,14 @@
     },
     "nothingNew": "Für diesen Knoten gibt es nichts weiter anzuzeigen.",
     "tableOnly": "Es wird nur die Tabelle angezeigt, damit alles flüssig bleibt."
+  },
+  "groupScopes": {
+    "title": "Funktionsberechtigungen",
+    "content": "Inhaltszugriff",
+    "limit": "Verfügbare Aktionen einschränken",
+    "about": "Über Funktionsberechtigungen",
+    "unrestricted": "Diese Gruppe schränkt keine Funktionen ein.",
+    "selected": "Erlaubte Aktionen: {{count}}",
+    "help": "Die Einschränkungen aller Gruppen gelten gemeinsam. Rollen, Token-Berechtigungen und Inhaltszugriff gelten weiterhin. Administratoren behalten den Verwaltungszugriff."
   }
 }

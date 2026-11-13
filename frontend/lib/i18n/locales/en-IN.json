@@ -6278,5 +6278,14 @@
     },
     "nothingNew": "Nothing more to show for this node.",
     "tableOnly": "Showing the table only, to keep things responsive."
+  },
+  "groupScopes": {
+    "title": "Feature permissions",
+    "content": "Content access",
+    "limit": "Limit available actions",
+    "about": "About feature permissions",
+    "unrestricted": "This group adds no feature limits.",
+    "selected": "Allowed actions: {{count}}",
+    "help": "Limits combine across groups. Existing roles, token scopes and content access still apply. Admins retain management access."
   }
 }

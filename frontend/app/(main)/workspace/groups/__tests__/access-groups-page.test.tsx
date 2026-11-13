@@ -52,6 +52,7 @@ vi.mock("../access-api", () => ({
       hasMore: false,
     })),
     savePolicy: vi.fn(),
+    scopes: vi.fn(async () => [{ name: 'agent:read', description: 'Read agents', category: 'Agents' }, { name: 'agent:execute', description: 'Execute agents', category: 'Agents' }]),
   },
 }));
 vi.mock("../../users/api", () => ({
@@ -89,6 +90,36 @@ describe("access groups", () => {
     state.admin = false;
     show();
     expect(AccessGroupsApi.list).not.toHaveBeenCalled();
+  });
+  it("saves native feature scopes while preserving content restrictions and revision", async () => {
+    vi.mocked(AccessGroupsApi.policy).mockResolvedValue({ defaultAllow: false, revision: 4,
+      rules: [{ ref: 'apps/slack', allow: true }], featureScopes: null });
+    show();
+    fireEvent.click(await screen.findByText('Finance'));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'groupScopes.title' }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole('button', { name: 'workspace.groups.actions.managePermissions' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'groupScopes.limit' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'agent:execute', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    await waitFor(() => expect(AccessGroupsApi.savePolicy).toHaveBeenCalledWith('g1', {
+      defaultAllow: false, revision: 4, rules: [{ ref: 'apps/slack', allow: true }], featureScopes: ['agent:read'],
+    }));
+  });
+  it("keeps failed feature edits reviewable and cancels them without changing the policy", async () => {
+    vi.mocked(AccessGroupsApi.policy).mockResolvedValue({ defaultAllow: true, revision: 7, rules: [], featureScopes: null });
+    vi.mocked(AccessGroupsApi.savePolicy).mockRejectedValueOnce(new Error('Another administrator changed this policy. Reload it before saving.'));
+    show();
+    fireEvent.click(await screen.findByText('Finance'));
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'groupScopes.title' }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole('button', { name: 'workspace.groups.actions.managePermissions' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'groupScopes.limit' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'agent:execute', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(await screen.findByText('Another administrator changed this policy. Reload it before saving.')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'agent:execute', exact: true }).getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }));
+    expect(screen.getByRole('switch', { name: 'groupScopes.limit' }).getAttribute('aria-checked')).toBe('false');
+    expect(AccessGroupsApi.savePolicy).toHaveBeenCalledTimes(1);
   });
   it("shows group metadata in the table and cancels description changes", async () => {
     vi.mocked(AccessGroupsApi.list).mockResolvedValue([{
@@ -493,7 +524,7 @@ describe("access groups", () => {
     fireEvent.click(await screen.findByText("Finance"));
     fireEvent.mouseDown(
       screen.getByRole("tab", {
-        name: /workspace.groups.detail.accessPermissions/,
+        name: /groupScopes.content/,
       }),
       { button: 0, ctrlKey: false },
     );

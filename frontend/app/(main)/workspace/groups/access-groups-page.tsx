@@ -34,6 +34,7 @@ import {
 import { PAGE_PADDING_TOP } from "../components/settings-page-container";
 import { usePaginatedUserOptions } from "../hooks/use-paginated-user-options";
 import { GroupAccessPanel } from "./group-access-panel";
+import { GroupScopesPanel } from "./group-scopes-panel";
 import { AccessGroupsApi, type AccessGroup } from "./access-api";
 import { GroupNameInput } from "./components/group-name-input";
 import { formatDate } from "@/lib/utils/formatters";
@@ -400,7 +401,7 @@ export default function AccessGroupsPage() {
         }}
         title={selectedGroup?.name ?? ""}
         icon="shield"
-        hideFooter={tab === "access"}
+        hideFooter={tab !== "members"}
         primaryLabel={t(
           editing ? "workspace.groups.edit.save" : "workspace.groups.edit.edit",
         )}
@@ -434,8 +435,9 @@ export default function AccessGroupsPage() {
               {t("accessGroups.members")}
             </Tabs.Trigger>
             <Tabs.Trigger value="access">
-              {t("workspace.groups.detail.accessPermissions")}
+              {t("groupScopes.content")}
             </Tabs.Trigger>
+            <Tabs.Trigger value="features" aria-label={t("groupScopes.title")}>{t("groupScopes.title")}</Tabs.Trigger>
           </Tabs.List>
           <Box pt="4">
             <Tabs.Content value="members">
@@ -622,6 +624,9 @@ export default function AccessGroupsPage() {
                   onDirtyChange={setAccessDirty}
                 />
               )}
+            </Tabs.Content>
+            <Tabs.Content value="features">
+              {selected && <GroupScopesPanel key={selected} groupId={selected} onDirtyChange={setAccessDirty} onBusyChange={setBusy} />}
             </Tabs.Content>
           </Box>
         </Tabs.Root>
