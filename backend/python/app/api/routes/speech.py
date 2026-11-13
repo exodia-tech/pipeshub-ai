@@ -6,7 +6,7 @@ configured, the client falls back to the browser's Web Speech API.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 from app.api.middlewares.auth import require_scopes
 from app.config.configuration_service import ConfigurationService
 from app.config.constants.service import OAuthScopes
-from app.containers.query import QueryAppContainer
 from app.services.model_identity.boundary import principal_from_request_user
 from app.services.model_identity.runtime import call_scope
 from app.services.model_identity.workload import Workload
@@ -27,6 +26,9 @@ from app.utils.llm import (
     get_tts_model_instance,
 )
 from app.utils.user_messages import action_failed
+
+if TYPE_CHECKING:
+    from app.containers.query import QueryAppContainer
 
 router = APIRouter()
 

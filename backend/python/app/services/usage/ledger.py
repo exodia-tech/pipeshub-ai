@@ -232,9 +232,10 @@ class UsageLedger:
                 "SELECT rates FROM usage_rates WHERE org_id=? AND provider=? AND model=?",
                 (e["org_id"], e["provider"], e["model"]),
             ).fetchone()
-            rates = (
-                json.loads(row[0]) if row else catalog_rates(e["provider"], e["model"])
-            )
+            rates = json.loads(row[0]) if row else None
+            # Speech can be billed by audio tokens, duration or characters; text rates are not interchangeable.
+            if not row and e["kind"] not in ("speech", "speech_to_text", "text_to_speech"):
+                rates = catalog_rates(e["provider"], e["model"])
             e["pricing_source"] = (
                 "custom" if row else "catalog" if rates else "unpriced"
             )
